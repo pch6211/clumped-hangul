@@ -15295,6 +15295,84 @@ canvas.addEventListener('pointerdown', e => {
     }
   }
 });
+// [감상모드 통합] 캔버스 우클릭 컨텍스트 메뉴 — 자모 우클릭 시 편집/모임꼴/획붙임해제 옵션.
+canvas.addEventListener('contextmenu', e => {
+  if (!world) return;
+  const p = canvasCoords(e);
+  const pr = pickRadius();
+  const r2 = pr * pr;
+  // 가장 가까운 노드 + body 픽 (호버 알고리즘 재사용)
+  let _hb = null, _hi = -1, _hd = Infinity;
+  for (const body of world.bodies) {
+    for (let ni = 0; ni < body.nodes.length; ni++) {
+      const n = body.nodes[ni];
+      const dx = n.x - p.x, dy = n.y - p.y;
+      const dd = dx * dx + dy * dy;
+      if (dd < _hd) { _hd = dd; _hb = body; _hi = ni; }
+    }
+  }
+  if (!_hb || _hd > r2 * 4) return;  // 자모 hit 반경 밖이면 기본 컨텍스트 메뉴 허용
+  e.preventDefault();
+  // 자모 그룹 결정
+  let grp = null;
+  if (Array.isArray(_hb.jamos)) {
+    for (const j of _hb.jamos) {
+      if (j.nodeIndices && j.nodeIndices.indexOf(_hi) >= 0) { grp = j; break; }
+    }
+  }
+  const items = [];
+  if (_hb.isPunct) {
+    // 비한글: "{char} 편집"
+    items.push({
+      label: _hb.ch + ' 편집',
+      action: () => _openEditorWithJamo(_hb.ch)
+    });
+  } else if (grp) {
+    // 한글 음절: 자모 편집 + 모임꼴 편집 + (붙임이 있으면) 획 붙임 해제
+    const d = (typeof decomposeSyllable === 'function') ? decomposeSyllable(_hb.ch) : null;
+    let jamoChar = null;
+    if (d && grp.name) {
+      if (grp.name.indexOf('cho') === 0)  jamoChar = d.cho;
+      else if (grp.name.indexOf('jung') === 0) jamoChar = d.jung;
+      else if (grp.name.indexOf('jong') === 0) jamoChar = d.jong;
+    }
+    if (jamoChar) {
+      items.push({
+        label: jamoChar + ' 편집',
+        action: () => _openEditorWithJamo(jamoChar)
+      });
+    }
+    // 모임꼴 편집 — 현재 음절의 패턴(미/므/믜/밈/믐/믬) 자동 선택
+    if (typeof _moimkkolPatternKey === 'function' && typeof MOIMKKOL_CHARS !== 'undefined') {
+      const _pk = _moimkkolPatternKey(_hb.ch);
+      const _mk = _pk ? MOIMKKOL_CHARS.find(c => _moimkkolPatternKey(c) === _pk) : null;
+      if (_mk) {
+        items.push({
+          label: '모임꼴 편집',
+          action: () => _openEditorWithMoimkkol(_mk)
+        });
+      }
+    }
+    // 획 붙임 해제 — 클릭한 자모에 연결된 모든 자석 페어 제거
+    if (Array.isArray(_hb.magnetPairs) && _hb.magnetPairs.length > 0 && grp.nodeIndices) {
+      const _inJ = new Set(grp.nodeIndices);
+      const _pairs = _hb.magnetPairs.filter(pr => _inJ.has(pr[0]) || _inJ.has(pr[1]));
+      if (_pairs.length > 0) {
+        items.push({
+          label: '획 붙임 해제',
+          action: () => {
+            const _snap = _pairs.slice();
+            for (const pr of _snap) {
+              try { _detachCommit(_hb, pr[0], pr[1]); } catch (_) {}
+            }
+          }
+        });
+      }
+    }
+  }
+  if (items.length === 0) return;
+  _showViewCanvasCtxMenu(e.clientX, e.clientY, items);
+});
 canvas.addEventListener('pointermove', e => {
   const p = canvasCoords(e);
   if (draggedNode) {
@@ -15370,6 +15448,72 @@ canvas.addEventListener('pointermove', e => {
   }
 });
 let _hoverJamo = null;  // [F4] 감상모드 호버 중인 자모 { body, idxs }
+
+// [감상모드 통합] 캔버스 우클릭 컨텍스트 메뉴 — .mhContextMenu 패턴 (커피 메뉴와 동일 디자인).
+//   editorCtxMenu 는 .editor 자식이라 편집창 닫혀있으면 안 보임 → 별도 #viewCanvasCtxMenu 생성.
+function _showViewCanvasCtxMenu(x, y, items) {
+  const old = document.getElementById('viewCanvasCtxMenu');
+  if (old) old.remove();
+  const menu = document.createElement('div');
+  menu.id = 'viewCanvasCtxMenu';
+  menu.className = 'mhContextMenu show';
+  items.forEach(it => {
+    const d = document.createElement('div');
+    d.className = 'ctxItem';
+    d.textContent = it.label;
+    d.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      menu.remove();
+      try { it.action(); } catch (_) {}
+    });
+    menu.appendChild(d);
+  });
+  document.body.appendChild(menu);
+  const mr = menu.getBoundingClientRect();
+  let mx = Math.max(8, Math.min(window.innerWidth - mr.width - 8, x));
+  let my = Math.max(8, Math.min(window.innerHeight - mr.height - 8, y));
+  menu.style.left = mx + 'px';
+  menu.style.top = my + 'px';
+  // 외부 클릭 시 닫기
+  setTimeout(() => {
+    const closer = (ev) => {
+      if (!menu.contains(ev.target)) { menu.remove(); document.removeEventListener('click', closer, true); document.removeEventListener('contextmenu', closer, true); }
+    };
+    document.addEventListener('click', closer, true);
+    document.addEventListener('contextmenu', closer, true);
+  }, 0);
+}
+
+// [감상모드 통합] 편집창을 열고 특정 자모/문자를 자동 선택. 편집창이 닫혀있으면 함께 연 뒤
+//   자모 그리드의 해당 버튼을 프로그램적으로 클릭(기존 click 핸들러 재사용).
+function _openEditorWithJamo(jamoChar) {
+  if (!jamoChar) return;
+  const overlay = document.getElementById('editor');
+  if (!overlay) return;
+  if (!overlay.classList.contains('open')) {
+    if (typeof openEditor === 'function') openEditor();
+  }
+  requestAnimationFrame(() => {
+    const list = document.getElementById('editorJamoList');
+    if (!list) return;
+    const btn = list.querySelector('.jamoBtn[data-id="' + jamoChar + '"]');
+    if (btn) btn.click();
+  });
+}
+
+// [감상모드 통합] 편집창을 열고 특정 모임꼴 패턴을 자동 선택.
+function _openEditorWithMoimkkol(moimkkolChar) {
+  if (!moimkkolChar) return;
+  const overlay = document.getElementById('editor');
+  if (!overlay) return;
+  if (!overlay.classList.contains('open')) {
+    if (typeof openEditor === 'function') openEditor();
+  }
+  requestAnimationFrame(() => {
+    if (typeof openMoimkkolView === 'function') openMoimkkolView(moimkkolChar);
+  });
+}
+
 function endDrag(e) {
   if (!draggedNode) return;
   // [항목3·4] 붙임 파트너가 잡혀 있으면 디자인에 앞/뒤붙임 기록 + world 재빌드.
