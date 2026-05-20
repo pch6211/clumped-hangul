@@ -36,14 +36,16 @@
       border: 1px solid currentColor; border-radius: 0; outline: none;
       font-family: inherit; font-size: 10px; line-height: 1.4; letter-spacing: 0.5px;
     }
-    /* 모바일 햄버거 메뉴 버튼(☰) — 좌상단 고정. 속성창 열기. ✕/▩ 와 동일하게 특수문자 자체가 버튼. */
+    /* 모바일 햄버거 메뉴 버튼(☰) — 좌상단 고정. 속성창 열기. ✕/▩/⚀ 와 동일하게 특수문자 자체가 버튼.
+       버튼 왼쪽 끝 = 입력바 좌측 마진(24px)과 정렬. 크기·정렬 규칙은 .die(14px) 와 통일. */
     #mobileMenuBtn {
       display: inline-flex; align-items: center; justify-content: center;
-      position: fixed; top: 8px; left: 12px; z-index: 130;
-      padding: 8px 12px; line-height: 1;
-      font-family: 'Noto Sans KR', sans-serif; font-size: 18px;
+      position: fixed; top: 8px; left: 24px; z-index: 130;
+      padding: 8px 8px 8px 0; height: 14px; line-height: 1;
+      font-family: 'Noto Sans KR', sans-serif; font-size: 14px;
       color: var(--editor-fg, currentColor); background: transparent;
       cursor: pointer; user-select: none; pointer-events: auto;
+      vertical-align: middle;
     }
     /* 패널 = 화면 좌측 2/3 오버레이. 우측 1/3 영역은 캔버스(출력화면)가 보임.
        우측 끝에 1px 선 = 패널 div 의 우측 경계. 좌우 여백은 모바일 입력바(24px)와 동일 톤. */
@@ -70,14 +72,16 @@
     .panel.open #panelTextTitle,
     .panel.open #mainText,
     .panel.open #panelGuide { display: none !important; }
-    /* 패널 우상단 뒤로가기(←) — 패널의 우측 경계(2/3 지점) 안쪽 12px 에 고정 */
+    /* 패널 우상단 뒤로가기(←) — 패널의 우측 경계(2/3 지점) 안쪽 12px 에 고정.
+       크기·정렬 규칙은 .die(14px) 와 통일. */
     .panel.open .panelMobileBack {
       display: inline-flex; align-items: center; justify-content: center;
       position: fixed; top: 8px; right: calc((100vw / 3) + 12px); z-index: 210;
-      padding: 8px 12px; line-height: 1;
-      font-family: 'Noto Sans KR', sans-serif; font-size: 18px;
+      padding: 8px 0 8px 8px; height: 14px; line-height: 1;
+      font-family: 'Noto Sans KR', sans-serif; font-size: 14px;
       color: var(--editor-fg, currentColor); background: var(--editor-bg, transparent);
       cursor: pointer; user-select: none;
+      vertical-align: middle;
     }
   }
   #universe { position: fixed; inset: 0; width: 100vw; height: 100vh; display: block; background: transparent; cursor: default; }
@@ -298,7 +302,7 @@
   .hud .hudSection .hudSectionLine { display: none !important; }
   .hud .hudItem { display: inline-block; white-space: nowrap; margin-right: 14px; }
   .hud .hudItem:last-child { margin-right: 0; }
-  .hud .hudItem b { font-weight: 500; }
+  .hud .hudItem b { font-weight: normal; }
   .hud .hudToggleBtn,
   .hud .hudClickable { cursor: pointer; pointer-events: auto; }
   .hud.hidden { display: none; }
@@ -376,7 +380,7 @@
     border-left: 1px solid currentColor;
   }
   .guideList .guideLine { font-size: 10px; letter-spacing: 1px; line-height: 1.6; white-space: nowrap; opacity: 1; }
-  .guideList .guideLine b { font-weight: 500; }
+  .guideList .guideLine b { font-weight: normal; }
   .guideList .guideLine .gk { opacity: 1; margin-left: 4px; }
   .guideList .guideSub { margin-top: 12px; opacity: 1; font-size: 10px; letter-spacing: 1px; }
   /* 에디터창 가이드: 박스 위치는 그대로(우측, margin-left:auto)·텍스트만 좌측 정렬 */
@@ -446,7 +450,7 @@
   .editor .stage { position: fixed; right: 401px; top: 24px; pointer-events: auto; display: none; }
   .editor .stage.shown { display: block; }
   .editor .stage .meta { display: flex; gap: 8px; align-items: baseline; margin-bottom: 7px; justify-content: flex-start; line-height: 1; }
-  .stageBtn { font-size: 10px; line-height: 1; user-select: none; flex: 0 0 auto; }
+  .stageBtn { display: inline-flex; align-items: center; justify-content: center; font-size: 10px; line-height: 1; height: 14px; user-select: none; flex: 0 0 auto; vertical-align: middle; }
   .stageBtn.closeX { cursor: pointer; }
   .stageBtn.dragHandle { cursor: grab; }
   .stageBtn.dragHandle.dragging { cursor: grabbing; }
@@ -481,7 +485,7 @@
   #addCharDialog .acdRow { display: block; margin-bottom: 8px; position: relative; }
   #addCharDialog select, #addCharDialog input[type="text"] { width: 100%; padding: 4px 6px; font-family: inherit; font-size: 10px; letter-spacing: 0.5px; background: var(--editor-bg, transparent); color: currentColor; border: 1px solid currentColor; border-radius: 0; outline: none; box-sizing: border-box; }
   #addCharDialog select { max-height: 200px; }
-  #addCharDialog .acdLabel { display: block; margin-bottom: 3px; font-weight: 500; }
+  #addCharDialog .acdLabel { display: block; margin-bottom: 3px; font-weight: normal; }
   /* 블록 선택 박스 — 텍스트 + 우측 화살표를 한 박스 안에 */
   #addCharDialog .acdBlockBox { display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 4px 6px; background: var(--editor-bg, transparent); color: currentColor; border: 1px solid currentColor; border-radius: 0; cursor: pointer; box-sizing: border-box; line-height: 1.2; user-select: none; }
   #addCharDialog .acdBlockBoxText { flex: 1 1 auto; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -518,7 +522,7 @@
 <body>
 <canvas id="universe"></canvas>
 <div class="hud" id="hud">
-  <div class="hudSection" id="hudMain"><span class="hudItem hudClickable" data-action="panel"><b>속성</b> S</span><span class="hudItem hudClickable" data-action="editor"><b>디자인 창</b> D</span><span class="hudItem hudClickable" data-action="random"><b>랜덤 설정</b> R</span><span class="hudItem hudClickable" data-action="text"><b>랜덤 글귀</b> T</span><span class="hudItem hudClickable" data-action="auto"><b>자동</b> A</span><span class="hudItem hudClickable" data-action="reset"><b>리셋</b> B</span><span class="hudItem"><b>자간</b> Alt ⇄</span><span class="hudItem"><b>행간</b> Alt ⇅</span><span class="hudItem"><b>수정</b> 획 당기기</span><span class="hudItem hudClickable" id="hudToggleBtn" title="가이드 표시 토글"><b>가이드 끄기</b> M</span></div>
+  <div class="hudSection" id="hudMain"><span class="hudItem hudClickable" data-action="panel"><b>설정 창</b> S</span><span class="hudItem hudClickable" data-action="editor"><b>편집 창</b> E</span><span class="hudItem hudClickable" data-action="random"><b>랜덤 설정</b> R</span><span class="hudItem hudClickable" data-action="text"><b>랜덤 글귀</b> T</span><span class="hudItem hudClickable" data-action="auto"><b>자동</b> A</span><span class="hudItem hudClickable" data-action="reset"><b>리셋</b> B</span><span class="hudItem"><b>자간</b> Alt ⇄</span><span class="hudItem"><b>행간</b> Alt ⇅</span><span class="hudItem"><b>수정</b> 획 당기기</span><span class="hudItem hudClickable" id="hudToggleBtn" title="가이드 표시 토글"><b>가이드 끄기</b> M</span></div>
 </div>
 <div id="introPanel" style="display:none;">
   <div class="introMeta">
@@ -14857,7 +14861,7 @@ window.addEventListener('keydown', e => {
   // e.code 사용 — 한글/일본어/중국어 IME, QWERTZ 등 모든 레이아웃에서 일관 동작
   const kc = e.code;
   if (kc === 'KeyS') { e.preventDefault(); togglePanel(); return; }
-  if (kc === 'KeyD') { e.preventDefault(); openEditor(); return; }
+  if (kc === 'KeyE') { e.preventDefault(); openEditor(); return; }
   if (kc === 'KeyR') { e.preventDefault(); randomizeAll(); return; }
   if (kc === 'KeyB') { e.preventDefault(); resetWorld(); return; }  // 리셋 — 현재 설정으로 글자 다시 출력
   if (kc === 'KeyT') { e.preventDefault(); applyRandomText(); return; }  // 글귀만 바꿈 — 설정 유지
@@ -15719,7 +15723,7 @@ function makeBarRow(label, mn, mx, step, getter, setter, opts) {
   row.className = 'row';
   row.innerHTML =
     '<div class="bar"><div class="fill"></div></div>' +
-    '<span class="lbv"><span class="lbvLabel" style="font-weight:500;"></span> <span class="lbvVal" style="cursor:pointer; text-decoration:underline; text-decoration-thickness:1px; text-underline-offset:2.5px;"></span></span>';
+    '<span class="lbv"><span class="lbvLabel"></span> <span class="lbvVal" style="cursor:pointer; text-decoration:underline; text-decoration-thickness:1px; text-underline-offset:2px;"></span></span>';
   const lbv = row.querySelector('.lbv');
   const lbvLabel = row.querySelector('.lbvLabel');
   const lbvVal = row.querySelector('.lbvVal');
@@ -16760,7 +16764,7 @@ function _applyMobileMode(force) {
     TEXT = MOBILE_NOTICE;
     // 기본 문구일 때는 입력창을 비워 placeholder(샘플 텍스트 톤)가 보이도록.
     if (mta) mta.value = '';
-    if (!_mobileRTimer) _mobileRTimer = setInterval(() => { if (typeof randomizeAll === 'function') randomizeAll(); }, 5000);
+    // 모바일 자동재생은 초기 OFF — 사용자가 주사위(R 글로벌 랜덤)·HUD 자동 토글 등으로 켜야 함.
   } else {
     TEXT = _pcText;                                   // 돌아올 때 PC 글귀 복원
     // 기본 문구이면 placeholder 표시(빈 value), 사용자 글귀이면 그대로 표시.
@@ -20623,9 +20627,7 @@ requestAnimationFrame(() => {
   if (_mbtn && !_mbtn._bound) { _mbtn.addEventListener('click', () => togglePanel()); _mbtn._bound = true; }
   const _back = document.getElementById('panelMobileBack');
   if (_back && !_back._bound) { _back.addEventListener('click', () => togglePanel()); _back._bound = true; }
-  if (_MOBILE && !_mobileRTimer) {
-    _mobileRTimer = setInterval(() => { if (typeof randomizeAll === 'function') randomizeAll(); }, 5000);
-  }
+  // [E4] 모바일 자동재생은 초기화면에서 OFF — 사용자가 주사위 버튼·HUD 토글 등으로 켜야 함.
   // 가이드 박스 폭 정수 스냅 — 초기 + 웹폰트 로드 후(글리프 advance 변동) 재스냅
   requestAnimationFrame(_snapGuideBoxWidths);
   if (document.fonts && document.fonts.ready) {
