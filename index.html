@@ -14771,12 +14771,12 @@ function draw() {
       const _ic = (typeof _bondInvColor === 'function') ? _bondInvColor() : currentFgColor();
       ctx.fillStyle = _ic; ctx.strokeStyle = _ic;
       const _hr = Math.max((PARAMS.nodeR || 0) / 2, 3);
-      // [v1.09] 호버 강조 = 모든 노드 (isBase 무관). dedupe 만 적용 (1 디자인 꼭짓점당 1).
-      //   사용자가 새로 그린 노드도 호버 강조됨. 'isBase 하드코딩' 제거.
+      // [v1.09] 호버 강조 = FACTORY_DEFAULTS 원본 노드만 (isBase === true). 1 디자인 꼭짓점당 1 dedupe.
+      //   서브디비전·편집창 추가·옛 데이터 추가 노드는 강조 X.
       const _hbest = new Map();
       _hoverJamo.idxs.forEach(i => {
         const n = _hb.nodes[i];
-        if (!n || n.inv) return;
+        if (!n || n.inv || n.isBase !== true) return;
         const m = (typeof _bondMapNode === 'function') ? _bondMapNode(_hb, i) : null;
         if (!m) { _hbest.set('idx#' + i, { idx: i, nd2: 0 }); return; }
         const key = m.part + '#' + m.designIdx;
