@@ -507,7 +507,7 @@
   .editor .stage .meta { display: flex; gap: 8px; align-items: baseline; margin-bottom: 7px; justify-content: flex-start; line-height: 1; }
   .stageBtn { display: inline-flex; align-items: center; justify-content: center; font-size: 10px; line-height: 1; height: 14px; user-select: none; flex: 0 0 auto; vertical-align: middle; }
   .stageBtn.closeX { cursor: pointer; }
-  .stageBtn.dragHandle { cursor: grab; }  /* 오늘 수정(font-size·height) 제거 → 기본 .stageBtn(10px·14px) 그대로 */
+  .stageBtn.dragHandle { cursor: grab; position: relative; top: -1px; }  /* [v1.09] 1px 위로 (다른 버튼과 시각 정렬) */
   .stageBtn.dragHandle.dragging { cursor: grabbing; }
   .editor .stage .meta .label { flex: 1 1 auto; text-align: left; }
   /* 노드/엣지 두 항목 간 간격 — HUD 항목 간격(margin-right: 14px)과 동일 */
