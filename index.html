@@ -338,12 +338,14 @@
   .panel::-webkit-scrollbar-button { display: none; height: 0; width: 0; }
   .panel.open { display: block; }
   /* 행: [bar 1fr][label_with_val 110px] */
-  .panel .row { display: grid; grid-template-columns: 1fr 50px; align-items: center; column-gap: 8px; height: 14px; margin-bottom: 2px; }
+  .panel .row { display: grid; grid-template-columns: 1fr 65px; align-items: center; column-gap: 8px; height: 14px; margin-bottom: 2px; }
   /* .row.disabled 클래스는 더 이상 사용하지 않음 */
   .panel .row .bar { position: relative; height: 8px; cursor: ew-resize; }
   .panel .row .bar::before { content: ''; position: absolute; inset: 0; background: currentColor; opacity: 0.16; }
   .panel .row .bar .fill { position: absolute; left: 0; top: 0; bottom: 0; background: currentColor; }
   .panel .row .lbv { font-family: inherit; opacity: 1; white-space: nowrap; overflow: visible; text-align: left; letter-spacing: 0.5px; }
+  .panel .row .lbvVal { cursor: pointer; position: relative; display: inline-block; }
+  .panel .row .lbvVal::after { content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 1px; background: currentColor; opacity: 0.4; }
   .panel .gap { height: 10px; }
   /* 입력창 — resize 핸들 제거(resize: none). 높이는 JS 가 내용에 맞춰 자동 조정 */
   .panel textarea { width: 100%; resize: none; overflow-y: hidden; padding: 4px 6px; border: 1px solid currentColor; background: transparent; color: currentColor; font-family: inherit; font-size: 10px; line-height: 1.4; letter-spacing: 0.5px; outline: none; box-sizing: border-box; margin-bottom: 15px; opacity: 1; min-height: 24px; }
@@ -421,7 +423,7 @@
   .editor.sidebar-hidden .sidebar { display: none !important; }
   /* 사이드바 = 입력창 + 자모 그리드 (우측, 설정창과 동일 높이/간격).
      bottom: var(--hud-h) — HUD 높이에 따라 자동 축소(설정창과 동일 동작). */
-  .editor .sidebar { position: fixed; right: calc(var(--ui-gap) - var(--sbw)); top: 24px; bottom: calc(var(--hud-h, 16px) + var(--g1-gap)); width: 309px; overflow-y: auto; overflow-x: hidden; padding-left: 8px; padding-right: 8px; pointer-events: auto; line-height: 1; scrollbar-width: thin; scrollbar-color: currentColor transparent; scrollbar-gutter: stable; box-sizing: border-box; }
+  .editor .sidebar { position: fixed; right: calc(var(--ui-gap) - var(--sbw)); top: 24px; bottom: calc(var(--hud-h, 16px) + var(--g1-gap)); width: 309px; overflow-y: auto; overflow-x: hidden; padding-left: 8px; padding-right: 0; pointer-events: auto; line-height: 1; scrollbar-width: thin; scrollbar-color: currentColor transparent; scrollbar-gutter: auto; box-sizing: border-box; }
   .editor .sidebar::-webkit-scrollbar { width: 8px; height: 8px; }
   .editor .sidebar::-webkit-scrollbar-track { background: transparent; }
   .editor .sidebar::-webkit-scrollbar-thumb { background: currentColor; opacity: 0.16; border-radius: 0; }
@@ -485,6 +487,8 @@
   .editor .marginBottom { bottom: -10px; left: 50%; transform: translateX(-50%); }
   .editor .marginLeft   { left: -17px;   top: 50%;  transform: translateY(-50%); }
   .editor .marginRight  { right: -17px;  top: 50%;  transform: translateY(-50%); }
+  /* 자모 디자인창 yShift(등장 높이) 입력은 사용자 요청에 따라 숨김. 모임꼴 디자인창 동일 입력은 유지. */
+  #editorHeightInput { display: none !important; }
   /* 캔버스 아래 버튼 행 — 원래대로 캔버스 하단에서 20px 아래 */
   .editor .toolBtnBottomRow { position: absolute; left: 0; right: 0; top: calc(100% + 20px); display: flex; flex-direction: row; gap: 8px; justify-content: flex-end; align-items: center; }
   .editor .toolBtnBottomRow .pillBtn { min-width: 70px; white-space: nowrap; }
@@ -14647,16 +14651,19 @@ function draw() {
     const _ic = _bondInvColor();
     ctx.save();
     ctx.setLineDash([]);
-    ctx.fillStyle = _ic; ctx.strokeStyle = _ic;
+    // 색상 정리: 노드(fill) = 동적 배경색, 획(stroke) = 동적 투명획 색.
+    ctx.fillStyle = currentBgColor();
+    ctx.strokeStyle = _ic;
+    ctx.lineWidth = 1;
     const _r = Math.max((PARAMS.nodeR || 0) / 2, 3);  // 점 크기 반영(가시성 하한 3px)
     const _selIdx = (_bond._partnerIdx != null) ? _bond._partnerIdx : -1;  // 지금 선택된(붙을) 노드
     _bond.cands.forEach(c => {
       if (c.idx === _selIdx) return;  // 선택 노드는 아래에서 강조로 따로 그림
-      const n = _bond.body.nodes[c.idx]; if (n) drawNodeShape(n, _r);  // 선택 가능 노드
+      const n = _bond.body.nodes[c.idx]; if (n) { drawNodeShape(n, _r); ctx.stroke(); }
     });
     const _sn = _bond.body.nodes[_bond.srcIdx];
-    if (_sn && _bond.srcIdx !== _selIdx) drawNodeShape(_sn, _r);  // 내가 잡은 노드
-    // [선택 노드 강조] 지금 붙을 노드 = 동적 글자색 코어만 → 다른 후보(단색 점)와 구분.
+    if (_sn && _bond.srcIdx !== _selIdx) { drawNodeShape(_sn, _r); ctx.stroke(); }
+    // [선택 노드 강조] 지금 붙을 노드 = 동적 글자색 코어만 → 다른 후보(링)와 구분.
     if (_selIdx >= 0) {
       const _selN = _bond.body.nodes[_selIdx];
       if (_selN) {
@@ -14674,11 +14681,17 @@ function draw() {
     if (world.bodies.indexOf(_hb) >= 0) {
       ctx.save();
       ctx.setLineDash([]);
+      // 색상 정리: 획(stroke) = 동적 투명획 색, 노드(fill) = 동적 배경색.
       const _ic = (typeof _bondInvColor === 'function') ? _bondInvColor() : currentFgColor();
-      ctx.fillStyle = _ic; ctx.strokeStyle = _ic;
+      ctx.fillStyle = currentBgColor();
+      ctx.strokeStyle = _ic;
+      ctx.lineWidth = 1;
       const _hr = Math.max((PARAMS.nodeR || 0) / 2, 3);
-      // [감상모드 통합] 기본 디자인 노드만 하이라이트 — isBase=false(서브디비전 추가) 제외.
-      _hoverJamo.idxs.forEach(i => { const n = _hb.nodes[i]; if (n && !n.inv && n.isBase !== false) drawNodeShape(n, _hr); });
+      // 기본 디자인 노드만 하이라이트 — isBase=false(서브디비전 추가) 제외.
+      _hoverJamo.idxs.forEach(i => {
+        const n = _hb.nodes[i];
+        if (n && !n.inv && n.isBase !== false) { drawNodeShape(n, _hr); ctx.stroke(); }
+      });
       ctx.restore();
     }
   }
@@ -15446,12 +15459,19 @@ canvas.addEventListener('pointermove', e => {
   if (near) canvas.classList.add('near-node');
   else canvas.classList.remove('near-node');
   // 자모 위(노드 hit 반경 약간 여유)에 있을 때만 호버 강조
-  if (_hb && _hd < r2 * 4 && Array.isArray(_hb.jamos)) {
-    let grp = null;
-    for (const j of _hb.jamos) {
-      if (j.nodeIndices && j.nodeIndices.indexOf(_hi) >= 0) { grp = j; break; }
+  if (_hb && _hd < r2 * 4) {
+    if (Array.isArray(_hb.jamos)) {
+      let grp = null;
+      for (const j of _hb.jamos) {
+        if (j.nodeIndices && j.nodeIndices.indexOf(_hi) >= 0) { grp = j; break; }
+      }
+      _hoverJamo = grp ? { body: _hb, idxs: grp.nodeIndices.slice() } : null;
+    } else if (_hb.nodes) {
+      // 비한글/구두점 — jamos 메타가 없으므로 전체 노드를 단일 그룹으로 처리
+      _hoverJamo = { body: _hb, idxs: _hb.nodes.map((_, i) => i) };
+    } else {
+      _hoverJamo = null;
     }
-    _hoverJamo = grp ? { body: _hb, idxs: grp.nodeIndices.slice() } : null;
   } else {
     _hoverJamo = null;
   }
@@ -15579,7 +15599,7 @@ function buildPanel() {
     const ts = document.createElement('span');
     ts.className = 'titleText';
     ts.style.lineHeight = '14px';
-    ts.textContent = '텍스트  ';  // 주사위와 사이 띄어쓰기 1개 추가 (nbsp)
+    ts.textContent = '텍스트 ';  // 주사위와 사이 띄어쓰기 1개 추가 (nbsp)
     const td = document.createElement('span');
     td.className = 'die';
     td.id = 'panelTextDie';
@@ -15763,7 +15783,7 @@ function makeTitleWithDie(text, groupId) {
   const titleSpan = document.createElement('span');
   titleSpan.className = 'titleText';
   // 제목 + 띄어쓰기 + 주사위 (제목 우측 끝에 붙도록)
-  titleSpan.textContent = text + '  ';  // 주사위와 사이 띄어쓰기 1개 추가 (nbsp)
+  titleSpan.textContent = text + ' ';  // 주사위와 사이 띄어쓰기 1개 추가 (nbsp)
   const die = document.createElement('span');
   die.className = 'die';
   die.textContent = randomDieFace();
@@ -15913,7 +15933,7 @@ function makeBarRow(label, mn, mx, step, getter, setter, opts) {
   row.className = 'row';
   row.innerHTML =
     '<div class="bar"><div class="fill"></div></div>' +
-    '<span class="lbv"><span class="lbvLabel"></span> <span class="lbvVal" style="cursor:pointer; text-decoration:underline; text-decoration-thickness:0.5px; text-underline-offset:2px;"></span></span>';
+    '<span class="lbv"><span class="lbvLabel"></span> <span class="lbvVal"></span></span>';
   const lbv = row.querySelector('.lbv');
   const lbvLabel = row.querySelector('.lbvLabel');
   const lbvVal = row.querySelector('.lbvVal');
