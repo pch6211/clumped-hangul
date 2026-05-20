@@ -14771,11 +14771,12 @@ function draw() {
       const _ic = (typeof _bondInvColor === 'function') ? _bondInvColor() : currentFgColor();
       ctx.fillStyle = _ic; ctx.strokeStyle = _ic;
       const _hr = Math.max((PARAMS.nodeR || 0) / 2, 3);
-      // [v1.09] 호버 강조 = 호버한 자모 그룹 자체의 base 노드만 (strict isBase===true) + 1 디자인 꼭짓점당 1 dedupe.
+      // [v1.09] 호버 강조 = 모든 노드 (isBase 무관). dedupe 만 적용 (1 디자인 꼭짓점당 1).
+      //   사용자가 새로 그린 노드도 호버 강조됨. 'isBase 하드코딩' 제거.
       const _hbest = new Map();
       _hoverJamo.idxs.forEach(i => {
         const n = _hb.nodes[i];
-        if (!n || n.inv || n.isBase !== true) return;
+        if (!n || n.inv) return;
         const m = (typeof _bondMapNode === 'function') ? _bondMapNode(_hb, i) : null;
         if (!m) { _hbest.set('idx#' + i, { idx: i, nd2: 0 }); return; }
         const key = m.part + '#' + m.designIdx;
@@ -15472,67 +15473,57 @@ canvas.addEventListener('pointerdown', e => {
     dragX = p.x; dragY = p.y;
     canvas.classList.add('dragging');
     try { canvas.setPointerCapture(e.pointerId); } catch(_){}
-    // [항목3·4] 잡은 노드가 한글 음절의 원본(획 끝) 노드면 "붙임 짓기" 세션 시작 —
-    //   같은 글자 안의 다른 파트 원본 노드들만 후보(D-4: 다른 파트). 자격 미달이면
-    //   _bond=null 로 두어 기존 드래그와 100% 동일하게 동작.
-    // [감상모드 통합] 기본 디자인 노드(isBase!==false)만 자석 모드 활성. 추가 노드(서브디비전)는 스프링 고정만.
+    // [v1.09] bond/detach 분기 재설계 — isBase 가 아닌 magnetPair 매치 (현재 결합 상태) 기준.
+    //   결합된 자모의 노드 잡음 → 떼기 (Detach). isBase 무관.
+    //   결합 안 된 자유 노드 잡음 → 붙이기 후보 강조 (Bond). isBase 무관.
     _bond = null;
-    const _hitNode = (best) ? best : null;
-    const _hitIsBase = !!(_hitNode && _hitNode.isBase === true);  // [v1.09] strict — PRIMITIVES 원본만 base. 옛 _editorDefs 는 좌표 매칭 후 분류.
-    if (_hitIsBase && bestBody && !bestBody.isPunct && Array.isArray(bestBody.jamos)) {
-      const src = _bondMapNode(bestBody, bestIdx);
-      if (src) {
-        // [항목1] 한 디자인 꼭짓점(part+designIdx)당 후보는 1개만 — 분할로 생긴
-        //   여러 world 노드가 같은 꼭짓점에 매핑돼 "기본 디자인보다 많은 노드"가
-        //   하이라이트되던 현상 제거. nd2(정규화 거리²) 최소 = 진짜 꼭짓점만 채택.
-        const _best = new Map();  // key "part#designIdx" → {idx,m}
-        bestBody.jamos.forEach(j => {
-          const rk = _bondPartRank(j.name);
-          if (rk < 0 || rk === src.rank) return;  // 다른 파트만
-          (j.nodeIndices || []).forEach(i => {
-            if (i === bestIdx) return;
-            const m = _bondMapNode(bestBody, i);
-            if (!m) return;
-            const key = m.part + '#' + m.designIdx;
-            const prev = _best.get(key);
-            if (!prev || m.nd2 < prev.m.nd2) _best.set(key, { idx: i, m });
-          });
-        });
-        const cands = Array.from(_best.values());
-        if (cands.length) _bond = { body: bestBody, srcIdx: bestIdx, src, cands, partner: null, _partnerIdx: -1 };
-      }
-    }
-    // [항목4] 잡은 노드가 "붙어 있는 자모"에 속하면(그 자모의 어느 부위든) → 떼기 모드.
-    //   정확히 붙은 점을 클릭하지 않아도, 그 자모의 아무 곳이나 잡고 끌면 붙어 있던
-    //   부위가 알아서 떨어짐. 끌어서 융합반경 밖으로 놓으면 endDrag 에서 그 붙임의
-    //   s/n 태그·필터 토큰을 양쪽 디자인에서 영속 제거.
-    // [감상모드 통합] 추가 노드(isBase===false)만 떼기 가능. 기본 노드는 떼기 대신 자석 후보 안내(위 _bond).
     _detach = null;
-    if (!_hitIsBase && bestBody && Array.isArray(bestBody.magnetPairs) && Array.isArray(bestBody.jamos)) {
-      let _gJ = null;  // 잡은 노드가 속한 자모(파트)
+    if (bestBody && Array.isArray(bestBody.jamos)) {
+      // 1) 잡은 노드가 속한 자모 그룹
+      let _gJ = null;
       for (const j of bestBody.jamos) {
         if (j.nodeIndices && j.nodeIndices.indexOf(bestIdx) >= 0) { _gJ = j; break; }
       }
-      if (_gJ && _gJ.nodeIndices) {
+      // 2) 그 자모가 magnetPair 에 등장하는지 (결합 여부)
+      let _bestPair = null;
+      if (_gJ && Array.isArray(bestBody.magnetPairs)) {
         const _inJ = new Set(_gJ.nodeIndices);
         const _gn = bestBody.nodes[bestIdx];
-        let _bestPair = null, _bestD2 = Infinity;
+        let _bestD2 = Infinity;
         for (const pr of bestBody.magnetPairs) {
           let gi = -1, pi = -1;
           if (_inJ.has(pr[0]))      { gi = pr[0]; pi = pr[1]; }
           else if (_inJ.has(pr[1])) { gi = pr[1]; pi = pr[0]; }
           if (gi < 0) continue;
-          // 같은 자모에 붙은 점이 여러 개면 잡은 위치에서 가장 가까운 붙임을 택함
           const bn = bestBody.nodes[gi];
           const d2 = (bn && _gn) ? (bn.x - _gn.x) * (bn.x - _gn.x) + (bn.y - _gn.y) * (bn.y - _gn.y) : 0;
           if (d2 < _bestD2) { _bestD2 = d2; _bestPair = { gi, pi }; }
         }
-        if (_bestPair) {
-          // sx/sy = 잡은 시점 커서. moved = 실제로 끌었는지(클릭과 구분).
-          // [감상모드 통합] _bond 와 _detach 는 위 _hitIsBase 분기로 이미 mutually exclusive.
-          //   (기본 노드면 _bond 만, 추가 노드면 _detach 만 세팅됨.)
-          _detach = { body: bestBody, gi: _bestPair.gi, pi: _bestPair.pi,
-                      sx: p.x, sy: p.y, moved: true };  // [v1.09] 추가 노드 클릭 = 즉시 떼기 (drag 임계 제거)
+      }
+      if (_bestPair) {
+        // 3a) 결합된 자모 → 떼기 (어떤 노드든 — isBase 무관)
+        _detach = { body: bestBody, gi: _bestPair.gi, pi: _bestPair.pi,
+                    sx: p.x, sy: p.y, moved: true };  // 즉시 활성
+      } else if (!bestBody.isPunct) {
+        // 3b) 결합 안 된 자유 노드 → 붙이기 후보 검색 (Bond)
+        const src = _bondMapNode(bestBody, bestIdx);
+        if (src) {
+          // 1 디자인 꼭짓점당 1 후보 dedupe
+          const _best = new Map();
+          bestBody.jamos.forEach(j => {
+            const rk = _bondPartRank(j.name);
+            if (rk < 0 || rk === src.rank) return;  // 다른 part 만
+            (j.nodeIndices || []).forEach(i => {
+              if (i === bestIdx) return;
+              const m = _bondMapNode(bestBody, i);
+              if (!m) return;
+              const key = m.part + '#' + m.designIdx;
+              const prev = _best.get(key);
+              if (!prev || m.nd2 < prev.m.nd2) _best.set(key, { idx: i, m });
+            });
+          });
+          const cands = Array.from(_best.values());
+          if (cands.length) _bond = { body: bestBody, srcIdx: bestIdx, src, cands, partner: null, _partnerIdx: -1 };
         }
       }
     }
