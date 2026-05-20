@@ -12981,6 +12981,32 @@ function resolveJamo(name) {
   }
   return null;
 }
+// 디자인이 없는 글자(라틴 대문자·이모지·드물게 사용되는 기호 등) 의 fallback 글리프.
+//   PRIMITIVES['ㅁ'] + PRIMITIVES['x'] 의 기본 디자인을 가운데 정렬하여 합쳐
+//   X-in-box (ㅁ 사각형 안에 ✕) 모양으로 출력. 사용자 요청 기능.
+function _fallbackBoxGlyph() {
+  const m = resolveJamo('ㅁ');
+  const x = resolveJamo('x');
+  if (!m || !x || !m.nodes || !m.nodes.length || !x.nodes || !x.nodes.length) return null;
+  const bm = bbox(m.nodes), bx = bbox(x.nodes);
+  const wm = Math.max(0.001, bm.maxX - bm.minX), hm = Math.max(0.001, bm.maxY - bm.minY);
+  const wx = Math.max(0.001, bx.maxX - bx.minX), hx = Math.max(0.001, bx.maxY - bx.minY);
+  // x 글리프의 bbox 를 ㅁ 의 bbox 와 정확히 일치시키도록 scale + 평행이동 → ㅁ 안에 X 들어가는 모양
+  const sx = wm / wx, sy = hm / hx;
+  const mNodes = m.nodes.map(n => Object.assign({}, n));
+  const xNodes = x.nodes.map(n => Object.assign({}, n, {
+    x: bm.minX + (n.x - bx.minX) * sx,
+    y: bm.minY + (n.y - bx.minY) * sy
+  }));
+  const offset = mNodes.length;
+  const mEdges = (m.edges || []).map(e => e.slice());
+  const xEdges = (x.edges || []).map(e => {
+    const ne = [e[0] + offset, e[1] + offset];
+    if (e.length > 2) ne.push(e[2]);
+    return ne;
+  });
+  return { nodes: mNodes.concat(xNodes), edges: mEdges.concat(xEdges) };
+}
 // [C2·C3] ㅐㅒㅔㅖ(ㅏ+ㅣ 등) · 쌍자음 ㄲㄸㅃㅆㅉ(ㄱ+ㄱ 등)을 단일 PRIMITIVE 로 "구워" 등록.
 //   사용자 결정: 표준 디자인으로 등록 → resolveJamo 가 PRIMITIVES 를 우선 보므로 이후
 //   텍스트·음절의 해당 글자가 이 디자인을 직접 사용(COMPOUND_GLUE/DOUBLES 자동분해 대체).
@@ -13696,7 +13722,11 @@ function buildToken(ch, consSub, vowSub, extras) {
   // 사용자 정의(PRIMITIVES) > 합성(자모/쌍자음/cluster) > 기본 PUNCT 순으로 시도
   let proto = resolveJamo(ch);  // PRIMITIVES + COMPOUND_GLUE/2D + DOUBLES + CLUSTERS 모두 시도
   if (!proto && PUNCT[ch]) proto = PUNCT[ch];
-  if (!proto) return null;
+  if (!proto) {
+    // 디자인 없는 글자 → ㅁ + x X-in-box fallback (사용자 요청)
+    proto = _fallbackBoxGlyph();
+    if (!proto) return null;
+  }
   let g = normalize(deepClone(proto));
   // [F1] 비한글도 전역 너비/높이 동일 적용(자음/모음 구분 없이 공평).
   const _kH = PARAMS.skelWidth  || 0;
@@ -13711,6 +13741,9 @@ function buildToken(ch, consSub, vowSub, extras) {
 const canvas = document.getElementById('universe');
 const ctx = canvas.getContext('2d');
 let world = null;
+// 픽셀 거리 측정 도구 상태 — 배경(빈 영역) 좌클릭 드래그 시 활성. 수직/수평만 그려짐.
+//   { sx, sy, cx, cy, axis: 'h'|'v'|null }  좌표는 client(viewport) px.
+let _pxMeasure = null;
 let rafId = null;
 let cssW = window.innerWidth, cssH = window.innerHeight;
 
@@ -13859,10 +13892,9 @@ function buildWorld(str) {
       if (d || PRIMITIVES[ch] || PUNCT[ch]) {
         extrasForCh = charSlots[csIdx]?.slots;
         csIdx++;
-      } else {
-        // 알 수 없는 문자 → 공백으로 대체 (문장 흐름 보존)
-        ch = ' ';
       }
+      // 디자인 없는 글자: ch 유지, extrasForCh null. buildToken 의 _fallbackBoxGlyph 가
+      //   ㅁ + x 합성 글리프를 반환 → 토큰이 정상 출력됨.
     }
     const t = buildToken(ch, consSub, vowSub, extrasForCh);
     if (t) tokens.push(t);
@@ -14683,18 +14715,51 @@ function draw() {
       ctx.fillStyle = _ic; ctx.strokeStyle = _ic;
       const _hr = Math.max((PARAMS.nodeR || 0) / 2, 3);
       // 호버 강조 = 자석 attachment 후보 노드만. body.magnetPairs 에 등장하는 노드 인덱스 집합으로 한정.
-      //   magnetPairs 없는 body (비한글·구두점·자석 정보 미보유) → fallback 으로 base 노드 모두 강조.
-      const _mp = Array.isArray(_hb.magnetPairs) ? _hb.magnetPairs : null;
-      const _magnetSet = (_mp && _mp.length) ? new Set() : null;
-      if (_magnetSet) _mp.forEach(p => { if (Array.isArray(p)) p.forEach(idx => _magnetSet.add(idx)); });
+      //   magnetPairs 가 array 면 (한글 글리프) 빈 배열이라도 magnet 모드 적용 → 자석 노드 0개면 강조 0개.
+      //   magnetPairs 가 undefined (비한글·구두점) → fallback 으로 base 노드 모두 강조.
+      const _mp = _hb.magnetPairs;
+      const _useMagnet = Array.isArray(_mp);
+      const _magnetSet = _useMagnet ? new Set() : null;
+      if (_useMagnet) _mp.forEach(p => { if (Array.isArray(p)) p.forEach(idx => _magnetSet.add(idx)); });
       _hoverJamo.idxs.forEach(i => {
         const n = _hb.nodes[i];
         if (!n || n.inv || n.isBase === false) return;
-        if (_magnetSet && !_magnetSet.has(i)) return;  // 자석 가능 노드만
+        if (_useMagnet && !_magnetSet.has(i)) return;  // 자석 가능 노드만 (한글)
         drawNodeShape(n, _hr);
       });
       ctx.restore();
     }
+  }
+  // 픽셀 거리 측정 도구 표시 — 수직 또는 수평 1px 선 + 중앙에 거리 텍스트(선과 동기 회전)
+  if (_pxMeasure && _pxMeasure.axis) {
+    const rect = canvas.getBoundingClientRect();
+    const rx = (rect.width  > 0) ? cssW / rect.width  : 1;
+    const ry = (rect.height > 0) ? cssH / rect.height : 1;
+    const x0 = (_pxMeasure.sx - rect.left) * rx;
+    const y0 = (_pxMeasure.sy - rect.top)  * ry;
+    let x1, y1;
+    if (_pxMeasure.axis === 'h') { x1 = (_pxMeasure.cx - rect.left) * rx; y1 = y0; }
+    else                          { x1 = x0; y1 = (_pxMeasure.cy - rect.top) * ry; }
+    ctx.save();
+    ctx.setLineDash([]);
+    const _mc = currentFgColor();
+    ctx.strokeStyle = _mc; ctx.fillStyle = _mc;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(x0, y0); ctx.lineTo(x1, y1);
+    ctx.stroke();
+    const distPx = (_pxMeasure.axis === 'h')
+      ? Math.abs(_pxMeasure.cx - _pxMeasure.sx)
+      : Math.abs(_pxMeasure.cy - _pxMeasure.sy);
+    const txt = Math.round(distPx) + 'px';
+    const mx = (x0 + x1) / 2, my = (y0 + y1) / 2;
+    ctx.font = '10px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'bottom';
+    ctx.translate(mx, my);
+    if (_pxMeasure.axis === 'v') ctx.rotate(-Math.PI / 2);
+    ctx.fillText(txt, 0, -5);  // 선 위 5px
+    ctx.restore();
   }
 }
 
@@ -15258,6 +15323,12 @@ canvas.addEventListener('pointerdown', e => {
     const d2 = dx * dx + dy * dy;
     if (d2 < bestD2) { bestD2 = d2; best = n; bestBody = body; bestIdx = ni; }
   }));
+  // 빈 영역 좌클릭 드래그 → 픽셀 거리 측정 모드 시작 (수직/수평만)
+  if (!best && (e.button === 0 || e.button === undefined)) {
+    _pxMeasure = { sx: e.clientX, sy: e.clientY, cx: e.clientX, cy: e.clientY, axis: null };
+    try { canvas.setPointerCapture(e.pointerId); } catch(_){}
+    return;
+  }
   if (best) {
     draggedNode = best;
     // 잡는 동안에는 rest 변경 없음 — 마우스 놓는 순간에만 각도 rest 재설정 (endDrag에서)
@@ -15409,6 +15480,14 @@ canvas.addEventListener('contextmenu', e => {
   _showViewCanvasCtxMenu(e.clientX, e.clientY, items);
 });
 canvas.addEventListener('pointermove', e => {
+  // 픽셀 측정 모드 — 끝점 갱신 후 |dx|,|dy| 비교로 축 결정 (수직/수평만)
+  if (_pxMeasure) {
+    _pxMeasure.cx = e.clientX; _pxMeasure.cy = e.clientY;
+    const ddx = _pxMeasure.cx - _pxMeasure.sx;
+    const ddy = _pxMeasure.cy - _pxMeasure.sy;
+    _pxMeasure.axis = (Math.abs(ddx) >= Math.abs(ddy)) ? 'h' : 'v';
+    return;
+  }
   const p = canvasCoords(e);
   if (draggedNode) {
     dragX = p.x; dragY = p.y;
@@ -15559,6 +15638,23 @@ function _openEditorWithMoimkkol(moimkkolChar) {
 }
 
 function endDrag(e) {
+  // 픽셀 측정 모드 종료 — 거리 클립보드 복사 후 상태 해제
+  if (_pxMeasure) {
+    const ddx = _pxMeasure.cx - _pxMeasure.sx;
+    const ddy = _pxMeasure.cy - _pxMeasure.sy;
+    const dist = (_pxMeasure.axis === 'h') ? Math.abs(ddx)
+              : (_pxMeasure.axis === 'v') ? Math.abs(ddy)
+              : 0;
+    if (dist >= 1) {
+      const txt = Math.round(dist) + 'px';
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(txt).catch(()=>{});
+      }
+    }
+    _pxMeasure = null;
+    try { if (e && e.pointerId != null) canvas.releasePointerCapture(e.pointerId); } catch(_){}
+    return;
+  }
   if (!draggedNode) return;
   // [항목3·4] 붙임 파트너가 잡혀 있으면 디자인에 앞/뒤붙임 기록 + world 재빌드.
   //   (재빌드 시 새 s/n 쌍을 _computeMagnetPairs 가 잡아 이후 물리 인력/융합 적용)
