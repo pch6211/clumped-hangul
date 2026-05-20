@@ -17,7 +17,7 @@
   /* 하단 고정 텍스트 입력바 — 모바일 전용. 기본은 숨김(데스크탑에선 안 보임) */
   #mobileTextBar { display: none; }
   /* 모바일 전용: 햄버거 메뉴(☰) / 패널 우상단 뒤로가기(←) — 데스크탑에서는 숨김 */
-  #mobileMenuBtn, #panelMobileBack { display: none; }  /* ID selector — .stageBtn(class) 보다 우위 → PC 에서 확실히 숨김 */
+  #mobileMenuBtn, #panelMobileBack, #mobileMenuDie { display: none; }  /* ID selector — .stageBtn(class) 보다 우위 → PC 에서 확실히 숨김 */
   /* 모바일 (≤ 600px) — 자동 감상모드만, UI 모두 숨김 + 하단 텍스트 입력바만 노출 */
   @media (max-width: 600px) {
     .panel, .editor, #hud, #cwTooltipEl, #introPanel, .ccFooter { display: none !important; }
@@ -53,6 +53,18 @@
       cursor: pointer; user-select: none; pointer-events: auto;
       vertical-align: middle;
     }
+    /* [v1.09] 모바일 전역 주사위 (R = 전체 랜덤) — 햄버거 같은 줄 우상단 고정 */
+    #mobileMenuDie {
+      display: inline-flex; align-items: center; justify-content: center;
+      position: fixed; top: 24px; right: 24px; z-index: 130;
+      height: 14px; line-height: 1;
+      font-family: sans-serif; font-size: 14px;
+      color: var(--editor-fg, currentColor); background: transparent;
+      cursor: pointer; user-select: none; pointer-events: auto;
+      vertical-align: middle; padding: 0 2px;
+    }
+    /* 패널 열렸을 때 햄버거·주사위·하단 입력바 숨김 */
+    body.panel-open #mobileMenuDie { display: none !important; }
     /* 패널 = 화면 좌측 3/4 오버레이. 우측 1/4 영역은 캔버스(출력화면)가 보임.
        우측 끝에 1px 선 = 패널 div 의 우측 경계. 좌우 여백은 모바일 입력바(24px)와 동일 톤.
        (3/4 폭 = 하단 SVG/PNG/SAVE/LOAD 4 버튼이 한 줄에 들어가도록 — F8) */
@@ -311,11 +323,10 @@
     color: var(--editor-bg, transparent);
     border-color: var(--editor-fg, currentColor);
   }
-  .hud { position: fixed; top: 22px; bottom: auto; left: var(--ui-gap); right: auto; max-width: calc(100vw - var(--ui-gap) * 2 - 14px); font-family: sans-serif; font-size: 10px; line-height: 1.6; letter-spacing: 1px; z-index: 10; user-select: none;
+  .hud { position: fixed; top: 27px; bottom: auto; left: calc(var(--ui-gap) + 11px); right: auto; max-width: calc(100vw - var(--ui-gap) * 2 - 14px); font-family: sans-serif; font-size: 10px; line-height: 1.6; letter-spacing: 1px; z-index: 10; user-select: none;
     padding: 10px 14px; background: var(--editor-bg, transparent); border: 1px solid currentColor; width: fit-content; box-sizing: border-box;
-    transition: transform 0.18s ease;
   }
-  /* S 키로 설정창 열면 HUD 가 패널 폭만큼 우측 이동 (CSS transform) */
+  /* S 키로 설정창 열면 HUD 가 패널 폭만큼 우측 이동 (CSS transform, 즉시 이동) */
   body.panel-open .hud { transform: translateX(304px); }
   /* HUD 도 .guideList 와 동일한 우하단 도그이어(접힘) 외곽 추가 */
   .hud::after {
@@ -327,7 +338,7 @@
     border-left: 1px solid currentColor;
   }
   /* PC 전용 외부 텍스트 입력바 — 화면 왼쪽 하단. 설정창 폭(288px) 와 동일. */
-  #pcTextBar { position: fixed; left: calc(var(--ui-gap) - var(--sbw)); transform: none; bottom: 22px; width: 288px; max-width: calc(100vw - 32px); z-index: 90; font-family: sans-serif; font-size: 10px; letter-spacing: 0.5px; line-height: 1.4; color: currentColor; pointer-events: auto; box-sizing: border-box; padding-left: 8px; }
+  #pcTextBar { position: fixed; left: calc(var(--ui-gap) - var(--sbw) + 11px); transform: none; bottom: 22px; width: 288px; max-width: calc(100vw - 32px); z-index: 90; font-family: sans-serif; font-size: 10px; letter-spacing: 0.5px; line-height: 1.4; color: currentColor; pointer-events: auto; box-sizing: border-box; padding-left: 8px; }
   /* 제목은 설정창 내부 .groupTitle 와 동일 디자인 (className 으로 위임). 별도 override 없음. */
   #pcTextBar #mainText { width: 100%; resize: none; overflow-y: hidden; padding: 4px 6px; border: 1px solid currentColor; background: transparent; color: currentColor; font-family: inherit; font-size: 10px; line-height: 1.4; letter-spacing: 0.5px; outline: none; box-sizing: border-box; min-height: 24px; opacity: 1; scrollbar-width: thin; scrollbar-color: currentColor transparent; }
   #pcTextBar #mainText::-webkit-scrollbar { width: 8px; height: 8px; }
@@ -348,12 +359,8 @@
   .hud .hudItem:last-child { margin-right: 0; }
   .hud .hudItem b { font-weight: normal; }
   .hud .hudToggleBtn,
-  .hud .hudClickable { cursor: pointer; pointer-events: auto; position: relative; display: block; width: fit-content; line-height: 1.4; }
-  /* 클릭 가능 단축키 안내 밑줄 — .lbvVal 의 1px 점선 패턴과 동일 (currentColor 동기화) */
-  .hud .hudClickable::after {
-    content: ''; position: absolute; left: 0; right: 0; bottom: -2px; height: 1px;
-    background: repeating-linear-gradient(to right, currentColor 0 1px, transparent 1px 2px);
-  }
+  .hud .hudClickable { cursor: pointer; pointer-events: auto; display: block; width: fit-content; line-height: 1.4; }
+  /* HUD 클릭 단축키 밑줄 — 사용자 요청에 따라 삭제 (숫자 밑줄과 시각 동일 안 되어). */
   .hud.hidden { display: none; }
   /* #4 초기 소개 팝업 — 다른 팝업(.mhDialog) 벤치마크: 제목(버전)+이동(▩)+닫기(✕) meta 행,
      내용은 테두리 박스(.introBox)로 감싸고 동적 배경(var(--editor-bg)) 적용. 드래그 이동 가능. */
@@ -540,9 +547,15 @@
   .editor .editorBottomRow { display: flex; align-items: flex-end; gap: 12px; margin-top: 8px; }
   .editor .heightInputBlock { display: flex; flex-direction: column; align-items: flex-start; }
   .editor .heightInputBlock .groupTitle { line-height: 14px; margin-bottom: 4px; letter-spacing: 0.5px; opacity: 1; }
-  .editor .heightInputBlock .numBox { width: 50px; }
+  .editor .heightInputBlock .numBox { width: 40px; }
+  /* 등장 높이 입력 좌측 ↑↓ 화살표 — 클릭 시 ±1 (네이티브 spinner 대체) */
+  .editor .heightInputCtrl { display: flex; align-items: stretch; gap: 4px; }
+  .editor .hArrowCol { display: flex; flex-direction: column; justify-content: center; user-select: none; }
+  .editor .hArrow { font-size: 8px; cursor: pointer; padding: 0 2px; line-height: 1; opacity: 0.8; }
+  .editor .hArrow:hover { opacity: 1; }
   /* 캔버스 아래 버튼 행 — 원래대로 캔버스 하단에서 20px 아래 */
-  .editor .toolBtnBottomRow { position: absolute; left: 0; right: 0; top: calc(100% + 20px); display: flex; flex-direction: row; gap: 8px; justify-content: flex-end; align-items: center; }
+  /* .toolBtnBottomRow — .editorBottomRow flex row 안에서 normal flow (등장 높이 옆) */
+  .editor .toolBtnBottomRow { display: flex; flex-direction: row; gap: 8px; justify-content: flex-end; align-items: center; }
   .editor .toolBtnBottomRow .pillBtn { min-width: 70px; white-space: nowrap; }
   /* 문자 추가 다이얼로그 — 사이드바 안에 인라인으로 나타나는 작은 폼 */
   #addCharDialog { font-family: sans-serif; font-size: 10px; letter-spacing: 0.5px; line-height: 1.4; color: currentColor; position: relative; }
@@ -586,13 +599,14 @@
 <body>
 <canvas id="universe"></canvas>
 <div class="hud" id="hud">
-  <div class="hudSection" id="hudMain"><span class="hudItem hudClickable" data-action="panel"><b>설정 창</b> S</span><span class="hudItem hudClickable" data-action="editor"><b>편집 창</b> E</span><span class="hudItem hudClickable" data-action="random"><b>랜덤 설정</b> R</span><span class="hudItem hudClickable" data-action="text"><b>랜덤 글귀</b> T</span><span class="hudItem hudClickable" data-action="auto"><b>자동</b> A</span><span class="hudItem hudClickable" data-action="reset"><b>리셋</b> B</span><span class="hudItem hudClickable" id="hudToggleBtn" title="가이드 표시 토글"><b>가이드 끄기</b> M</span><span class="hudItem"><b>자간</b> Alt ⇄</span><span class="hudItem"><b>행간</b> Alt ⇅</span><span class="hudItem"><b>수정</b> 획 당기기</span></div>
+  <div class="hudSection" id="hudMain"><span class="hudItem hudClickable" data-action="panel"><b>설정 창</b> S</span><span class="hudItem hudClickable" data-action="editor"><b>편집 창</b> E</span><span class="hudItem hudClickable" data-action="random"><b>랜덤 설정</b> R</span><span class="hudItem hudClickable" data-action="text"><b>랜덤 글귀</b> T</span><span class="hudItem hudClickable" data-action="auto"><b>자동</b> A</span><span class="hudItem hudClickable" data-action="reset"><b>리셋</b> B</span><span class="hudItem"><b>자간</b> Alt ⇄</span><span class="hudItem"><b>행간</b> Alt ⇅</span><span class="hudItem"><b>수정</b> 획 당기기</span><span class="hudItem hudClickable" id="hudToggleBtn" title="가이드 표시 토글"><b>가이드 끄기</b> M</span></div>
 </div>
 <!-- [v1.09] 초기 인트로 팝업 삭제 (사용자 요청). -->
 <!-- PC 전용 외부 텍스트 입력 바 — 화면 왼쪽 하단. -->
 <div id="pcTextBar"></div>
 <div class="panel" id="panel">
-  <span class="panelMobileBack stageBtn closeX" id="panelMobileBack" title="닫기">✕</span>
+  <!-- [v1.09] 모바일 ✕ 닫기 버튼 삭제 (사용자 요청). 우측 캔버스 영역 탭으로 닫기 사용. -->
+  <span class="panelMobileBack stageBtn closeX" id="panelMobileBack" title="닫기" style="display:none">✕</span>
   <div id="panel-body"></div>
   <div class="inlineExpand" id="globalInline"></div>
 </div>
@@ -628,9 +642,15 @@
     <div class="editorBottomRow">
       <div class="heightInputBlock" id="editorHeightBlock">
         <div class="groupTitle"><span class="titleText">등장 높이</span></div>
-        <input type="number" inputmode="numeric" class="numBox"
-               id="editorHeightInput"
-               title="등장 높이 — 양수는 위, 음수는 아래, 0은 정중앙" />
+        <div class="heightInputCtrl">
+          <span class="hArrowCol">
+            <span class="hArrow" data-dir="1" title="+1">▲</span>
+            <span class="hArrow" data-dir="-1" title="-1">▼</span>
+          </span>
+          <input type="number" inputmode="numeric" class="numBox"
+                 id="editorHeightInput"
+                 title="등장 높이 — 양수는 위, 음수는 아래, 0은 정중앙" />
+        </div>
       </div>
       <div class="toolBtnBottomRow">
         <button class="pillBtn" id="btnRevertDefault" title="현재 자모 디자인을 편집 전 상태로 복원">초기화</button>
@@ -670,9 +690,15 @@
     <div class="editorBottomRow">
       <div class="heightInputBlock">
         <div class="groupTitle"><span class="titleText">등장 높이</span></div>
-        <input type="number" inputmode="numeric" class="numBox"
-               id="moimkkolHeightInput"
-               title="등장 높이 — 양수는 위, 음수는 아래, 0은 정중앙 (이 모임꼴 전체에 적용)" />
+        <div class="heightInputCtrl">
+          <span class="hArrowCol">
+            <span class="hArrow" data-dir="1" title="+1">▲</span>
+            <span class="hArrow" data-dir="-1" title="-1">▼</span>
+          </span>
+          <input type="number" inputmode="numeric" class="numBox"
+                 id="moimkkolHeightInput"
+                 title="등장 높이 — 양수는 위, 음수는 아래, 0은 정중앙 (이 모임꼴 전체에 적용)" />
+        </div>
       </div>
       <div class="toolBtnBottomRow">
         <button class="pillBtn" id="btnMoimkkolResetPattern" title="이 모임꼴 패턴의 박스 배치를 기본값으로 되돌리기">초기화</button>
@@ -12035,7 +12061,8 @@ function applyRandomText() {
   if (world) world = buildWorld(currentText());
   if (typeof _refreshUsedInTextHighlight === 'function') _refreshUsedInTextHighlight();  // [항목1·2]
 }
-function currentText() { return TEXT; }
+// [v1.09] 입력창 비우면 기본 문구(MOBILE_NOTICE) 다시 출력 — PC/모바일 공통.
+function currentText() { return (TEXT && TEXT.length > 0) ? TEXT : MOBILE_NOTICE; }
 
 // 사용자가 슬라이더로 조절하는 파라미터.
 //   [작업5] 실제 값은 코드 맨 앞 설정 대시보드 MH_CFG.params 에 모여 있습니다.
@@ -17431,11 +17458,20 @@ function _makePersistentDraggablePopup(el, opts) {
     } catch (_) {}
   };
   // 표시 시 위치 결정: 저장값(화면 안으로 클램프) 우선, 없으면 충돌회피 배치
+  //   [v1.09] opts.otherStageId 가 지정되면 그 stage 가 안 보일 때 저장 위치 무시 → defaultPlace 강제.
+  //   stack 의 두번째 위치에 저장된 위치 잔존 → 첫번째 비어도 두번째에 표시되던 문제 fix.
   const place = () => {
     el.style.right = 'auto';
     el.style.transform = 'none';
+    // 다른 stage visibility 검사 — 안 보이면 저장 위치 무시
+    let useDefault = false;
+    if (opts.otherStageId) {
+      const _o = document.getElementById(opts.otherStageId);
+      const _oVisible = _o && _o.classList.contains('shown') && _o.getBoundingClientRect().width > 0;
+      if (!_oVisible) useDefault = true;
+    }
     let restored = false;
-    if (storageKey) {
+    if (storageKey && !useDefault) {
       try {
         const s = JSON.parse(localStorage.getItem(storageKey) || 'null');
         if (s && typeof s.left === 'number' && typeof s.top === 'number') {
@@ -18015,9 +18051,25 @@ function openEditor() {
 let _editorStagePopup = null;
 let _moimkkolStagePopup = null;
 function setupEditorStageDrag() {
-  // #13 — 결정적 초기 배치(사용자 스펙): 에디터창 맨 위 위쪽 여백(=사이드바 top)에 맞춰
-  //   사이드바 왼쪽으로 25px 떨어진 위치. 먼저 연 창이 사이드바에 가장 가깝고,
-  //   그 이후 여는 창은 이미 떠 있는 창의 "왼쪽으로 25px" (왼쪽 가로 스택).
+  // [v1.09] 등장 높이 입력칸 좌측 ↑▲ ▼ 화살표 — 클릭 시 input.value ±1, 'input' 이벤트 트리거.
+  ['editorHeightBlock','moimkkolStage'].forEach(parentId => {
+    const parent = document.getElementById(parentId);
+    if (!parent) return;
+    parent.querySelectorAll('.hArrow').forEach(arr => {
+      if (arr._wired) return; arr._wired = true;
+      arr.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const blk = arr.closest('.heightInputBlock');
+        if (!blk) return;
+        const inp = blk.querySelector('input[type="number"]');
+        if (!inp) return;
+        const dir = parseFloat(arr.getAttribute('data-dir') || '0') || 0;
+        const v = (parseFloat(inp.value || '0') || 0) + dir;
+        inp.value = v;
+        inp.dispatchEvent(new Event('input', { bubbles: true }));
+      });
+    });
+  });
   const _STAGE_GAP = 20;  // 두 stage 가로 스택 간격 (사용자 요청 25 → 20 = +5px 우측)
   const _clampStage = (el, left, top) => {
     const r = el.getBoundingClientRect();
@@ -18077,7 +18129,8 @@ function setupEditorStageDrag() {
     _editorStagePopup = _makePersistentDraggablePopup(estage, {
       handle: ehandle,
       storageKey: 'mungchin_editor_stage_pos_v2',
-      defaultPlace: _placeEditorStage
+      defaultPlace: _placeEditorStage,
+      otherStageId: 'moimkkolStage'  // 다른 stage 안 보이면 저장 위치 무시 → 첫번째 위치 강제
     });
     // 관리자 모드 트리거 — 핸들 10연속 클릭 (1.5초 안) [보존]
     let _adminClickCount = 0, _adminClickTimer = null;
@@ -18099,7 +18152,8 @@ function setupEditorStageDrag() {
     _moimkkolStagePopup = _makePersistentDraggablePopup(mstage, {
       handle: mhandle,
       storageKey: 'mungchin_moimkkol_stage_pos_v2',
-      defaultPlace: _placeMoimkkolStage
+      defaultPlace: _placeMoimkkolStage,
+      otherStageId: 'editorStage'
     });
   }
 }
@@ -18752,6 +18806,11 @@ function toggleAddCharDialog() {
   const inp = document.createElement('input');
   inp.type = 'text';
   inp.placeholder = 'U+AC00, U+AC00, ···';
+  // 브라우저 비밀번호 저장 팝업 차단 + 자동 채우기 비활성화
+  inp.autocomplete = 'off'; inp.autocorrect = 'off'; inp.autocapitalize = 'off'; inp.spellcheck = false;
+  inp.setAttribute('name', 'mh_codepoint_' + Math.random().toString(36).slice(2,8));  // 랜덤 name = 자동완성 매칭 방지
+  inp.setAttribute('data-lpignore', 'true');  // LastPass ignore
+  inp.setAttribute('data-1p-ignore', 'true');  // 1Password ignore
   const _commit = () => {
     const raw = inp.value.trim();
     if (!raw) return;
@@ -21156,6 +21215,17 @@ requestAnimationFrame(() => {
   // 모바일 햄버거(☰) / 패널 뒤로가기(←) — 둘 다 togglePanel 호출
   const _mbtn = document.getElementById('mobileMenuBtn');
   if (_mbtn && !_mbtn._bound) { _mbtn.addEventListener('click', () => togglePanel()); _mbtn._bound = true; }
+  // [v1.09] 모바일 전역 주사위 — R 단축키 동일 (전체 랜덤). 0.75s 굴림 후 randomizeAll
+  const _mmDie = document.getElementById('mobileMenuDie');
+  if (_mmDie && !_mmDie._bound) {
+    _mmDie._bound = true;
+    _mmDie.textContent = randomDieFace();
+    _mmDie.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (_mmDie.classList.contains('rolling')) return;
+      rollDie(_mmDie, () => { if (typeof randomizeAll === 'function') randomizeAll(); });
+    });
+  }
   const _back = document.getElementById('panelMobileBack');
   if (_back && !_back._bound) { _back.addEventListener('click', () => togglePanel()); _back._bound = true; }
   // 모바일 입력바 "텍스트" 옆 주사위 — 글귀 랜덤(T) 트리거. 0.75초 굴림 애니메이션 후 applyRandomText.
@@ -21180,6 +21250,8 @@ requestAnimationFrame(() => {
 </script>
 <!-- 모바일 전용 햄버거 메뉴 버튼 — 속성창(풀스크린 오버레이) 열기 -->
 <div id="mobileMenuBtn" title="속성 메뉴" role="button" aria-label="속성 메뉴 열기">☰</div>
+<!-- [v1.09] 모바일 햄버거 줄 우측 — 전역 주사위(R = 전체 랜덤). 햄버거와 동일한 top/디자인. -->
+<span class="die" id="mobileMenuDie" title="전체 랜덤 (R)">⚂</span>
 <!-- 모바일 전용 하단 고정 텍스트 입력바 (데스크탑 display:none) -->
 <div id="mobileTextBar"><span class="mtbLabel">텍스트<span class="die" id="mtbDie" title="글귀 랜덤 (T)">⚂</span></span><textarea id="mobileText" rows="1" translate="no" placeholder="뭉친 한글 Clumped Hangul"></textarea></div>
 <a class="ccFooter" href="https://github.com/pch6211/clumped-hangul/blob/main/LICENSE" target="_blank" rel="noopener noreferrer"
