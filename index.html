@@ -20434,7 +20434,7 @@ function handleEditorClick(canvas, evX, evY) {
       const _mid = snapSquare((def.nodes[a].x + def.nodes[b].x) / 2,
                               (def.nodes[a].y + def.nodes[b].y) / 2);
       const newIdx = def.nodes.length;
-      const newN = { x: _mid.x, y: _mid.y };
+      const newN = { x: _mid.x, y: _mid.y, isBase: false };  // 편집창 추가 노드 = base 아님 (호버/자석 제외, 떼기 가능)
       if (_invisibleStrokeMode) newN.inv = true;
       def.nodes.push(newN);
       def.edges.splice(_hitE.i, 1);
@@ -20499,7 +20499,7 @@ function handleEditorClick(canvas, evX, evY) {
     const a = origEdge[0], b = origEdge[1];
     const origFlag = (origEdge.length > 2) ? origEdge[2] : null;
     const newIdx = def.nodes.length;
-    const newN = { x: sx, y: sy };
+    const newN = { x: sx, y: sy, isBase: false };  // 편집창 추가 노드 = base 아님
     if (_invisibleStrokeMode) newN.inv = true;
     def.nodes.push(newN);
     def.edges.splice(onEdge.i, 1);
@@ -20520,7 +20520,7 @@ function handleEditorClick(canvas, evX, evY) {
   // 빈 그리드 점 — 새 노드 생성, 펜 있으면 연결, 펜은 새 노드로 이동(체인)
   pushHistory();
   const newIdx = def.nodes.length;
-  const newN = { x: sx, y: sy };
+  const newN = { x: sx, y: sy, isBase: false };  // 편집창 추가 노드 = base 아님
   if (_invisibleStrokeMode) newN.inv = true;
   def.nodes.push(newN);
   if (_editorPen != null) pushEdge(def, _editorPen, newIdx);
