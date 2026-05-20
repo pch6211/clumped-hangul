@@ -161,6 +161,10 @@
     .panel .pillBtn { padding: 5px 10px; }
     /* 모바일 한정 — 슬라이더 행 라벨 컬럼 65 → 80px (사용자 요청: 슬라이더 바 15px 줄임) */
     .panel .row { grid-template-columns: 1fr 80px; }
+    /* 모바일에서 PC 텍스트바 숨김 — 입력은 하단 #mobileTextBar 에 일원화 */
+    #pcTextBar { display: none !important; }
+    /* 모바일에서 HUD 박스 padding 축소 (단축키 안내는 모바일에서 짧음) */
+    .hud { padding: 6px 10px; }
     .panel { width: 198px; top: 16px; }
     .editor .sidebar { width: 188px; top: 16px; }
     .editor .stage { right: 222px; top: 16px; }
@@ -299,7 +303,25 @@
     color: var(--editor-bg, transparent);
     border-color: var(--editor-fg, currentColor);
   }
-  .hud { position: fixed; bottom: 22px; left: calc(var(--ui-gap) + var(--sbw)); right: auto; max-width: calc(100vw - var(--ui-gap) * 2 - var(--cc-width, 0px) - 14px); font-family: sans-serif; font-size: 10px; line-height: 1.6; letter-spacing: 1px; z-index: 10; user-select: none; }
+  .hud { position: fixed; bottom: 22px; left: calc(var(--ui-gap) + var(--sbw)); right: auto; max-width: calc(100vw - var(--ui-gap) * 2 - var(--cc-width, 0px) - 14px); font-family: sans-serif; font-size: 10px; line-height: 1.6; letter-spacing: 1px; z-index: 10; user-select: none;
+    padding: 10px 14px; background: var(--editor-bg, transparent); border: 1px solid currentColor; width: fit-content; box-sizing: border-box;
+  }
+  /* HUD 도 .guideList 와 동일한 우하단 도그이어(접힘) 외곽 추가 */
+  .hud::after {
+    content: ""; position: absolute; right: -1px; bottom: -1px;
+    width: 12px; height: 12px; box-sizing: border-box; pointer-events: none;
+    background-color: var(--editor-bg, transparent);
+    background-image: linear-gradient(135deg, transparent calc(50% - 0.45px), currentColor calc(50% - 0.45px), currentColor calc(50% + 0.45px), transparent calc(50% + 0.45px));
+    border-top: 1px solid currentColor;
+    border-left: 1px solid currentColor;
+  }
+  /* PC 전용 외부 텍스트 입력바 — 출력화면 하단 중앙. CC 푸터 bottom 22px 과 동일. */
+  #pcTextBar { position: fixed; left: 50%; transform: translateX(-50%); bottom: 22px; width: min(480px, 60vw); z-index: 90; font-family: sans-serif; font-size: 10px; letter-spacing: 0.5px; line-height: 1.4; color: currentColor; pointer-events: auto; box-sizing: border-box; display: flex; flex-direction: column; }
+  #pcTextBar #panelTextTitle { line-height: 14px; margin-bottom: 4px; letter-spacing: 1px; user-select: none; }
+  #pcTextBar #mainText { width: 100%; resize: vertical; padding: 4px 6px; border: 1px solid currentColor; background: var(--editor-bg, transparent); color: currentColor; font-family: inherit; font-size: 10px; line-height: 1.4; letter-spacing: 0.5px; outline: none; box-sizing: border-box; min-height: 30px; scrollbar-width: thin; scrollbar-color: currentColor transparent; }
+  #pcTextBar #mainText::-webkit-scrollbar { width: 8px; height: 8px; }
+  #pcTextBar #mainText::-webkit-scrollbar-thumb { background: currentColor; opacity: 0.16; }
+  #pcTextBar #mainText::placeholder { color: inherit; opacity: 0.45; }
   .hud .hint { pointer-events: none; }
   /* HUD 섹션 카드 — 메인 / 설정 / 에디터를 누적. 자연 콘텐츠 폭, max-width(.hud) 넘으면 자연스럽게 wrap.
      에디터 사이드바·설정창은 --hud-h 변수로 HUD 높이만큼 자기 영역을 줄임 → 시각적 충돌 회피. */
@@ -558,6 +580,8 @@
   </div>
   <div class="introDontShow" id="introDontShow" title="체크하면 다음부터 이 안내를 보지 않습니다"><span class="introChk">☐</span> 다시 보지 않기</div>
 </div>
+<!-- PC 전용 외부 텍스트 입력 바 — 출력화면 하단 중앙. CC 푸터 bottom 과 동일 베이스라인. -->
+<div id="pcTextBar"></div>
 <div class="panel" id="panel">
   <span class="panelMobileBack stageBtn closeX" id="panelMobileBack" title="닫기">✕</span>
   <div id="panel-body"></div>
@@ -15746,22 +15770,22 @@ const DICE_FACES = ['⚀','⚁','⚂','⚃','⚄','⚅'];
 const DEFAULT_DIE = '⚂';
 function randomDieFace() { return DICE_FACES[Math.floor(Math.random() * DICE_FACES.length)]; }
 
-function buildPanel() {
-  const body = document.getElementById('panel-body');
-  body.innerHTML = '';
-  sliderUpdaters.length = 0;
-
-  // "텍스트" 제목 — 슬라이더 그룹 제목과 동일한 box-height(14px) + margin-bottom(4px).
-  //   주사위(T = 글귀 랜덤) 동반.
-  //   id 부여: 모바일에서는 외부 입력바로 일원화하므로 이 제목+입력창을 CSS 로 숨김.
+// [7번] PC 전용 외부 텍스트 입력바 — 출력화면 하단 중앙(#pcTextBar). 페이지 init 시 한 번 호출.
+//   panel.open 여부와 무관하게 항상 표시 (모바일에선 CSS 로 hidden).
+function setupPcTextBar() {
+  const host = document.getElementById('pcTextBar');
+  if (!host) return;
+  // 기존 (혹 panel 안에 남아있을 수 있는) 요소 제거 후 신규 생성
+  ['panelTextTitle','mainText'].forEach(id => { const el = document.getElementById(id); if (el && el.parentNode !== host) el.remove(); });
+  if (host.querySelector('#mainText')) return;  // 이미 빌드됨
+  // 제목 + 주사위
   const taTitle = document.createElement('div');
-  taTitle.className = 'groupTitle';
   taTitle.id = 'panelTextTitle';
   {
     const ts = document.createElement('span');
     ts.className = 'titleText';
     ts.style.lineHeight = '14px';
-    ts.textContent = '텍스트 ';  // 주사위와 사이 띄어쓰기 1개 추가 (nbsp)
+    ts.textContent = '텍스트 ';
     const td = document.createElement('span');
     td.className = 'die';
     td.id = 'panelTextDie';
@@ -15775,32 +15799,36 @@ function buildPanel() {
     taTitle.appendChild(ts);
     taTitle.appendChild(td);
   }
-  body.appendChild(taTitle);
-  // 타이핑 입력창 — 자동 높이 조정. 기본 1행, 내용에 따라 늘어남
+  host.appendChild(taTitle);
+  // textarea — 자동 높이
   const ta = document.createElement('textarea');
   ta.id = 'mainText';
   ta.rows = 1;
-  // 기본 문구는 placeholder(샘플 톤)로만 노출 — 값은 비워서 사이트 공통 opacity 0.45 가 적용되게 함.
   ta.placeholder = MOBILE_NOTICE;
   ta.value = (TEXT === MOBILE_NOTICE) ? '' : TEXT;
-  // scrollHeight 기반 자동 높이 — 입력 시 / 초기 / 폭 변경 시 호출
   const _adjustTaHeight = () => {
     ta.style.height = 'auto';
     ta.style.height = ta.scrollHeight + 'px';
   };
   ta.addEventListener('input', () => {
     TEXT = ta.value;
-    // 텍스트에 자모 선택창에 없는 (디자인되지 않은) 유니코드가 들어오면 자동 등록
-    _autoRegisterUnknownChars(TEXT);
+    if (typeof _autoRegisterUnknownChars === 'function') _autoRegisterUnknownChars(TEXT);
     if (world) world = buildWorld(currentText());
     saveTextLocal();
     _adjustTaHeight();
-    if (typeof _refreshUsedInTextHighlight === 'function') _refreshUsedInTextHighlight();  // [항목1·2]
+    if (typeof _refreshUsedInTextHighlight === 'function') _refreshUsedInTextHighlight();
   });
-  body.appendChild(ta);
-  // DOM 부착 후 한 번 — 초기 높이 설정
+  host.appendChild(ta);
   requestAnimationFrame(_adjustTaHeight);
+}
 
+function buildPanel() {
+  const body = document.getElementById('panel-body');
+  body.innerHTML = '';
+  sliderUpdaters.length = 0;
+
+  // [7번] 텍스트 입력바는 #pcTextBar(PC) 또는 #mobileTextBar(모바일) 에 별도 위치.
+  //   buildPanel 안에서는 더 이상 생성 안 함 — setupPcTextBar() 가 페이지 init 에서 한 번 만듦.
   let _shownGroupCount = 0;
   PANEL_GROUPS.forEach((group) => {
     if (group.hidden) {
@@ -21003,6 +21031,7 @@ requestAnimationFrame(() => {
   _mobileMode = _MOBILE;
   rebuild();
   setupCustomTooltips();
+  if (typeof setupPcTextBar === 'function') setupPcTextBar();  // PC 외부 텍스트바 초기 빌드 (한 번)
   tick();
   // 시작 시 R(전체 랜덤) 1회만 — 자동 루프는 off (사용자가 A로 켜기 전까지 고정)
   if (typeof randomizeAll === 'function') randomizeAll();
