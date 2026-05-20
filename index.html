@@ -7,6 +7,8 @@
 <meta name="description" content="">
 <!-- Google AdSense 로더 (퍼블리셔 ca-pub-7237044319292911) — 우하단 광고 박스용 -->
 <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7237044319292911" rossorigin="anonymous"></script>
+<!-- QRious 라이브러리 — 로컬 QR 생성 (외부 API fallback 의 ~1s 네트워크 지연 제거) -->
+<script src="https://cdn.jsdelivr.net/npm/qrious@4.0.2/dist/qrious.min.js"></script>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   html, body { width: 100%; height: 100%; overflow: hidden; background: #808080; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
@@ -415,6 +417,9 @@
   
   /* 커스텀 툴팁 — 페이지 배경색과 일치 */
   .cwTooltip { position: fixed; z-index: 2147483647; pointer-events: none; padding: 4px 8px; border: 1px solid var(--editor-fg, currentColor); background: var(--editor-bg, transparent); color: var(--editor-fg, currentColor); font-family: sans-serif; font-size: 10px; letter-spacing: 0.5px; line-height: 1.4; white-space: normal; max-width: 280px; opacity: 0; transition: opacity 0.12s; }
+  /* 픽셀 거리 측정 도구 오버레이 — 화면 전체 fixed 위치, pointer-events none. 클릭 가능 요소가 아닌 빈 영역 드래그 시 표시. */
+  #pxMeasureOverlay { position: fixed; inset: 0; pointer-events: none; z-index: 2147483646; display: none; }
+  #pxMeasureOverlay svg { position: absolute; left: 0; top: 0; width: 100%; height: 100%; }
   .cwTooltip.show { opacity: 1; }
   .panel .pillBtn { display: inline-flex; align-items: center; justify-content: center; padding: 5px 14px; border: 1px solid currentColor; background: var(--editor-bg, transparent); color: currentColor; font-family: inherit; font-size: 10px; cursor: pointer; letter-spacing: 0.5px; border-radius: 999px; text-decoration: none; text-align: center; line-height: 1; height: 22px; box-sizing: border-box; }
   /* === 에디터 오버레이 (E) — 우측 정렬, 배경 투명, 편집 캔버스만 불투명 === */
@@ -12981,6 +12986,30 @@ function resolveJamo(name) {
   }
   return null;
 }
+// Editor 좌표계용 fallback 글리프 — PRIMITIVES 의 원본 좌표 그대로 사용 (× COORD_SCALE 정수 단위).
+//   ensureEditorDef / addUserEditorChar 에서 PRIMITIVES 가 없는 글자의 초기 디자인으로 사용.
+function _fallbackBoxGlyphForEditor() {
+  const m = PRIMITIVES['ㅁ'];
+  const x = PRIMITIVES['x'];
+  if (!m || !x) return null;
+  const bm = bbox(m.nodes), bx = bbox(x.nodes);
+  const wm = bm.maxX - bm.minX, hm = bm.maxY - bm.minY;
+  const wx = bx.maxX - bx.minX, hx = bx.maxY - bx.minY;
+  const sx = (wx > 0) ? wm / wx : 1, sy = (hx > 0) ? hm / hx : 1;
+  const mNodes = m.nodes.map(n => ({ x: n.x, y: n.y }));
+  const xNodes = x.nodes.map(n => ({
+    x: bm.minX + (n.x - bx.minX) * sx,
+    y: bm.minY + (n.y - bx.minY) * sy
+  }));
+  const off = mNodes.length;
+  const mEdges = (m.edges || []).map(e => e.slice());
+  const xEdges = (x.edges || []).map(e => {
+    const ne = [e[0] + off, e[1] + off];
+    if (e.length > 2) ne.push(e[2]);
+    return ne;
+  });
+  return { nodes: mNodes.concat(xNodes), edges: mEdges.concat(xEdges), strokes: [] };
+}
 // 디자인이 없는 글자(라틴 대문자·이모지·드물게 사용되는 기호 등) 의 fallback 글리프.
 //   PRIMITIVES['ㅁ'] + PRIMITIVES['x'] 의 기본 디자인을 가운데 정렬하여 합쳐
 //   X-in-box (ㅁ 사각형 안에 ✕) 모양으로 출력. 사용자 요청 기능.
@@ -14637,9 +14666,13 @@ function draw() {
   ctx.fillRect(0, 0, cssW, cssH);
   document.body.style.background = bg;
 
-  // [E3] 테두리 ON 이면 글자는 채우지 않고 윤곽선만(첫 테두리=글자 윤곽) 동심 윤곽으로
-  //   글자를 감쌈(스크린샷 형태). 부드럽게 on/off 무관·랜덤 제외. → 그린 뒤 즉시 종료.
-  if (_bordersOn()) { drawBorders(ctx, world.bodies, fg); return; }
+  // [E3] 테두리 음수(borderWidth < 0): 글자를 채우지 않고 테두리만 표시 (기존 동작).
+  //   테두리 양수(borderWidth > 0): 일반 노드·획 + 그 위에 반전 테두리 ring 같이 표시
+  //   → 노드/획 원본 색은 유지, 추가로 윤곽선만 강조 (사용자 요청).
+  if (_bordersOn() && (PARAMS.borderWidth || 0) < 0) {
+    drawBorders(ctx, world.bodies, fg);
+    return;
+  }
 
   // 부드럽게 활성 시 픽셀 마스크 모드
   const useOutline = (PARAMS.cornerR > 0);
@@ -14714,52 +14747,19 @@ function draw() {
       const _ic = (typeof _bondInvColor === 'function') ? _bondInvColor() : currentFgColor();
       ctx.fillStyle = _ic; ctx.strokeStyle = _ic;
       const _hr = Math.max((PARAMS.nodeR || 0) / 2, 3);
-      // 호버 강조 = 자석 attachment 후보 노드만. body.magnetPairs 에 등장하는 노드 인덱스 집합으로 한정.
-      //   magnetPairs 가 array 면 (한글 글리프) 빈 배열이라도 magnet 모드 적용 → 자석 노드 0개면 강조 0개.
-      //   magnetPairs 가 undefined (비한글·구두점) → fallback 으로 base 노드 모두 강조.
-      const _mp = _hb.magnetPairs;
-      const _useMagnet = Array.isArray(_mp);
-      const _magnetSet = _useMagnet ? new Set() : null;
-      if (_useMagnet) _mp.forEach(p => { if (Array.isArray(p)) p.forEach(idx => _magnetSet.add(idx)); });
+      // 호버 강조 = 기본 디자인 노드(isBase !== false) 전부. 한글/비한글 모두 동일 룰.
+      //   (이전의 magnetPairs 자석 필터 제거 — 사용자 요청)
       _hoverJamo.idxs.forEach(i => {
         const n = _hb.nodes[i];
         if (!n || n.inv || n.isBase === false) return;
-        if (_useMagnet && !_magnetSet.has(i)) return;  // 자석 가능 노드만 (한글)
         drawNodeShape(n, _hr);
       });
       ctx.restore();
     }
   }
-  // 픽셀 거리 측정 도구 표시 — 수직 또는 수평 1px 선 + 중앙에 거리 텍스트(선과 동기 회전)
-  if (_pxMeasure && _pxMeasure.axis) {
-    const rect = canvas.getBoundingClientRect();
-    const rx = (rect.width  > 0) ? cssW / rect.width  : 1;
-    const ry = (rect.height > 0) ? cssH / rect.height : 1;
-    const x0 = (_pxMeasure.sx - rect.left) * rx;
-    const y0 = (_pxMeasure.sy - rect.top)  * ry;
-    let x1, y1;
-    if (_pxMeasure.axis === 'h') { x1 = (_pxMeasure.cx - rect.left) * rx; y1 = y0; }
-    else                          { x1 = x0; y1 = (_pxMeasure.cy - rect.top) * ry; }
-    ctx.save();
-    ctx.setLineDash([]);
-    const _mc = currentFgColor();
-    ctx.strokeStyle = _mc; ctx.fillStyle = _mc;
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(x0, y0); ctx.lineTo(x1, y1);
-    ctx.stroke();
-    const distPx = (_pxMeasure.axis === 'h')
-      ? Math.abs(_pxMeasure.cx - _pxMeasure.sx)
-      : Math.abs(_pxMeasure.cy - _pxMeasure.sy);
-    const txt = Math.round(distPx) + 'px';
-    const mx = (x0 + x1) / 2, my = (y0 + y1) / 2;
-    ctx.font = '10px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'bottom';
-    ctx.translate(mx, my);
-    if (_pxMeasure.axis === 'v') ctx.rotate(-Math.PI / 2);
-    ctx.fillText(txt, 0, -5);  // 선 위 5px
-    ctx.restore();
+  // 테두리 양수 — 일반 노드·획 그리기 후 위에 반전 테두리 ring 추가
+  if (_bordersOn() && (PARAMS.borderWidth || 0) > 0) {
+    drawBorders(ctx, world.bodies, fg);
   }
 }
 
@@ -14773,6 +14773,118 @@ let K_ROT = MH_CFG.elasticity.kRot;    // 초기값 = 설정 대시보드 MH_CFG
 
 // ── 획 유연성 — 엣지 스프링 강도 ──
 let K_SPRING = MH_CFG.elasticity.kSpring; // 초기값 = 설정 대시보드 MH_CFG.elasticity.kSpring (실제 탄성 = FLEX_MAX - K_SPRING)
+
+// ── 픽셀 거리 측정 도구 — 전역. 모든 화면(메인 캔버스·설정창·편집창·팝업 등) 의 빈 영역에서 작동 ──
+//   클릭 가능 요소(버튼·자모 버튼·드래그 핸들·슬라이더 값·텍스트 입력 등) 위에서는 시작 안 함.
+//   드래그 결정: |dx| vs |dy| 비교로 수직 또는 수평선만 그려짐. 마우스 떼면 'Npx' 클립보드 복사.
+let _pxMeasureOverlay = null;
+function _ensurePxMeasureOverlay() {
+  if (_pxMeasureOverlay) return _pxMeasureOverlay;
+  const ov = document.createElement('div');
+  ov.id = 'pxMeasureOverlay';
+  ov.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg">'
+    + '<line id="pxMeasureLine" x1="0" y1="0" x2="0" y2="0" stroke-width="1" />'
+    + '<text id="pxMeasureText" font-family="sans-serif" font-size="10" text-anchor="middle">0px</text>'
+    + '</svg>';
+  document.body.appendChild(ov);
+  _pxMeasureOverlay = ov;
+  return ov;
+}
+function _measureColor() {
+  // 배경 명도 반전 — bg 가 밝으면 검정, 어두우면 흰색. 어떤 화면에서든 가시.
+  if (typeof bgR !== 'undefined') {
+    const lum = 0.299 * bgR + 0.587 * bgG + 0.114 * bgB;
+    return (lum > 127) ? '#000' : '#fff';
+  }
+  return '#000';
+}
+function _renderPxMeasure() {
+  if (!_pxMeasure || !_pxMeasure.axis) { _hidePxMeasure(); return; }
+  const ov = _ensurePxMeasureOverlay();
+  ov.style.display = 'block';
+  const svg = ov.querySelector('svg');
+  svg.setAttribute('viewBox', '0 0 ' + window.innerWidth + ' ' + window.innerHeight);
+  const ln = ov.querySelector('#pxMeasureLine');
+  const tx = ov.querySelector('#pxMeasureText');
+  const x0 = _pxMeasure.sx, y0 = _pxMeasure.sy;
+  let x1, y1;
+  if (_pxMeasure.axis === 'h') { x1 = _pxMeasure.cx; y1 = y0; }
+  else                          { x1 = x0; y1 = _pxMeasure.cy; }
+  const _col = _measureColor();
+  ln.setAttribute('x1', x0); ln.setAttribute('y1', y0);
+  ln.setAttribute('x2', x1); ln.setAttribute('y2', y1);
+  ln.setAttribute('stroke', _col);
+  const dist = (_pxMeasure.axis === 'h') ? Math.abs(_pxMeasure.cx - x0) : Math.abs(_pxMeasure.cy - y0);
+  tx.textContent = Math.round(dist) + 'px';
+  tx.setAttribute('fill', _col);
+  const mx = (x0 + x1) / 2, my = (y0 + y1) / 2;
+  if (_pxMeasure.axis === 'h') {
+    tx.setAttribute('x', mx);
+    tx.setAttribute('y', my - 4);
+    tx.removeAttribute('transform');
+  } else {
+    tx.setAttribute('x', 0);
+    tx.setAttribute('y', 0);
+    tx.setAttribute('transform', 'translate(' + mx + ',' + my + ') rotate(-90) translate(0,-4)');
+  }
+}
+function _hidePxMeasure() {
+  if (_pxMeasureOverlay) _pxMeasureOverlay.style.display = 'none';
+}
+function _canStartMeasure(target) {
+  if (!target || target.nodeType !== 1) return false;
+  const tag = (target.tagName || '').toLowerCase();
+  if (['button','a','input','textarea','select','label','option','img'].indexOf(tag) >= 0) return false;
+  // 클릭 가능 클래스 — 버튼류·인터랙티브 요소
+  const _CLICKABLE = 'button, a, input, textarea, select, label,'
+    + ' .pillBtn, .jamoBtn, .stageBtn, .die, .lbvVal, .dragHandle,'
+    + ' .ctxItem, .acdBlockBox, .acdBlockItem, .hudClickable,'
+    + ' [role="button"], [data-clickable], .panelMobileBack, #mobileMenuBtn';
+  if (target.closest && target.closest(_CLICKABLE)) return false;
+  // computed cursor 가 pointer / grab / col/row-resize 면 클릭/드래그 가능 요소 → 측정 시작 안 함
+  try {
+    const cs = getComputedStyle(target);
+    const cur = cs.cursor || '';
+    if (cur === 'pointer' || cur === 'grab' || cur === 'grabbing' || cur === 'col-resize' || cur === 'row-resize' || cur === 'move' || cur === 'ew-resize' || cur === 'ns-resize' || cur === 'nesw-resize' || cur === 'nwse-resize' || cur === 'text') return false;
+  } catch (_) {}
+  return true;
+}
+document.addEventListener('pointerdown', e => {
+  // 좌클릭 또는 터치만. 우클릭·중간버튼 무시.
+  if (e.button !== 0 && e.button !== undefined) return;
+  // 캔버스#universe 위 노드 hit 은 본 핸들러가 처리 (draggedNode 설정 됨) → 측정 안 함.
+  //   이벤트 bubble 순서: target → ... → document. 본 핸들러가 draggedNode 를 동기 설정 후 도달.
+  if (draggedNode) return;
+  if (_pxMeasure) return;  // 이미 측정 중
+  if (!_canStartMeasure(e.target)) return;
+  _pxMeasure = { sx: e.clientX, sy: e.clientY, cx: e.clientX, cy: e.clientY, axis: null };
+}, false);
+document.addEventListener('pointermove', e => {
+  if (!_pxMeasure) return;
+  _pxMeasure.cx = e.clientX; _pxMeasure.cy = e.clientY;
+  const ddx = _pxMeasure.cx - _pxMeasure.sx;
+  const ddy = _pxMeasure.cy - _pxMeasure.sy;
+  _pxMeasure.axis = (Math.abs(ddx) >= Math.abs(ddy)) ? 'h' : 'v';
+  _renderPxMeasure();
+}, false);
+function _endPxMeasure() {
+  if (!_pxMeasure) return;
+  const ddx = _pxMeasure.cx - _pxMeasure.sx;
+  const ddy = _pxMeasure.cy - _pxMeasure.sy;
+  const dist = (_pxMeasure.axis === 'h') ? Math.abs(ddx)
+            : (_pxMeasure.axis === 'v') ? Math.abs(ddy) : 0;
+  if (dist >= 1) {
+    const txt = Math.round(dist) + 'px';
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(txt).catch(()=>{});
+    }
+  }
+  _pxMeasure = null;
+  _hidePxMeasure();
+}
+document.addEventListener('pointerup',     _endPxMeasure, false);
+document.addEventListener('pointercancel', _endPxMeasure, false);
+window.addEventListener('resize', () => { if (_pxMeasure) _renderPxMeasure(); });
 
 function tick() {
   step(1);
@@ -15323,12 +15435,6 @@ canvas.addEventListener('pointerdown', e => {
     const d2 = dx * dx + dy * dy;
     if (d2 < bestD2) { bestD2 = d2; best = n; bestBody = body; bestIdx = ni; }
   }));
-  // 빈 영역 좌클릭 드래그 → 픽셀 거리 측정 모드 시작 (수직/수평만)
-  if (!best && (e.button === 0 || e.button === undefined)) {
-    _pxMeasure = { sx: e.clientX, sy: e.clientY, cx: e.clientX, cy: e.clientY, axis: null };
-    try { canvas.setPointerCapture(e.pointerId); } catch(_){}
-    return;
-  }
   if (best) {
     draggedNode = best;
     // 잡는 동안에는 rest 변경 없음 — 마우스 놓는 순간에만 각도 rest 재설정 (endDrag에서)
@@ -15480,14 +15586,6 @@ canvas.addEventListener('contextmenu', e => {
   _showViewCanvasCtxMenu(e.clientX, e.clientY, items);
 });
 canvas.addEventListener('pointermove', e => {
-  // 픽셀 측정 모드 — 끝점 갱신 후 |dx|,|dy| 비교로 축 결정 (수직/수평만)
-  if (_pxMeasure) {
-    _pxMeasure.cx = e.clientX; _pxMeasure.cy = e.clientY;
-    const ddx = _pxMeasure.cx - _pxMeasure.sx;
-    const ddy = _pxMeasure.cy - _pxMeasure.sy;
-    _pxMeasure.axis = (Math.abs(ddx) >= Math.abs(ddy)) ? 'h' : 'v';
-    return;
-  }
   const p = canvasCoords(e);
   if (draggedNode) {
     dragX = p.x; dragY = p.y;
@@ -15638,23 +15736,6 @@ function _openEditorWithMoimkkol(moimkkolChar) {
 }
 
 function endDrag(e) {
-  // 픽셀 측정 모드 종료 — 거리 클립보드 복사 후 상태 해제
-  if (_pxMeasure) {
-    const ddx = _pxMeasure.cx - _pxMeasure.sx;
-    const ddy = _pxMeasure.cy - _pxMeasure.sy;
-    const dist = (_pxMeasure.axis === 'h') ? Math.abs(ddx)
-              : (_pxMeasure.axis === 'v') ? Math.abs(ddy)
-              : 0;
-    if (dist >= 1) {
-      const txt = Math.round(dist) + 'px';
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(txt).catch(()=>{});
-      }
-    }
-    _pxMeasure = null;
-    try { if (e && e.pointerId != null) canvas.releasePointerCapture(e.pointerId); } catch(_){}
-    return;
-  }
   if (!draggedNode) return;
   // [항목3·4] 붙임 파트너가 잡혀 있으면 디자인에 앞/뒤붙임 기록 + world 재빌드.
   //   (재빌드 시 새 s/n 쌍을 _computeMagnetPairs 가 잡아 이후 물리 인력/융합 적용)
@@ -17732,9 +17813,13 @@ function addUserEditorChar(ch) {
     user.push(ch);
     _saveUserChars(user);
   }
-  // 추가된 문자는 디자인이 비어있도록 (PRIMITIVES 없는 상태) — _editorDefs도 초기화
+  // 추가된 문자 디자인 — PRIMITIVES 가 없으면 ㅁ+x X-in-box fallback 으로 초기화 (사용자 요청).
+  //   그래야 자모 선택창 버튼 클릭 시 편집창에 기본 모양이 표시되고, 출력 화면에서도 동일 모양으로 출력.
   if (typeof _editorDefs !== 'undefined') {
-    _editorDefs[ch] = { nodes: [], edges: [], strokes: [], margins: {T:0,B:0,L:0,R:0} };
+    const _fb = (typeof _fallbackBoxGlyphForEditor === 'function') ? _fallbackBoxGlyphForEditor() : null;
+    _editorDefs[ch] = _fb
+      ? Object.assign({ margins: {T:0,B:0,L:0,R:0} }, _fb)
+      : { nodes: [], edges: [], strokes: [], margins: {T:0,B:0,L:0,R:0} };
   }
   try { if (window.mhAnalytics) window.mhAnalytics.track('addchar', { ch }); } catch (_) {}
   _refreshEditorCategories();
