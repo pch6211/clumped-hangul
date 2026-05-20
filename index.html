@@ -324,20 +324,12 @@
     border-color: var(--editor-fg, currentColor);
   }
   /* [v1.09] HUD 박스 제거 — 가이드와 동일한 스타일 (테두리/배경/도그이어 없음, 패딩 0). */
-  .hud { position: fixed; top: 27px; bottom: auto; left: calc(var(--ui-gap) + 11px); right: auto; max-width: calc(100vw - var(--ui-gap) * 2 - 14px); font-family: sans-serif; font-size: 10px; line-height: 1.6; letter-spacing: 0.375px; z-index: 10; user-select: none;
+  .hud { position: fixed; top: 27px; bottom: auto; left: calc(var(--ui-gap) + 11px); right: auto; max-width: calc(100vw - var(--ui-gap) * 2 - 14px); font-family: sans-serif; font-size: 10px; line-height: 2; letter-spacing: 0.375px; z-index: 10; user-select: none;
     padding: 0; background: transparent; border: none; width: fit-content; box-sizing: border-box;
   }
   /* S 키로 설정창 열면 HUD 가 패널 폭만큼 우측 이동 (CSS transform, 즉시 이동) */
   body.panel-open .hud { transform: translateX(304px); }
-  /* HUD ::after 도그이어 제거 (가이드와 동일 스타일) */
-  .hud::after {
-    content: ""; position: absolute; right: -1px; bottom: -1px;
-    width: 12px; height: 12px; box-sizing: border-box; pointer-events: none;
-    background-color: var(--editor-bg, transparent);
-    background-image: linear-gradient(135deg, transparent calc(50% - 0.45px), currentColor calc(50% - 0.45px), currentColor calc(50% + 0.45px), transparent calc(50% + 0.45px));
-    border-top: 1px solid currentColor;
-    border-left: 1px solid currentColor;
-  }
+  /* [v1.09] HUD ::after 도그이어 완전 제거 (직전 commit 에서 주석만 남기고 코드 미삭제 → 실제 삭제) */
   /* PC 전용 외부 텍스트 입력바 — 화면 왼쪽 하단. 설정창 폭(288px) 와 동일. */
   #pcTextBar { position: fixed; left: calc(var(--ui-gap) - var(--sbw) + 11px); transform: none; bottom: 22px; width: 288px; max-width: calc(100vw - 32px); z-index: 90; font-family: sans-serif; font-size: 10px; letter-spacing: 0.5px; line-height: 1.4; color: currentColor; pointer-events: auto; box-sizing: border-box; padding-left: 8px; }
   /* 제목은 설정창 내부 .groupTitle 와 동일 디자인 (className 으로 위임). 별도 override 없음. */
@@ -424,12 +416,14 @@
     border-radius: 0;
   }
   /* 도그이어 ::after 제거 (사용자 요청) */
-  .guideList .guideLine { font-size: 10px; letter-spacing: 0.5px; line-height: 2.4; white-space: nowrap; opacity: 1; }
+  .guideList .guideLine { font-size: 10px; letter-spacing: 0.5px; line-height: 2; white-space: nowrap; opacity: 1; }  /* [v1.09] HUD(1.6)·가이드(2.4) 중간값 2.0 */
   .guideList .guideLine b { font-weight: normal; }
   .guideList .guideLine .gk { opacity: 1; margin-left: 0; }  /* [v1.09] 콜론 뒤 margin-left 4 → 0 (공백 단일화) */
   .guideList .guideSub { margin-top: 12px; opacity: 1; font-size: 10px; letter-spacing: 0.5px; }
   /* 에디터창 가이드: 박스 위치는 그대로(우측, margin-left:auto)·텍스트만 좌측 정렬 */
-  .editor .guideList { text-align: left; margin-left: 0; }  /* [v1.09] 왼쪽 정렬 (margin-left: auto 제거) */
+  .editor .guideList { text-align: left; margin-left: 0; }  /* [v1.09] 왼쪽 정렬 */
+  /* [v1.09] 사이드바 가이드 들여쓰기 = 카테고리 제목과 동일 12.5px */
+  #editorCommonGuide { padding-left: 12.5px; }
   .editor .guideList .guideLine .gk { margin-left: 0; margin-right: 0; }  /* [v1.09] 콜론 뒤 공백 단일화 */
   /* #13 D — 편집창(.stage) 안 가이드: toolBtnBottomRow 가 canvasWrap 기준 absolute
      (top: calc(100% + 20px))로 흐름에서 빠짐 → 버튼행을 지나도록 원래 위 여백 60px. */
@@ -505,7 +499,7 @@
   .editor .stage .meta { display: flex; gap: 8px; align-items: baseline; margin-bottom: 7px; justify-content: flex-start; line-height: 1; }
   .stageBtn { display: inline-flex; align-items: center; justify-content: center; font-size: 10px; line-height: 1; height: 14px; user-select: none; flex: 0 0 auto; vertical-align: middle; }
   .stageBtn.closeX { cursor: pointer; }
-  .stageBtn.dragHandle { cursor: grab; }
+  .stageBtn.dragHandle { cursor: grab; font-size: 15px; height: 15px; }  /* [v1.09] 주사위(15px)와 동일 크기 */
   .stageBtn.dragHandle.dragging { cursor: grabbing; }
   .editor .stage .meta .label { flex: 1 1 auto; text-align: left; }
   /* 노드/엣지 두 항목 간 간격 — HUD 항목 간격(margin-right: 14px)과 동일 */
@@ -14756,11 +14750,20 @@ function draw() {
       const _ic = (typeof _bondInvColor === 'function') ? _bondInvColor() : currentFgColor();
       ctx.fillStyle = _ic; ctx.strokeStyle = _ic;
       const _hr = Math.max((PARAMS.nodeR || 0) / 2, 3);
-      // 호버 강조 = 기본 디자인 노드 (isBase !== false). 한글/비한글 동일.
+      // 호버 강조 = 기본 디자인 노드 + dedupe (1 디자인 꼭짓점당 1 후보) — bond candidate 와 동일 패턴.
+      const _hbest = new Map();
       _hoverJamo.idxs.forEach(i => {
         const n = _hb.nodes[i];
         if (!n || n.inv || n.isBase === false) return;
-        drawNodeShape(n, _hr);
+        const m = (typeof _bondMapNode === 'function') ? _bondMapNode(_hb, i) : null;
+        if (!m) { _hbest.set('idx#' + i, { idx: i, nd2: 0 }); return; }
+        const key = m.part + '#' + m.designIdx;
+        const prev = _hbest.get(key);
+        if (!prev || m.nd2 < prev.nd2) _hbest.set(key, { idx: i, nd2: m.nd2 });
+      });
+      _hbest.forEach(c => {
+        const n = _hb.nodes[c.idx];
+        if (n) drawNodeShape(n, _hr);
       });
       ctx.restore();
     }
@@ -18036,6 +18039,16 @@ function openEditor() {
   const overlay = document.getElementById('editor');
   if (!overlay) return;
   if (overlay.classList.contains('open')) {
+    // [v1.09] stage 만 표시 (sidebar-hidden) 상태에서 E 누름 → 사이드바만 추가 표시 (stage 유지).
+    //   기존 stage 위치는 popup.place() 로 재계산해 사이드바와 겹침 자연스럽게 회피.
+    if (overlay.classList.contains('sidebar-hidden')) {
+      overlay.classList.remove('sidebar-hidden');
+      requestAnimationFrame(() => {
+        if (typeof _editorStagePopup !== 'undefined' && _editorStagePopup && _editorStagePopup.place) _editorStagePopup.place();
+        if (typeof _moimkkolStagePopup !== 'undefined' && _moimkkolStagePopup && _moimkkolStagePopup.place) _moimkkolStagePopup.place();
+      });
+      return;
+    }
     closeEditor();
   } else {
     overlay.classList.remove('sidebar-hidden');  // 일반 진입(E·HUD) — 사이드바 표시 복원
