@@ -530,10 +530,12 @@
   .editor .marginBottom { bottom: -10px; left: 50%; transform: translateX(-50%); }
   .editor .marginLeft   { left: -17px;   top: 50%;  transform: translateY(-50%); }
   .editor .marginRight  { right: -17px;  top: 50%;  transform: translateY(-50%); }
-  /* [v1.09] 등장 높이 + 초기화/모두 지움 — 단일 row, 한 줄 가운데 정렬. 모두 세로 가운데. */
-  .editor .editorBottomRow { position: absolute; left: 0; right: 0; top: calc(100% + 20px); display: flex; align-items: center; justify-content: center; gap: 8px; }
-  .editor .editorBottomRow .titleText { line-height: 1; }
-  .editor .editorBottomRow .hArrowCol { display: flex; flex-direction: column; justify-content: center; align-items: center; }
+  /* [v1.09] editorBottomRow — 좌: 등장 높이, 우: 초기화/모두 지움. space-between, 세로 가운데. */
+  .editor .editorBottomRow { position: absolute; left: 0; right: 0; top: calc(100% + 20px); display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .editor .editorHeightDiv { display: flex; align-items: center; }
+  .editor .editorHeightDiv .hLbl { font-size: 10px; letter-spacing: 0.5px; line-height: 1; }
+  .editor .editorHeightDiv .lbvVal { cursor: pointer; position: relative; display: inline-block; }
+  .editor .editorHeightDiv .lbvVal::after { content: ''; position: absolute; left: 0; right: 0; bottom: -2px; height: 1px; background: repeating-linear-gradient(to right, currentColor 0 1px, transparent 1px 2px); }
   .editor .heightInputBlock { display: flex; flex-direction: column; align-items: flex-start; }
   .editor .heightInputBlock .groupTitle { line-height: 14px; margin-bottom: 4px; letter-spacing: 0.5px; opacity: 1; }
   .editor .heightInputBlock .numBox { width: 25px; }
@@ -626,16 +628,15 @@
     </div>
     <div class="canvasWrap">
       <canvas class="editorCanvas" id="editorCanvas" width="453" height="453"></canvas>
-      <!-- [v1.09] 단일 row: 등장 높이 제목 + 입력 + 화살표 + 초기화 + 모두 지움. 모두 세로 가운데. -->
-      <div class="editorBottomRow" id="editorHeightBlock" title="등장 높이 — 양수는 위, 음수는 아래, 0은 정중앙">
-        <span class="titleText">등장 높이</span>
-        <input type="number" inputmode="numeric" class="numBox" id="editorHeightInput" />
-        <span class="hArrowCol">
-          <span class="hArrow" data-dir="1" title="+1">▲</span>
-          <span class="hArrow" data-dir="-1" title="-1">▼</span>
-        </span>
-        <button class="pillBtn" id="btnRevertDefault" title="현재 자모 디자인을 편집 전 상태로 복원">초기화</button>
-        <button class="pillBtn" id="btnClearAll" title="현재 자모의 모든 노드·획 삭제">모두 지움</button>
+      <!-- [v1.09] editorBottomRow — 좌: 등장 높이 (자모 한글일 때 hide), 우: 초기화/모두 지움. -->
+      <div class="editorBottomRow">
+        <div class="editorHeightDiv" id="editorHeightBlock" title="등장 높이 — 양수는 위, 음수는 아래, 0은 정중앙">
+          <span class="hLbl">등장 높이: <span class="lbvVal" id="editorHeightVal">0</span></span>
+        </div>
+        <div class="toolBtnBottomRow">
+          <button class="pillBtn" id="btnRevertDefault" title="현재 자모 디자인을 편집 전 상태로 복원">초기화</button>
+          <button class="pillBtn" id="btnClearAll" title="현재 자모의 모든 노드·획 삭제">모두 지움</button>
+        </div>
       </div>
     </div>
     <!-- #13 D — 자모 디자인 편집 가이드(제목 삭제, 내용만). 창이 보일 때 함께 표시 -->
@@ -663,15 +664,14 @@
     </div>
     <div class="canvasWrap">
       <canvas class="editorCanvas" id="moimkkolCanvas" width="453" height="453"></canvas>
-      <!-- [v1.09] 단일 row: 등장 높이 제목 + 입력 + 화살표 + 초기화. -->
-      <div class="editorBottomRow" title="등장 높이 — 양수는 위, 음수는 아래, 0은 정중앙 (이 모임꼴 전체에 적용)">
-        <span class="titleText">등장 높이</span>
-        <input type="number" inputmode="numeric" class="numBox" id="moimkkolHeightInput" />
-        <span class="hArrowCol">
-          <span class="hArrow" data-dir="1" title="+1">▲</span>
-          <span class="hArrow" data-dir="-1" title="-1">▼</span>
-        </span>
-        <button class="pillBtn" id="btnMoimkkolResetPattern" title="이 모임꼴 패턴의 박스 배치를 기본값으로 되돌리기">초기화</button>
+      <!-- [v1.09] editorBottomRow — 좌: 등장 높이, 우: 초기화. -->
+      <div class="editorBottomRow">
+        <div class="editorHeightDiv" title="등장 높이 — 양수는 위, 음수는 아래, 0은 정중앙 (이 모임꼴 전체에 적용)">
+          <span class="hLbl">등장 높이: <span class="lbvVal" id="moimkkolHeightVal">0</span></span>
+        </div>
+        <div class="toolBtnBottomRow">
+          <button class="pillBtn" id="btnMoimkkolResetPattern" title="이 모임꼴 패턴의 박스 배치를 기본값으로 되돌리기">초기화</button>
+        </div>
       </div>
     </div>
     <!-- #13 D — 한글 모임꼴 편집 가이드(제목 삭제, 내용만). 창이 보일 때 함께 표시 -->
@@ -12331,11 +12331,11 @@ function openMoimkkolView(syllable) {
   }
   // [F2] 등장 높이 입력 동기화 — 표시값 = -내부(사용자 양수=위). 패턴 키 기준.
   {
-    const _mhInp = document.getElementById('moimkkolHeightInput');
-    if (_mhInp && document.activeElement !== _mhInp) {
+    const _mhVal = document.getElementById('moimkkolHeightVal');
+    if (_mhVal) {
       const _pk = (typeof _moimkkolPatternKey === 'function') ? _moimkkolPatternKey(syllable) : null;
       const _iv = (_pk && typeof _moimkkolYShift[_pk] === 'number') ? _moimkkolYShift[_pk] : 0;
-      _mhInp.value = String(-Math.round(_iv));
+      _mhVal.textContent = String(-Math.round(_iv));
     }
   }
   // #13 D — 가이드는 각 편집창 안에 위치 → 창 표시와 함께 노출(별도 토글 불필요)
@@ -18670,35 +18670,41 @@ function buildEditorContent() {
         inp._bound = true;
       }
     });
-    // [작업3] 등장 높이(yShift) 입력 바인딩 — 마진 입력과 동일 패턴(음수 허용 +
-    //   ↑↓ 키 ±1). 부활시킨 맨 오른쪽 칸 1개를 yShift 전용으로 사용.
-    const _hInp = document.getElementById('editorHeightInput');
-    if (_hInp && !_hInp._bound) {
-      _hInp.addEventListener('input', () => onHeightInputChange(_hInp.value));
-      _hInp.addEventListener('change', () => {
-        const v = parseInt(_hInp.value, 10);
-        _hInp.value = String(isNaN(v) ? 0 : v);
-        onHeightInputChange(_hInp.value);
-      });
-      _hInp.addEventListener('keydown', (ev) => {
-        if (ev.key === 'ArrowUp' || ev.key === 'ArrowDown') {
-          ev.preventDefault();
-          const cur = parseInt(_hInp.value, 10) || 0;
-          _hInp.value = String(cur + (ev.key === 'ArrowUp' ? 1 : -1));
-          onHeightInputChange(_hInp.value);
+    // [v1.09] 등장 높이 lbvVal click — showSliderValueInput floating input 사용 (슬라이더 숫자와 동일 패턴).
+    const _hVal = document.getElementById('editorHeightVal');
+    if (_hVal && !_hVal._bound) {
+      _hVal._bound = true;
+      _hVal.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const cur = parseInt(_hVal.textContent, 10) || 0;
+        if (typeof showSliderValueInput === 'function') {
+          showSliderValueInput(_hVal, cur, 1, (v) => {
+            v = Math.round(v);
+            _hVal.textContent = String(v);
+            if (typeof onHeightInputChange === 'function') onHeightInputChange(String(v));
+          });
         }
       });
-      _hInp._bound = true;
     }
-    // [F2] 모임꼴 등장 높이 입력 바인딩 — 자모 높이 입력과 동일 패턴(음수 허용 + ↑↓ ±1)
-    const _mhInp = document.getElementById('moimkkolHeightInput');
-    if (_mhInp && !_mhInp._bound) {
-      _mhInp.addEventListener('input', () => onMoimkkolHeightChange(_mhInp.value));
-      _mhInp.addEventListener('change', () => {
-        const v = parseInt(_mhInp.value, 10);
-        _mhInp.value = String(isNaN(v) ? 0 : v);
-        onMoimkkolHeightChange(_mhInp.value);
+    // 모임꼴 등장 높이 lbvVal click — 동일 패턴
+    const _mhVal = document.getElementById('moimkkolHeightVal');
+    if (_mhVal && !_mhVal._bound) {
+      _mhVal._bound = true;
+      _mhVal.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const cur = parseInt(_mhVal.textContent, 10) || 0;
+        if (typeof showSliderValueInput === 'function') {
+          showSliderValueInput(_mhVal, cur, 1, (v) => {
+            v = Math.round(v);
+            _mhVal.textContent = String(v);
+            if (typeof onMoimkkolHeightChange === 'function') onMoimkkolHeightChange(String(v));
+          });
+        }
       });
+    }
+    // [legacy] 옛 input 코드 (제거됨) — 더미 변수 유지하지 않음.
+    if (false) {
+      const _mhInp = document.getElementById('moimkkolHeightInput');
       _mhInp.addEventListener('keydown', (ev) => {
         if (ev.key === 'ArrowUp' || ev.key === 'ArrowDown') {
           ev.preventDefault();
@@ -19501,12 +19507,10 @@ function updateEditorSelectionUI() {
         inp.value = (def.margins && typeof def.margins[k] === 'number') ? def.margins[k] : 0;
       }
     });
-    // [작업3] 등장 높이 입력 동기화 — 사용자 표기는 "양수=위/음수=아래/0=정중앙".
-    //   내부 yShift 는 기존 규약(양수=아래) 유지(임베드 디자인 불변) → 입력은 부호 반전.
-    //   편집 중(포커스)인 입력은 건드리지 않음. 값이 없으면 0(정중앙).
-    const _hInp = document.getElementById('editorHeightInput');
-    if (_hInp && document.activeElement !== _hInp) {
-      _hInp.value = String(-Math.round((typeof def.yShift === 'number') ? def.yShift : 0));
+    // [v1.09] 등장 높이 lbvVal span 동기화 — 양수=위/음수=아래/0=정중앙. 부호 반전.
+    const _hVal = document.getElementById('editorHeightVal');
+    if (_hVal) {
+      _hVal.textContent = String(-Math.round((typeof def.yShift === 'number') ? def.yShift : 0));
     }
     // [F2] 한글(호환 자모·모임꼴)은 자모 편집창에서 높이 입력 불가 — 모임꼴 편집창에서 설정.
     //   기본 라틴 등 비한글은 그대로 가능.
