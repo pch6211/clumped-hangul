@@ -13010,6 +13010,9 @@ function _subdivideByCounts(jamo, counts) {
     if (n.tagFilters) o.tagFilters = Object.assign({}, n.tagFilters);
     if (n.jSrc) o.jSrc = n.jSrc;
     if (n.inv) o.inv = true;
+    // [감상모드 통합] 기본 디자인 노드 표시 보존 — 명시적 false 만 carry-over.
+    //   원본 디자인 노드(undefined)는 base 로 간주.
+    if (n.isBase === false) o.isBase = false;
     return o;
   });
   const newEdges = [];
@@ -13026,6 +13029,8 @@ function _subdivideByCounts(jamo, counts) {
       const newN = { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
       if (isInv) newN.inv = true;
       if (a.jSrc) newN.jSrc = a.jSrc;
+      // [감상모드 통합] 서브디비전으로 추가된 노드는 base 가 아님 — 호버 하이라이트·자석 대상 제외.
+      newN.isBase = false;
       newNodes.push(newN);
       inserted.push(idx);
     }
@@ -13974,6 +13979,9 @@ function buildWorld(str) {
         if (n.tags && n.tags.length) o.tags = n.tags.slice();
         if (n.tagFilters) o.tagFilters = Object.assign({}, n.tagFilters);
         if (n.inv) o.inv = true;
+        // [감상모드 통합] 기본 디자인 노드 여부 — 명시적 false 이외는 base 로 간주.
+        //   서브디비전으로 추가된 노드만 isBase=false.
+        o.isBase = (n.isBase !== false);
         return o;
       });
       const edges = t.glyph.edges.map(e => ({
@@ -14660,7 +14668,8 @@ function draw() {
       const _ic = (typeof _bondInvColor === 'function') ? _bondInvColor() : currentFgColor();
       ctx.fillStyle = _ic; ctx.strokeStyle = _ic;
       const _hr = Math.max((PARAMS.nodeR || 0) / 2, 3);
-      _hoverJamo.idxs.forEach(i => { const n = _hb.nodes[i]; if (n && !n.inv) drawNodeShape(n, _hr); });
+      // [감상모드 통합] 기본 디자인 노드만 하이라이트 — isBase=false(서브디비전 추가) 제외.
+      _hoverJamo.idxs.forEach(i => { const n = _hb.nodes[i]; if (n && !n.inv && n.isBase !== false) drawNodeShape(n, _hr); });
       ctx.restore();
     }
   }
