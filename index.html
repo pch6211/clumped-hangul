@@ -352,7 +352,7 @@
   .hud .hudItem:last-child { margin-right: 0; }
   .hud .hudItem b { font-weight: normal; }
   .hud .hudToggleBtn,
-  .hud .hudClickable { cursor: pointer; pointer-events: auto; display: block; width: fit-content; line-height: 1.4; }
+  .hud .hudClickable { cursor: pointer; pointer-events: auto; display: block; width: fit-content; }  /* [v1.09] line-height 제거 — parent .hud (2.0) 상속 */
   /* HUD 클릭 단축키 밑줄 — 사용자 요청에 따라 삭제 (숫자 밑줄과 시각 동일 안 되어). */
   .hud.hidden { display: none; }
   /* #4 초기 소개 팝업 — 다른 팝업(.mhDialog) 벤치마크: 제목(버전)+이동(▩)+닫기(✕) meta 행,
@@ -421,9 +421,10 @@
   .guideList .guideLine .gk { opacity: 1; margin-left: 0; }  /* [v1.09] 콜론 뒤 margin-left 4 → 0 (공백 단일화) */
   .guideList .guideSub { margin-top: 12px; opacity: 1; font-size: 10px; letter-spacing: 0.5px; }
   /* 에디터창 가이드: 박스 위치는 그대로(우측, margin-left:auto)·텍스트만 좌측 정렬 */
-  .editor .guideList { text-align: left; margin-left: 0; }  /* [v1.09] 왼쪽 정렬 */
-  /* [v1.09] 사이드바 가이드 들여쓰기 = 카테고리 제목과 동일 12.5px */
+  .editor .guideList { text-align: left; margin-left: 0; }  /* 사이드바 가이드 (#editorCommonGuide) 좌측 정렬 + 들여쓰기 */
   #editorCommonGuide { padding-left: 12.5px; }
+  /* [v1.09] 디자인창(stage) 안 가이드(jamoEditGuide/moimkkolGuide)는 우측 정렬 복귀 */
+  .editor .stage .guideList { margin-left: auto; }
   .editor .guideList .guideLine .gk { margin-left: 0; margin-right: 0; }  /* [v1.09] 콜론 뒤 공백 단일화 */
   /* #13 D — 편집창(.stage) 안 가이드: toolBtnBottomRow 가 canvasWrap 기준 absolute
      (top: calc(100% + 20px))로 흐름에서 빠짐 → 버튼행을 지나도록 원래 위 여백 60px. */
@@ -499,7 +500,7 @@
   .editor .stage .meta { display: flex; gap: 8px; align-items: baseline; margin-bottom: 7px; justify-content: flex-start; line-height: 1; }
   .stageBtn { display: inline-flex; align-items: center; justify-content: center; font-size: 10px; line-height: 1; height: 14px; user-select: none; flex: 0 0 auto; vertical-align: middle; }
   .stageBtn.closeX { cursor: pointer; }
-  .stageBtn.dragHandle { cursor: grab; font-size: 15px; height: 15px; }  /* [v1.09] 주사위(15px)와 동일 크기 */
+  .stageBtn.dragHandle { cursor: grab; font-size: 10px; height: 10px; }  /* [v1.09] 주사위 15px × 0.65 ≈ 10px */
   .stageBtn.dragHandle.dragging { cursor: grabbing; }
   .editor .stage .meta .label { flex: 1 1 auto; text-align: left; }
   /* 노드/엣지 두 항목 간 간격 — HUD 항목 간격(margin-right: 14px)과 동일 */
@@ -524,8 +525,11 @@
   .editor .marginBottom { bottom: -10px; left: 50%; transform: translateX(-50%); }
   .editor .marginLeft   { left: -17px;   top: 50%;  transform: translateY(-50%); }
   .editor .marginRight  { right: -17px;  top: 50%;  transform: translateY(-50%); }
-  /* [v1.09] editorBottomRow — 좌: 등장 높이, 우: 초기화/모두 지움. space-between, 세로 가운데. */
+  /* [v1.09] editorBottomRow — 좌: 등장 높이, 우: 초기화/모두 지움. space-between, 세로 가운데.
+     등장 높이가 hide 일 때(한글 자모) → 버튼들만 남고 우측 정렬 유지 (margin-left: auto trick). */
   .editor .editorBottomRow { position: absolute; left: 0; right: 0; top: calc(100% + 20px); display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .editor .editorBottomRow .editorHeightDiv[style*="display: none"] + .toolBtnBottomRow,
+  .editor .editorBottomRow .editorHeightDiv[style*="display:none"] + .toolBtnBottomRow { margin-left: auto; }
   .editor .editorHeightDiv { display: flex; align-items: center; }
   .editor .editorHeightDiv .hLbl { font-size: 10px; letter-spacing: 0.5px; line-height: 1; }
   .editor .editorHeightDiv .lbvVal { cursor: pointer; position: relative; display: inline-block; }
@@ -14750,21 +14754,32 @@ function draw() {
       const _ic = (typeof _bondInvColor === 'function') ? _bondInvColor() : currentFgColor();
       ctx.fillStyle = _ic; ctx.strokeStyle = _ic;
       const _hr = Math.max((PARAMS.nodeR || 0) / 2, 3);
-      // 호버 강조 = 기본 디자인 노드 + dedupe (1 디자인 꼭짓점당 1 후보) — bond candidate 와 동일 패턴.
-      const _hbest = new Map();
-      _hoverJamo.idxs.forEach(i => {
-        const n = _hb.nodes[i];
-        if (!n || n.inv || n.isBase === false) return;
-        const m = (typeof _bondMapNode === 'function') ? _bondMapNode(_hb, i) : null;
-        if (!m) { _hbest.set('idx#' + i, { idx: i, nd2: 0 }); return; }
-        const key = m.part + '#' + m.designIdx;
-        const prev = _hbest.get(key);
-        if (!prev || m.nd2 < prev.nd2) _hbest.set(key, { idx: i, nd2: m.nd2 });
-      });
-      _hbest.forEach(c => {
-        const n = _hb.nodes[c.idx];
-        if (n) drawNodeShape(n, _hr);
-      });
+      // [v1.09] 호버 강조 = bond candidate 와 정확히 동일.
+      //   호버한 노드를 잡으면 결합 가능한 *다른 자모 part* 의 base 노드 후보를 미리 강조.
+      //   1 디자인 꼭짓점당 1 dedupe (서브디비전 같은 꼭짓점 매핑되는 여러 노드 중 nd2 최소만).
+      const _hitIdx = _hoverJamo.hitIdx;
+      const _src = (typeof _bondMapNode === 'function' && _hitIdx != null) ? _bondMapNode(_hb, _hitIdx) : null;
+      if (_src && Array.isArray(_hb.jamos)) {
+        const _hbest = new Map();
+        _hb.jamos.forEach(j => {
+          const rk = _bondPartRank(j.name);
+          if (rk < 0 || rk === _src.rank) return;  // 다른 part 만 — 호버한 자모 자신은 제외
+          (j.nodeIndices || []).forEach(i => {
+            if (i === _hitIdx) return;
+            const n = _hb.nodes[i];
+            if (!n || n.inv || n.isBase === false) return;
+            const m = _bondMapNode(_hb, i);
+            if (!m) return;
+            const key = m.part + '#' + m.designIdx;
+            const prev = _hbest.get(key);
+            if (!prev || m.nd2 < prev.nd2) _hbest.set(key, { idx: i, nd2: m.nd2 });
+          });
+        });
+        _hbest.forEach(c => {
+          const n = _hb.nodes[c.idx];
+          if (n) drawNodeShape(n, _hr);
+        });
+      }
       ctx.restore();
     }
   }
@@ -15511,7 +15526,7 @@ canvas.addEventListener('pointerdown', e => {
           // [감상모드 통합] _bond 와 _detach 는 위 _hitIsBase 분기로 이미 mutually exclusive.
           //   (기본 노드면 _bond 만, 추가 노드면 _detach 만 세팅됨.)
           _detach = { body: bestBody, gi: _bestPair.gi, pi: _bestPair.pi,
-                      sx: p.x, sy: p.y, moved: false };
+                      sx: p.x, sy: p.y, moved: true };  // [v1.09] 추가 노드 클릭 = 즉시 떼기 (drag 임계 제거)
         }
       }
     }
@@ -15665,10 +15680,10 @@ canvas.addEventListener('pointermove', e => {
       for (const j of _hb.jamos) {
         if (j.nodeIndices && j.nodeIndices.indexOf(_hi) >= 0) { grp = j; break; }
       }
-      _hoverJamo = grp ? { body: _hb, idxs: grp.nodeIndices.slice() } : null;
+      _hoverJamo = grp ? { body: _hb, idxs: grp.nodeIndices.slice(), hitIdx: _hi } : null;
     } else if (_hb.nodes) {
       // 비한글/구두점 — jamos 메타가 없으므로 전체 노드를 단일 그룹으로 처리
-      _hoverJamo = { body: _hb, idxs: _hb.nodes.map((_, i) => i) };
+      _hoverJamo = { body: _hb, idxs: _hb.nodes.map((_, i) => i), hitIdx: _hi };
     } else {
       _hoverJamo = null;
     }
