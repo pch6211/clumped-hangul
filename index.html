@@ -133,7 +133,8 @@
   #mhAdBox.mhDialog { z-index: 300; display: none; }
   #mhAdBox.mhDialog.shown { display: block; }
   /* 광고 슬롯 = 실제 AdSense 디스플레이 광고 크기(300×150) 고정 */
-  #mhAdSlot { position: relative; width: 300px; height: 150px; overflow: hidden;
+  /* [v1.09] AdSense 승인 대기 중 — 광고 박스 자체 hide. 승인 후 아래 display:none 제거. */
+  #mhAdSlot { display: none !important; position: relative; width: 300px; height: 150px; overflow: hidden;
     background: var(--editor-bg, #fff); box-sizing: content-box; }
   #mhAdSlot .adsbygoogle { display: inline-block; width: 300px; height: 150px; }
   /* 테두리는 ::after 오버레이로 광고(iframe) 위에 그림 — '테두리가 광고 위로' */
@@ -324,9 +325,9 @@
     border-top: 1px solid currentColor;
     border-left: 1px solid currentColor;
   }
-  /* PC 전용 외부 텍스트 입력바 — 출력화면 하단 중앙. CC 푸터 bottom 22px 과 동일. */
-  #pcTextBar { position: fixed; left: 50%; transform: translateX(-50%); bottom: 22px; width: 380px; max-width: calc(100vw - 32px); z-index: 90; font-family: sans-serif; font-size: 10px; letter-spacing: 0.5px; line-height: 1.4; color: currentColor; pointer-events: auto; box-sizing: border-box; display: flex; flex-direction: column; }
-  #pcTextBar #panelTextTitle { line-height: 14px; margin-bottom: 4px; letter-spacing: 1px; user-select: none; }
+  /* PC 전용 외부 텍스트 입력바 — 화면 왼쪽 하단. 설정창 폭(288px) 와 동일. */
+  #pcTextBar { position: fixed; left: calc(var(--ui-gap) - var(--sbw)); transform: none; bottom: 22px; width: 288px; max-width: calc(100vw - 32px); z-index: 90; font-family: sans-serif; font-size: 10px; letter-spacing: 0.5px; line-height: 1.4; color: currentColor; pointer-events: auto; box-sizing: border-box; padding-left: 8px; }
+  /* 제목은 설정창 내부 .groupTitle 와 동일 디자인 (className 으로 위임). 별도 override 없음. */
   #pcTextBar #mainText { width: 100%; resize: none; overflow-y: hidden; padding: 4px 6px; border: 1px solid currentColor; background: transparent; color: currentColor; font-family: inherit; font-size: 10px; line-height: 1.4; letter-spacing: 0.5px; outline: none; box-sizing: border-box; min-height: 24px; opacity: 1; scrollbar-width: thin; scrollbar-color: currentColor transparent; }
   #pcTextBar #mainText::-webkit-scrollbar { width: 8px; height: 8px; }
   #pcTextBar #mainText::-webkit-scrollbar-thumb { background: currentColor; opacity: 0.16; }
@@ -346,7 +347,7 @@
   .hud .hudItem:last-child { margin-right: 0; }
   .hud .hudItem b { font-weight: normal; }
   .hud .hudToggleBtn,
-  .hud .hudClickable { cursor: pointer; pointer-events: auto; position: relative; display: inline-block; }
+  .hud .hudClickable { cursor: pointer; pointer-events: auto; position: relative; display: block; width: fit-content; }
   /* 클릭 가능 단축키 안내 밑줄 — .lbvVal 의 1px 점선 패턴과 동일 (currentColor 동기화) */
   .hud .hudClickable::after {
     content: ''; position: absolute; left: 0; right: 0; bottom: -2px; height: 1px;
@@ -370,7 +371,8 @@
   /* 설정 패널 — 미니멀, 배경 없음, 좌상단. 슬라이더는 좌측정렬, 라벨+값은 바 우측. */
   /* 설정 패널 — HUD가 차지하는 하단 높이를 빼고 그 위 영역에서만 표시. 내용 넘치면 세로 스크롤 */
   /* direction: rtl 트릭으로 스크롤바를 좌측에 배치. 내부 콘텐츠는 ltr 로 유지(아래 .panel > * 규칙). */
-  .panel { position: fixed; top: 24px; left: calc(var(--ui-gap) - var(--sbw)); bottom: var(--hud-h, 80px); z-index: 100; font-family: sans-serif; font-size: 10px; line-height: 1; letter-spacing: 0.5px; background: transparent; padding: 0 0 0 8px; border: none; border-radius: 0; user-select: none; display: none; width: 288px; color: #000; overflow-y: auto; overflow-x: hidden; box-sizing: border-box; scrollbar-width: thin; scrollbar-color: currentColor transparent; scrollbar-gutter: stable; direction: rtl; }
+  /* 설정창 bottom = PC 텍스트창 윗선 + 25px → calc(textbar_height + 22(textbar bottom) + 25). 텍스트창 갱신 시 --pc-textbar-h 동기 갱신 */
+  .panel { position: fixed; top: 24px; left: calc(var(--ui-gap) - var(--sbw)); bottom: calc(var(--pc-textbar-h, 50px) + 47px); z-index: 100; font-family: sans-serif; font-size: 10px; line-height: 1; letter-spacing: 0.5px; background: transparent; padding: 0 0 0 8px; border: none; border-radius: 0; user-select: none; display: none; width: 288px; color: #000; overflow-y: auto; overflow-x: hidden; box-sizing: border-box; scrollbar-width: thin; scrollbar-color: currentColor transparent; scrollbar-gutter: stable; direction: rtl; }
   .panel > * { direction: ltr; }
   .panel::-webkit-scrollbar { width: 8px; height: 8px; }
   .panel::-webkit-scrollbar-track { background: transparent; }
@@ -399,10 +401,10 @@
   .panel textarea::-webkit-scrollbar-button { display: none; height: 0; width: 0; }
   .panel textarea { scrollbar-width: thin; scrollbar-color: currentColor transparent; }
   .panel .colorBlock { }
-  .panel .groupTitle { display: flex; justify-content: flex-start; align-items: center; margin-bottom: 4px; letter-spacing: 0.5px; opacity: 1; }
-  .panel .groupTitle .titleText { text-align: left; }
-  .panel .groupTitle .die { display: inline-flex; align-items: center; justify-content: center; font-size: 14px; line-height: 1; height: 14px; cursor: pointer; user-select: none; padding: 0 2px; opacity: 1; vertical-align: middle; }
-  .panel .groupTitle .die.rolling { pointer-events: none; }
+  .panel .groupTitle, #pcTextBar .groupTitle { display: flex; justify-content: flex-start; align-items: center; margin-bottom: 4px; letter-spacing: 0.5px; opacity: 1; }
+  .panel .groupTitle .titleText, #pcTextBar .groupTitle .titleText { text-align: left; }
+  .panel .groupTitle .die, #pcTextBar .groupTitle .die { display: inline-flex; align-items: center; justify-content: center; font-size: 14px; line-height: 1; height: 14px; cursor: pointer; user-select: none; padding: 0 2px; opacity: 1; vertical-align: middle; }
+  .panel .groupTitle .die.rolling, #pcTextBar .groupTitle .die.rolling { pointer-events: none; }
   /* 가이드 세로 리스트 (#8·#9) — 버튼 다음 줄, 항목당 한 줄. 설정창/에디터 공용 */
   /* 가이드 = 기본 HUD와 동일 문자 스타일 (letter-spacing 1px, line-height 1.6, 투명도 없음) */
   /* #3 — 기본 HUD(#hudMain, .hudSection) 제외 모든 가이드(.guideList): 모든 내용이
@@ -468,7 +470,7 @@
   .editor.sidebar-hidden .sidebar { display: none !important; }
   /* 사이드바 = 입력창 + 자모 그리드 (우측, 설정창과 동일 높이/간격).
      bottom: var(--hud-h) — HUD 높이에 따라 자동 축소(설정창과 동일 동작). */
-  .editor .sidebar { position: fixed; right: calc(var(--ui-gap) - var(--sbw)); top: 24px; bottom: calc(var(--hud-h, 16px) + var(--g1-gap)); width: 309px; overflow-y: auto; overflow-x: hidden; padding-left: 8px; padding-right: 8px; pointer-events: auto; line-height: 1; scrollbar-width: thin; scrollbar-color: currentColor transparent; scrollbar-gutter: stable; box-sizing: border-box; }
+  .editor .sidebar { position: fixed; right: calc(var(--ui-gap) - var(--sbw)); top: 24px; bottom: calc(var(--hud-h, 16px) + var(--g1-gap) - 50px); width: 309px; overflow-y: auto; overflow-x: hidden; padding-left: 8px; padding-right: 8px; pointer-events: auto; line-height: 1; scrollbar-width: thin; scrollbar-color: currentColor transparent; scrollbar-gutter: stable; box-sizing: border-box; }
   .editor .sidebar::-webkit-scrollbar { width: 8px; height: 8px; }
   .editor .sidebar::-webkit-scrollbar-track { background: transparent; }
   .editor .sidebar::-webkit-scrollbar-thumb { background: currentColor; opacity: 0.16; border-radius: 0; }
@@ -615,7 +617,6 @@
     <div id="addCharDialog" style="display:none; margin-top: 20px; margin-bottom: 14px;"></div>
     <!-- #9 에디터창 공통 가이드 (버튼 다음 줄, 항목당 한 줄) -->
     <div class="guideList" id="editorCommonGuide">
-      <div class="guideLine"><b>문자 전체 삭제</b> <span class="gk">제목 우클릭</span></div>
       <div class="guideLine"><b>개별 문자 삭제</b> <span class="gk">문자 우클릭</span></div>
     </div>
     <!-- #13 D — #10 자모편집/#11 모임꼴 가이드는 각 편집창(#editorStage/#moimkkolStage)
@@ -15793,8 +15794,9 @@ function setupPcTextBar() {
   // 기존 (혹 panel 안에 남아있을 수 있는) 요소 제거 후 신규 생성
   ['panelTextTitle','mainText'].forEach(id => { const el = document.getElementById(id); if (el && el.parentNode !== host) el.remove(); });
   if (host.querySelector('#mainText')) return;  // 이미 빌드됨
-  // 제목 + 주사위
+  // 제목 + 주사위 — .groupTitle 클래스로 설정창 내부 속성그룹 제목과 동일 디자인
   const taTitle = document.createElement('div');
+  taTitle.className = 'groupTitle';
   taTitle.id = 'panelTextTitle';
   {
     const ts = document.createElement('span');
@@ -15821,9 +15823,15 @@ function setupPcTextBar() {
   ta.rows = 1;
   ta.placeholder = MOBILE_NOTICE;
   ta.value = (TEXT === MOBILE_NOTICE) ? '' : TEXT;
+  // textbar 총 높이를 --pc-textbar-h CSS 변수로 동기화 → 설정창 bottom 이 textbar 윗선 + 25px 위치 유지
+  const _syncTextBarHeight = () => {
+    const h = host.getBoundingClientRect().height;
+    document.documentElement.style.setProperty('--pc-textbar-h', h + 'px');
+  };
   const _adjustTaHeight = () => {
     ta.style.height = 'auto';
     ta.style.height = ta.scrollHeight + 'px';
+    _syncTextBarHeight();
   };
   ta.addEventListener('input', () => {
     TEXT = ta.value;
@@ -15835,6 +15843,7 @@ function setupPcTextBar() {
   });
   host.appendChild(ta);
   requestAnimationFrame(_adjustTaHeight);
+  window.addEventListener('resize', _syncTextBarHeight);
 }
 
 function buildPanel() {
@@ -16866,7 +16875,7 @@ function openDonationQR(which, anchor) {
   }
   document.body.appendChild(box);
   // 팝업 위치 localStorage 저장/복원 복구 (드래그한 위치 기억)
-  _placeSettingsDialog(box, { anchor, storageKey: 'mungchin_dlg_donation_pos_v2' });
+  _placeSettingsDialog(box, { anchor, storageKey: 'mungchin_dlg_donation_pos_v2', vgap: 5 });  // 커피 QR 만 -20px 아래
   _makeDialogDraggable(box);
   _persistDialogPos(box, 'mungchin_dlg_donation_pos_v2');
   box.querySelector('.stageBtn.closeX').addEventListener('click', () => box.remove());
@@ -16911,7 +16920,7 @@ function _placeSettingsDialog(box, opts) {
   // 기준 = 우하단 의견/커피 버튼 클러스터(#mhBottomBtns). 없으면 크레딧(.ccFooter),
   //   그래도 없으면 설정 패널(레거시). 먼저 뜨는 다이얼로그 = 커피 사주기 버튼 윗면에서
   //   25px 위, 오른쪽 변(커피 사주기 우측)에 정렬. 다음 다이얼로그는 옆(좌향)으로 겹침 없이.
-  const VGAP = 5;  // 커피 사주기 버튼 윗면 ~ 팝업 아래끝 간격 (25 → 5 = 팝업 20px 아래 이동, 6-19차)
+  const VGAP = (opts.vgap != null) ? opts.vgap : 25;  // 기본 25 (의견 보내기 등 공용). 커피 QR 만 opts.vgap=5 로 -20px 아래 이동.
   let baseR = null;
   const cluster = document.getElementById('mhBottomBtns');
   if (cluster) { const cr = cluster.getBoundingClientRect(); if (cr.width > 0) baseR = cr; }
