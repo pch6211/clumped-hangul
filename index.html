@@ -172,7 +172,9 @@
     .panel { width: 198px; top: 16px; }
     .editor .sidebar { width: 188px; top: 16px; }
     .editor .stage { right: 222px; top: 16px; }
-    .hud, .ccFooter { bottom: 14px; }
+    .hud, .ccFooter { top: auto; bottom: 14px; }
+    /* 모바일은 panel-open 시 HUD 시프트 안 함 (어차피 모바일 패널은 좌측 3/4 차지) */
+    body.panel-open .hud { transform: none; }
     .panel .btnRow, .editor .btnRow, .editor .toolBtnBottomRow,
     .mhDialog .mhMeta, .mhDialog .mhActions, .panel .feedbackActions,
     .mhQRRow, .mhControls,
@@ -307,9 +309,12 @@
     color: var(--editor-bg, transparent);
     border-color: var(--editor-fg, currentColor);
   }
-  .hud { position: fixed; bottom: 22px; left: calc(var(--ui-gap) + var(--sbw)); right: auto; max-width: calc(100vw - var(--ui-gap) * 2 - var(--cc-width, 0px) - 14px); font-family: sans-serif; font-size: 10px; line-height: 1.6; letter-spacing: 1px; z-index: 10; user-select: none;
+  .hud { position: fixed; top: 22px; bottom: auto; left: var(--ui-gap); right: auto; max-width: calc(100vw - var(--ui-gap) * 2 - 14px); font-family: sans-serif; font-size: 10px; line-height: 1.6; letter-spacing: 1px; z-index: 10; user-select: none;
     padding: 10px 14px; background: var(--editor-bg, transparent); border: 1px solid currentColor; width: fit-content; box-sizing: border-box;
+    transition: transform 0.18s ease;
   }
+  /* S 키로 설정창 열면 HUD 가 패널 폭만큼 우측 이동 (CSS transform) */
+  body.panel-open .hud { transform: translateX(304px); }
   /* HUD 도 .guideList 와 동일한 우하단 도그이어(접힘) 외곽 추가 */
   .hud::after {
     content: ""; position: absolute; right: -1px; bottom: -1px;
@@ -16906,7 +16911,7 @@ function _placeSettingsDialog(box, opts) {
   // 기준 = 우하단 의견/커피 버튼 클러스터(#mhBottomBtns). 없으면 크레딧(.ccFooter),
   //   그래도 없으면 설정 패널(레거시). 먼저 뜨는 다이얼로그 = 커피 사주기 버튼 윗면에서
   //   25px 위, 오른쪽 변(커피 사주기 우측)에 정렬. 다음 다이얼로그는 옆(좌향)으로 겹침 없이.
-  const VGAP = 25;  // 커피 사주기 버튼 윗면 ~ 첫 팝업 아래끝 간격
+  const VGAP = 5;  // 커피 사주기 버튼 윗면 ~ 팝업 아래끝 간격 (25 → 5 = 팝업 20px 아래 이동, 6-19차)
   let baseR = null;
   const cluster = document.getElementById('mhBottomBtns');
   if (cluster) { const cr = cluster.getBoundingClientRect(); if (cr.width > 0) baseR = cr; }
@@ -18004,7 +18009,7 @@ function setupEditorStageDrag() {
   // #13 — 결정적 초기 배치(사용자 스펙): 에디터창 맨 위 위쪽 여백(=사이드바 top)에 맞춰
   //   사이드바 왼쪽으로 25px 떨어진 위치. 먼저 연 창이 사이드바에 가장 가깝고,
   //   그 이후 여는 창은 이미 떠 있는 창의 "왼쪽으로 25px" (왼쪽 가로 스택).
-  const _STAGE_GAP = 25;
+  const _STAGE_GAP = 20;  // 두 stage 가로 스택 간격 (사용자 요청 25 → 20 = +5px 우측)
   const _clampStage = (el, left, top) => {
     const r = el.getBoundingClientRect();
     left = Math.max(8, Math.min(window.innerWidth  - r.width  - 8, left));
@@ -18017,12 +18022,12 @@ function setupEditorStageDrag() {
     const sb = document.querySelector('.editor .sidebar');
     const sbVisible = sb && getComputedStyle(sb).display !== 'none';
     const r = el.getBoundingClientRect();
-    const MARGIN = 16;  // --ui-gap 과 동일 인셋 (메인 DIV 마진 보존)
+    const MARGIN = 31;  // 우측 인셋 — ui-gap(16) + 15px 추가 (사용자 요청, 6-19차)
     let left = 24, top = 24;
     if (sbVisible) {
       // 첫 팝업: 사이드바 왼쪽 변 기준에서 오른쪽으로 60px 이동(사용자 스펙: 30→추가 30).
       const s = sb.getBoundingClientRect();
-      left = s.left - r.width + 60; top = s.top;
+      left = s.left - r.width + 65; top = s.top;  // 첫 stage +5px 우측 (60 → 65)
     } else {
       // 사이드바 숨김 — 화면 우측 끝(MARGIN 인셋), 최상단
       left = window.innerWidth - r.width - MARGIN;
@@ -21068,8 +21073,13 @@ requestAnimationFrame(() => {
     //   '텍스트' = #panel 콘텐츠 원점: panel.left(ui-gap−sbw) + 스크롤바 거터(8, rtl 좌측)
     //   + padding-left(8) = ui-gap−sbw+16. top 은 panel.top(24, padding-top 0) 과 동일.
     //   (buildPanel 은 설정창 열 때만 실행 → 인트로 시점엔 측정 불가, CSS 값으로 산출)
-    ip.style.left = 'calc(var(--ui-gap) - var(--sbw) + 16px)';
-    ip.style.top  = '24px';
+    // HUD 우측 +35px 위치 (HUD 와 동일 줄, top 22px). HUD 가 없으면 ui-gap fallback.
+    {
+      const _hud = document.getElementById('hud');
+      const _hudR = _hud ? _hud.getBoundingClientRect() : null;
+      ip.style.left = (_hudR && _hudR.width > 0) ? (_hudR.right + 35) + 'px' : 'calc(var(--ui-gap) + 200px)';
+      ip.style.top  = '22px';
+    }
     if (typeof _makeDialogDraggable === 'function') _makeDialogDraggable(ip);
     const close = () => { ip.style.display = 'none'; };
     const cx = document.getElementById('introClose');
