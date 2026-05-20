@@ -14754,32 +14754,21 @@ function draw() {
       const _ic = (typeof _bondInvColor === 'function') ? _bondInvColor() : currentFgColor();
       ctx.fillStyle = _ic; ctx.strokeStyle = _ic;
       const _hr = Math.max((PARAMS.nodeR || 0) / 2, 3);
-      // [v1.09] 호버 강조 = bond candidate 와 정확히 동일.
-      //   호버한 노드를 잡으면 결합 가능한 *다른 자모 part* 의 base 노드 후보를 미리 강조.
-      //   1 디자인 꼭짓점당 1 dedupe (서브디비전 같은 꼭짓점 매핑되는 여러 노드 중 nd2 최소만).
-      const _hitIdx = _hoverJamo.hitIdx;
-      const _src = (typeof _bondMapNode === 'function' && _hitIdx != null) ? _bondMapNode(_hb, _hitIdx) : null;
-      if (_src && Array.isArray(_hb.jamos)) {
-        const _hbest = new Map();
-        _hb.jamos.forEach(j => {
-          const rk = _bondPartRank(j.name);
-          if (rk < 0 || rk === _src.rank) return;  // 다른 part 만 — 호버한 자모 자신은 제외
-          (j.nodeIndices || []).forEach(i => {
-            if (i === _hitIdx) return;
-            const n = _hb.nodes[i];
-            if (!n || n.inv || n.isBase === false) return;
-            const m = _bondMapNode(_hb, i);
-            if (!m) return;
-            const key = m.part + '#' + m.designIdx;
-            const prev = _hbest.get(key);
-            if (!prev || m.nd2 < prev.nd2) _hbest.set(key, { idx: i, nd2: m.nd2 });
-          });
-        });
-        _hbest.forEach(c => {
-          const n = _hb.nodes[c.idx];
-          if (n) drawNodeShape(n, _hr);
-        });
-      }
+      // 호버 강조 = 호버한 자모 그룹의 base 노드 (dedupe). 색은 _bondInvColor 반전.
+      const _hbest = new Map();
+      _hoverJamo.idxs.forEach(i => {
+        const n = _hb.nodes[i];
+        if (!n || n.inv || n.isBase === false) return;
+        const m = (typeof _bondMapNode === 'function') ? _bondMapNode(_hb, i) : null;
+        if (!m) { _hbest.set('idx#' + i, { idx: i, nd2: 0 }); return; }
+        const key = m.part + '#' + m.designIdx;
+        const prev = _hbest.get(key);
+        if (!prev || m.nd2 < prev.nd2) _hbest.set(key, { idx: i, nd2: m.nd2 });
+      });
+      _hbest.forEach(c => {
+        const n = _hb.nodes[c.idx];
+        if (n) drawNodeShape(n, _hr);
+      });
       ctx.restore();
     }
   }
