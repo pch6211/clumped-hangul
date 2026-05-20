@@ -28,7 +28,10 @@
       font-family: 'Noto Sans KR', sans-serif; font-size: 10px; letter-spacing: 0.5px;
       pointer-events: auto;
     }
-    #mobileTextBar .mtbLabel { align-self: flex-start; }
+    #mobileTextBar .mtbLabel { align-self: flex-start; display: inline-flex; align-items: center; gap: 4px; }
+    /* 모바일 입력바 라벨 옆 주사위 — .panel .groupTitle .die 와 동일 규칙(가운데 정렬, 14px) */
+    #mobileTextBar .die { display: inline-flex; align-items: center; justify-content: center; font-size: 14px; line-height: 1; height: 14px; cursor: pointer; user-select: none; padding: 0 2px; opacity: 1; vertical-align: middle; }
+    #mobileTextBar .die.rolling { pointer-events: none; }
     #mobileTextBar textarea {
       width: 100%; resize: none; overflow-y: auto;
       max-height: 30vh; min-height: 22px; box-sizing: border-box; padding: 4px 6px;
@@ -15396,13 +15399,54 @@ function buildPanel() {
   body.innerHTML = '';
   sliderUpdaters.length = 0;
 
+  // "설정" 제목 — 패널 최상단, 주사위(R = 전체 랜덤) 함께. 모바일·PC 공통 노출.
+  const settingsTitle = document.createElement('div');
+  settingsTitle.className = 'groupTitle';
+  settingsTitle.id = 'panelSettingsTitle';
+  {
+    const ts = document.createElement('span');
+    ts.className = 'titleText';
+    ts.style.lineHeight = '14px';
+    ts.textContent = '설정 ';
+    const sd = document.createElement('span');
+    sd.className = 'die';
+    sd.id = 'panelSettingsDie';
+    sd.textContent = DEFAULT_DIE;
+    sd.title = '전체 랜덤 (R)';
+    sd.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (sd.classList.contains('rolling')) return;
+      rollDie(sd, () => { if (typeof randomizeAll === 'function') randomizeAll(); });
+    });
+    settingsTitle.appendChild(ts);
+    settingsTitle.appendChild(sd);
+  }
+  body.appendChild(settingsTitle);
+
   // "텍스트" 제목 — 슬라이더 그룹 제목과 동일한 box-height(14px) + margin-bottom(4px).
-  //   다른 groupTitle 은 주사위(14px) 때문에 14px 높이. 여긴 주사위 없으니 line-height: 14px 로 동일 높이 확보.
+  //   주사위(T = 글귀 랜덤) 동반.
   //   id 부여: 모바일에서는 외부 입력바로 일원화하므로 이 제목+입력창을 CSS 로 숨김.
   const taTitle = document.createElement('div');
   taTitle.className = 'groupTitle';
   taTitle.id = 'panelTextTitle';
-  taTitle.innerHTML = '<span class="titleText" style="line-height: 14px;">텍스트</span>';
+  {
+    const ts = document.createElement('span');
+    ts.className = 'titleText';
+    ts.style.lineHeight = '14px';
+    ts.textContent = '텍스트 ';
+    const td = document.createElement('span');
+    td.className = 'die';
+    td.id = 'panelTextDie';
+    td.textContent = DEFAULT_DIE;
+    td.title = '글귀 랜덤 (T)';
+    td.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (td.classList.contains('rolling')) return;
+      rollDie(td, () => { if (typeof applyRandomText === 'function') applyRandomText(); });
+    });
+    taTitle.appendChild(ts);
+    taTitle.appendChild(td);
+  }
   body.appendChild(taTitle);
   // 타이핑 입력창 — 자동 높이 조정. 기본 1행, 내용에 따라 늘어남
   const ta = document.createElement('textarea');
@@ -20627,6 +20671,16 @@ requestAnimationFrame(() => {
   if (_mbtn && !_mbtn._bound) { _mbtn.addEventListener('click', () => togglePanel()); _mbtn._bound = true; }
   const _back = document.getElementById('panelMobileBack');
   if (_back && !_back._bound) { _back.addEventListener('click', () => togglePanel()); _back._bound = true; }
+  // 모바일 입력바 "텍스트" 옆 주사위 — 글귀 랜덤(T) 트리거. 0.75초 굴림 애니메이션 후 applyRandomText.
+  const _mtbDie = document.getElementById('mtbDie');
+  if (_mtbDie && !_mtbDie._bound) {
+    _mtbDie.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (_mtbDie.classList.contains('rolling')) return;
+      rollDie(_mtbDie, () => { if (typeof applyRandomText === 'function') applyRandomText(); });
+    });
+    _mtbDie._bound = true;
+  }
   // [E4] 모바일 자동재생은 초기화면에서 OFF — 사용자가 주사위 버튼·HUD 토글 등으로 켜야 함.
   // 가이드 박스 폭 정수 스냅 — 초기 + 웹폰트 로드 후(글리프 advance 변동) 재스냅
   requestAnimationFrame(_snapGuideBoxWidths);
@@ -20639,7 +20693,7 @@ requestAnimationFrame(() => {
 <!-- 모바일 전용 햄버거 메뉴 버튼 — 속성창(풀스크린 오버레이) 열기 -->
 <div id="mobileMenuBtn" title="속성 메뉴" role="button" aria-label="속성 메뉴 열기">☰</div>
 <!-- 모바일 전용 하단 고정 텍스트 입력바 (데스크탑 display:none) -->
-<div id="mobileTextBar"><span class="mtbLabel">텍스트</span><textarea id="mobileText" rows="1" translate="no" placeholder="뭉친 한글 Clumped Hangul"></textarea></div>
+<div id="mobileTextBar"><span class="mtbLabel">텍스트<span class="die" id="mtbDie" title="글귀 랜덤 (T)">⚂</span></span><textarea id="mobileText" rows="1" translate="no" placeholder="뭉친 한글 Clumped Hangul"></textarea></div>
 <a class="ccFooter" href="https://github.com/pch6211/clumped-hangul/blob/main/LICENSE" target="_blank" rel="noopener noreferrer"
    title="MIT License — 자유롭게 사용·수정·배포 가능">© 2026 Chulhee Park · MIT License</a>
 <!-- [G1] 의견 보내기 / 커피 사주기 — 크레딧 바로 위 우하단 고정 클러스터 (위치는 _g1Layout 가 크레딧 실측해 정렬) -->
