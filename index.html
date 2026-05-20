@@ -165,6 +165,9 @@
     #pcTextBar { display: none !important; }
     /* 모바일에서 HUD 박스 padding 축소 (단축키 안내는 모바일에서 짧음) */
     .hud { padding: 6px 10px; }
+    /* 모바일 HUD 는 인라인 (PC 의 block 행갈이 오버라이드) */
+    .hud .hudItem { display: inline-block; margin-right: 10px; }
+    .hud .hudItem:last-child { margin-right: 0; }
     .panel { width: 198px; top: 16px; }
     .editor .sidebar { width: 188px; top: 16px; }
     .editor .stage { right: 222px; top: 16px; }
@@ -316,7 +319,7 @@
     border-left: 1px solid currentColor;
   }
   /* PC 전용 외부 텍스트 입력바 — 출력화면 하단 중앙. CC 푸터 bottom 22px 과 동일. */
-  #pcTextBar { position: fixed; left: 50%; transform: translateX(-50%); bottom: 22px; width: min(480px, 60vw); z-index: 90; font-family: sans-serif; font-size: 10px; letter-spacing: 0.5px; line-height: 1.4; color: currentColor; pointer-events: auto; box-sizing: border-box; display: flex; flex-direction: column; }
+  #pcTextBar { position: fixed; left: 50%; transform: translateX(-50%); bottom: 22px; width: 380px; max-width: calc(100vw - 32px); z-index: 90; font-family: sans-serif; font-size: 10px; letter-spacing: 0.5px; line-height: 1.4; color: currentColor; pointer-events: auto; box-sizing: border-box; display: flex; flex-direction: column; }
   #pcTextBar #panelTextTitle { line-height: 14px; margin-bottom: 4px; letter-spacing: 1px; user-select: none; }
   #pcTextBar #mainText { width: 100%; resize: vertical; padding: 4px 6px; border: 1px solid currentColor; background: var(--editor-bg, transparent); color: currentColor; font-family: inherit; font-size: 10px; line-height: 1.4; letter-spacing: 0.5px; outline: none; box-sizing: border-box; min-height: 30px; scrollbar-width: thin; scrollbar-color: currentColor transparent; }
   #pcTextBar #mainText::-webkit-scrollbar { width: 8px; height: 8px; }
@@ -332,7 +335,8 @@
      박스 경계라 어느 조합에서도 항상 1px 크리스프. */
   .hud .hudSection.dividerBelow { padding-bottom: 4px; margin-bottom: 4px; border-bottom: 1px solid currentColor; }
   .hud .hudSection .hudSectionLine { display: none !important; }
-  .hud .hudItem { display: inline-block; white-space: nowrap; margin-right: 14px; }
+  /* PC 한정 — HUD 항목별 행갈이 (가이드 .guideLine 과 동일 디자인). 모바일은 한 줄 inline. */
+  .hud .hudItem { display: block; white-space: nowrap; margin-right: 0; }
   .hud .hudItem:last-child { margin-right: 0; }
   .hud .hudItem b { font-weight: normal; }
   .hud .hudToggleBtn,
@@ -467,7 +471,7 @@
   .editor .group + .group { margin-top: 14px; }
   /* 그룹 제목 — 설정창 .groupTitle(주사위 14px 때문에 박스 14px)과 동일한 수직 공간을 차지하도록 line-height: 14px.
      이렇게 하면 제목 박스 + margin-bottom(4px) 합이 설정창과 동일 → 첫 항목까지의 간격이 정확히 일치. */
-  .editor .groupLabel { display: flex; align-items: center; justify-content: space-between; line-height: 14px; margin-bottom: 4px; letter-spacing: 1px; text-align: left; padding-left: 10px; }
+  .editor .groupLabel { display: flex; align-items: center; justify-content: space-between; line-height: 14px; margin-bottom: 4px; letter-spacing: 1px; text-align: left; padding-left: 15px; }
   /* 1px 표 — v.1.04 모델(셀마다 4면 보더 + 음수 마진 공유 + gridFiller 마지막행 채움 +
      nth-child(10n)/nth-last-child(-n+10) 외곽 음수마진 0). 단 정사각·우측정렬 폐기:
      사용자 요청 — 에디터 사이드바 div 전체 폭으로 펼쳐지는 10열 표(셀=직사각, repeat(10,1fr)). */
@@ -17820,6 +17824,11 @@ function addUserEditorChar(ch) {
     _editorDefs[ch] = _fb
       ? Object.assign({ margins: {T:0,B:0,L:0,R:0} }, _fb)
       : { nodes: [], edges: [], strokes: [], margins: {T:0,B:0,L:0,R:0} };
+    // PRIMITIVES 즉시 동기화 — 편집창 열 때만 동기화되던 흐름(line 17960) 의 lag 제거.
+    //   본문에 🌟 입력 → 즉시 buildWorld 가 resolveJamo(🌟) 로 디자인 찾음 → 출력 화면 즉시 반영.
+    if (typeof PRIMITIVES !== 'undefined') {
+      PRIMITIVES[ch] = JSON.parse(JSON.stringify(_editorDefs[ch]));
+    }
   }
   try { if (window.mhAnalytics) window.mhAnalytics.track('addchar', { ch }); } catch (_) {}
   _refreshEditorCategories();
