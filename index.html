@@ -421,10 +421,10 @@
   .guideList .guideLine .gk { opacity: 1; margin-left: 0; }  /* [v1.09] 콜론 뒤 margin-left 4 → 0 (공백 단일화) */
   .guideList .guideSub { margin-top: 12px; opacity: 1; font-size: 10px; letter-spacing: 0.5px; }
   /* 에디터창 가이드: 박스 위치는 그대로(우측, margin-left:auto)·텍스트만 좌측 정렬 */
-  .editor .guideList { text-align: left; margin-left: 0; }  /* 사이드바 가이드 (#editorCommonGuide) 좌측 정렬 + 들여쓰기 */
-  #editorCommonGuide { padding-left: 12.5px; }
-  /* [v1.09] 디자인창(stage) 안 가이드(jamoEditGuide/moimkkolGuide)는 우측 정렬 복귀 */
-  .editor .stage .guideList { margin-left: auto; }
+  .editor .guideList { text-align: left; margin-left: auto; }  /* [v1.09] 모든 에디터 가이드 우측 정렬 */
+  /* 디자인창(stage) 안 가이드 — 2단 분리 (사용자 요청). grid-auto-flow: column → 첫 N 행 좌, 나머지 우. */
+  .editor #jamoEditGuide { display: grid; grid-template-columns: max-content max-content; grid-template-rows: repeat(5, auto); grid-auto-flow: column; column-gap: 16px; }
+  .editor #moimkkolGuide { display: grid; grid-template-columns: max-content max-content; grid-template-rows: repeat(3, auto); grid-auto-flow: column; column-gap: 16px; }
   .editor .guideList .guideLine .gk { margin-left: 0; margin-right: 0; }  /* [v1.09] 콜론 뒤 공백 단일화 */
   /* #13 D — 편집창(.stage) 안 가이드: toolBtnBottomRow 가 canvasWrap 기준 absolute
      (top: calc(100% + 20px))로 흐름에서 빠짐 → 버튼행을 지나도록 원래 위 여백 60px. */
@@ -14754,21 +14754,32 @@ function draw() {
       const _ic = (typeof _bondInvColor === 'function') ? _bondInvColor() : currentFgColor();
       ctx.fillStyle = _ic; ctx.strokeStyle = _ic;
       const _hr = Math.max((PARAMS.nodeR || 0) / 2, 3);
-      // 호버 강조 = 호버한 자모 그룹의 base 노드 (dedupe). 색은 _bondInvColor 반전.
-      const _hbest = new Map();
-      _hoverJamo.idxs.forEach(i => {
-        const n = _hb.nodes[i];
-        if (!n || n.inv || n.isBase === false) return;
-        const m = (typeof _bondMapNode === 'function') ? _bondMapNode(_hb, i) : null;
-        if (!m) { _hbest.set('idx#' + i, { idx: i, nd2: 0 }); return; }
-        const key = m.part + '#' + m.designIdx;
-        const prev = _hbest.get(key);
-        if (!prev || m.nd2 < prev.nd2) _hbest.set(key, { idx: i, nd2: m.nd2 });
-      });
-      _hbest.forEach(c => {
-        const n = _hb.nodes[c.idx];
-        if (n) drawNodeShape(n, _hr);
-      });
+      // [v1.09] 호버 강조 = bond candidate 와 정확히 동일.
+      //   호버한 노드를 잡으면 결합 가능한 *다른 자모 part* 의 base 노드 후보를 미리 강조.
+      //   1 디자인 꼭짓점당 1 dedupe (서브디비전 같은 꼭짓점 매핑되는 여러 노드 중 nd2 최소만).
+      const _hitIdx = _hoverJamo.hitIdx;
+      const _src = (typeof _bondMapNode === 'function' && _hitIdx != null) ? _bondMapNode(_hb, _hitIdx) : null;
+      if (_src && Array.isArray(_hb.jamos)) {
+        const _hbest = new Map();
+        _hb.jamos.forEach(j => {
+          const rk = _bondPartRank(j.name);
+          if (rk < 0 || rk === _src.rank) return;  // 다른 part 만
+          (j.nodeIndices || []).forEach(i => {
+            if (i === _hitIdx) return;
+            const n = _hb.nodes[i];
+            if (!n || n.inv || n.isBase === false) return;
+            const m = _bondMapNode(_hb, i);
+            if (!m) return;
+            const key = m.part + '#' + m.designIdx;
+            const prev = _hbest.get(key);
+            if (!prev || m.nd2 < prev.nd2) _hbest.set(key, { idx: i, nd2: m.nd2 });
+          });
+        });
+        _hbest.forEach(c => {
+          const n = _hb.nodes[c.idx];
+          if (n) drawNodeShape(n, _hr);
+        });
+      }
       ctx.restore();
     }
   }
@@ -15676,20 +15687,9 @@ canvas.addEventListener('pointermove', e => {
     } else {
       _hoverJamo = null;
     }
-    // [v1.09] 노드 호버 시 툴팁 — 그 노드에 가능한 마우스 동작 안내.
-    if (_hoverJamo && _hb.nodes[_hi]) {
-      const _hn = _hb.nodes[_hi];
-      const _isB = _hn.isBase === true;
-      const _tip = _isB
-        ? '기본 점 — 끌기: 다른 자모와 자석 붙이기 / 우클릭: 편집 메뉴'
-        : '추가 점 — 끌기: 글자에서 떼기 / 우클릭: 편집 메뉴';
-      _showViewTooltip(e.clientX, e.clientY, _tip);
-    } else {
-      _hideViewTooltip();
-    }
+    // [v1.09] 호버 툴팁 삭제 (사용자 요청)
   } else {
     _hoverJamo = null;
-    _hideViewTooltip();
   }
 });
 let _hoverJamo = null;  // [F4] 감상모드 호버 중인 자모 { body, idxs }
@@ -19529,24 +19529,8 @@ function updateEditorSelectionUI() {
     if (_hVal) {
       _hVal.textContent = String(-Math.round((typeof def.yShift === 'number') ? def.yShift : 0));
     }
-    // [F2] 한글(호환 자모·모임꼴)은 자모 편집창에서 높이 입력 불가 — 모임꼴 편집창에서 설정.
-    //   기본 라틴 등 비한글은 그대로 가능.
-    if (_hInp) {
-      const _blk = (typeof classifyCharByBlock === 'function') ? classifyCharByBlock(_editorSelected) : '';
-      const _isHangul = (_blk === '한글 자음' || _blk === '한글 모음' || _blk === '한글 자모' || _blk === '한글 음절')
-        || (typeof MOIMKKOL_CHARS !== 'undefined' && MOIMKKOL_CHARS.indexOf(_editorSelected) >= 0);
-      if (_isHangul) {
-        _hInp.disabled = true;
-        _hInp.style.opacity = '0.35';
-        _hInp.style.pointerEvents = 'none';
-        _hInp.title = '한글은 모임꼴 편집창에서 등장 높이를 설정합니다';
-      } else {
-        _hInp.disabled = false;
-        _hInp.style.opacity = '';
-        _hInp.style.pointerEvents = '';
-        _hInp.title = '등장 높이 — 양수는 위, 음수는 아래, 0은 정중앙';
-      }
-    }
+    // [v1.09] 한글일 때 등장 높이 div hide 는 자모 click 핸들러의 #editorHeightBlock display 토글로 처리 (line ~18352).
+    //   옛 _hInp.disabled/opacity 블록은 6-31차에서 input 제거 시 함께 삭제 누락 → ReferenceError 로 renderEditorCanvas 등 중단되던 버그 fix.
   }
 }
 
