@@ -324,7 +324,7 @@
     border-color: var(--editor-fg, currentColor);
   }
   /* [v1.09] HUD 박스 제거 — 가이드와 동일한 스타일 (테두리/배경/도그이어 없음, 패딩 0). */
-  .hud { position: fixed; top: 27px; bottom: auto; left: calc(var(--ui-gap) + 11px); right: auto; max-width: calc(100vw - var(--ui-gap) * 2 - 14px); font-family: sans-serif; font-size: 10px; line-height: 2; letter-spacing: 0.375px; z-index: 10; user-select: none;
+  .hud { position: fixed; top: 17px; bottom: auto; left: calc(var(--ui-gap) + 11px); right: auto; max-width: calc(100vw - var(--ui-gap) * 2 - 14px); font-family: sans-serif; font-size: 10px; line-height: 2; letter-spacing: 0.375px; z-index: 10; user-select: none;
     padding: 0; background: transparent; border: none; width: fit-content; box-sizing: border-box;
   }
   /* S 키로 설정창 열면 HUD 가 패널 폭만큼 우측 이동 (CSS transform, 즉시 이동) */
@@ -407,7 +407,7 @@
   .panel .groupTitle .die, #pcTextBar .groupTitle .die { display: inline-flex; align-items: center; justify-content: center; font-size: 14px; line-height: 1; height: 14px; cursor: pointer; user-select: none; padding: 0 2px; opacity: 1; vertical-align: middle; }
   .panel .groupTitle .die.rolling, #pcTextBar .groupTitle .die.rolling { pointer-events: none; }
   /* 가이드 세로 리스트 — [v1.09] 박스(테두리/배경/도그이어) 모두 제거, 패딩 0, 행간 1.5배. */
-  .guideList { margin-top: 20px; margin-bottom: 20px; direction: ltr; opacity: 1;
+  .guideList { margin-top: 10px; margin-bottom: 20px; direction: ltr; opacity: 1;
     padding: 0; box-sizing: border-box; width: fit-content; max-width: 100%; }
   .guideList, #introPanel .introBox {
     position: relative;
@@ -422,13 +422,20 @@
   .guideList .guideSub { margin-top: 12px; opacity: 1; font-size: 10px; letter-spacing: 0.5px; }
   /* 에디터창 가이드: 박스 위치는 그대로(우측, margin-left:auto)·텍스트만 좌측 정렬 */
   .editor .guideList { text-align: left; margin-left: auto; }  /* [v1.09] 모든 에디터 가이드 우측 정렬 */
-  /* 디자인창(stage) 안 가이드 — 2단 분리 (사용자 요청). grid-auto-flow: column → 첫 N 행 좌, 나머지 우. */
-  .editor #jamoEditGuide { display: grid; grid-template-columns: max-content max-content; grid-template-rows: repeat(5, auto); grid-auto-flow: column; column-gap: 16px; }
-  .editor #moimkkolGuide { display: grid; grid-template-columns: max-content max-content; grid-template-rows: repeat(3, auto); grid-auto-flow: column; column-gap: 16px; }
+  /* 디자인창(stage) 안 가이드 — 2단 분리. 1단(좌측 column) -45px, 2단(우측 column) -30px 좌측 이동.
+     column-gap = 1단 - 2단 차이 = 15px 축소 (= 원래 16 + 15 → 1px 거리? 너무 좁음. 다른 방식: transform). */
+  .editor #jamoEditGuide,
+  .editor #moimkkolGuide {
+    display: grid; grid-template-columns: max-content max-content;
+    grid-auto-flow: column; column-gap: 1px;
+    transform: translateX(-45px);
+  }
+  .editor #jamoEditGuide { grid-template-rows: repeat(5, auto); }
+  .editor #moimkkolGuide { grid-template-rows: repeat(3, auto); }
   .editor .guideList .guideLine .gk { margin-left: 0; margin-right: 0; }  /* [v1.09] 콜론 뒤 공백 단일화 */
   /* #13 D — 편집창(.stage) 안 가이드: toolBtnBottomRow 가 canvasWrap 기준 absolute
      (top: calc(100% + 20px))로 흐름에서 빠짐 → 버튼행을 지나도록 원래 위 여백 60px. */
-  .editor .stage .guideList { margin-top: 60px; }
+  .editor .stage .guideList { margin-top: 50px; }  /* [v1.09] stage 가이드 -10px 위로 */
   /* 가이드 끄기(M) — body.guidesOff 면 모든 .guideList 숨김. 기본 HUD(#hudMain,
      .hudSection)는 .guideList 가 아니므로 항상 표시. */
   body.guidesOff .guideList { display: none !important; }
@@ -921,6 +928,15 @@ const SPECIAL_PRIMITIVES = {
   '』':{nodes:[{x:4.5,y:3},{x:4.5,y:5},{x:3,y:5},{x:4,y:3},{x:4,y:4.5},{x:3,y:4.5}],edges:[[0,1],[1,2],[3,4],[4,5]],strokes:[[0,1,2],[3,4,5]]}  // 』
 };
 Object.assign(PRIMITIVES, ENGLISH_UPPER_PRIMITIVES, ENGLISH_LOWER_PRIMITIVES, SPECIAL_PRIMITIVES);
+// [v1.09] PRIMITIVES 원본 노드 모두 isBase=true 강제 — 호버 strict / detach strict 분류 위해.
+//   서브디비전·6-22차 이후 편집창 추가 = isBase=false. 옛 _editorDefs 데이터 = undefined → ensureEditorDef
+//   안에서 좌표 매칭으로 자동 부여.
+Object.keys(PRIMITIVES).forEach(_pkCh => {
+  const _pkP = PRIMITIVES[_pkCh];
+  if (_pkP && Array.isArray(_pkP.nodes)) {
+    _pkP.nodes.forEach(_pkN => { if (_pkN && _pkN.isBase === undefined) _pkN.isBase = true; });
+  }
+});
 
 // ── 좌표계 ×2 마이그레이션 (0.5단위 그리드 → 정수 그리드) ──
 //   디자인 데이터는 ×2한 정수 좌표로 저장·편집(EDITOR_GRID 18, GRID_STEP 1).
@@ -14066,8 +14082,9 @@ function buildWorld(str) {
         if (n.tags && n.tags.length) o.tags = n.tags.slice();
         if (n.tagFilters) o.tagFilters = Object.assign({}, n.tagFilters);
         if (n.inv) o.inv = true;
-        // 명시적 false 이외는 base 로 간주 (서브디비전·6-22차 이후 편집창 추가만 명시 false).
-        o.isBase = (n.isBase !== false);
+        // [v1.09] strict — 명시적 true 만 base. undefined·false 모두 추가 노드.
+        //   PRIMITIVES 원본 = isBase=true 강제 (load 시점). 옛 _editorDefs 는 _annotateIsBaseFromFactory 가 좌표 매칭으로 부여.
+        o.isBase = (n.isBase === true);
         return o;
       });
       const edges = t.glyph.edges.map(e => ({
@@ -14754,32 +14771,21 @@ function draw() {
       const _ic = (typeof _bondInvColor === 'function') ? _bondInvColor() : currentFgColor();
       ctx.fillStyle = _ic; ctx.strokeStyle = _ic;
       const _hr = Math.max((PARAMS.nodeR || 0) / 2, 3);
-      // [v1.09] 호버 강조 = bond candidate 와 정확히 동일.
-      //   호버한 노드를 잡으면 결합 가능한 *다른 자모 part* 의 base 노드 후보를 미리 강조.
-      //   1 디자인 꼭짓점당 1 dedupe (서브디비전 같은 꼭짓점 매핑되는 여러 노드 중 nd2 최소만).
-      const _hitIdx = _hoverJamo.hitIdx;
-      const _src = (typeof _bondMapNode === 'function' && _hitIdx != null) ? _bondMapNode(_hb, _hitIdx) : null;
-      if (_src && Array.isArray(_hb.jamos)) {
-        const _hbest = new Map();
-        _hb.jamos.forEach(j => {
-          const rk = _bondPartRank(j.name);
-          if (rk < 0 || rk === _src.rank) return;  // 다른 part 만
-          (j.nodeIndices || []).forEach(i => {
-            if (i === _hitIdx) return;
-            const n = _hb.nodes[i];
-            if (!n || n.inv || n.isBase === false) return;
-            const m = _bondMapNode(_hb, i);
-            if (!m) return;
-            const key = m.part + '#' + m.designIdx;
-            const prev = _hbest.get(key);
-            if (!prev || m.nd2 < prev.nd2) _hbest.set(key, { idx: i, nd2: m.nd2 });
-          });
-        });
-        _hbest.forEach(c => {
-          const n = _hb.nodes[c.idx];
-          if (n) drawNodeShape(n, _hr);
-        });
-      }
+      // [v1.09] 호버 강조 = 호버한 자모 그룹 자체의 base 노드만 (strict isBase===true) + 1 디자인 꼭짓점당 1 dedupe.
+      const _hbest = new Map();
+      _hoverJamo.idxs.forEach(i => {
+        const n = _hb.nodes[i];
+        if (!n || n.inv || n.isBase !== true) return;
+        const m = (typeof _bondMapNode === 'function') ? _bondMapNode(_hb, i) : null;
+        if (!m) { _hbest.set('idx#' + i, { idx: i, nd2: 0 }); return; }
+        const key = m.part + '#' + m.designIdx;
+        const prev = _hbest.get(key);
+        if (!prev || m.nd2 < prev.nd2) _hbest.set(key, { idx: i, nd2: m.nd2 });
+      });
+      _hbest.forEach(c => {
+        const n = _hb.nodes[c.idx];
+        if (n) drawNodeShape(n, _hr);
+      });
       ctx.restore();
     }
   }
@@ -15472,7 +15478,7 @@ canvas.addEventListener('pointerdown', e => {
     // [감상모드 통합] 기본 디자인 노드(isBase!==false)만 자석 모드 활성. 추가 노드(서브디비전)는 스프링 고정만.
     _bond = null;
     const _hitNode = (best) ? best : null;
-    const _hitIsBase = !!(_hitNode && _hitNode.isBase !== false);  // 명시적 false 만 추가 노드 (서브디비전·6-22차 이후 편집창 추가)
+    const _hitIsBase = !!(_hitNode && _hitNode.isBase === true);  // [v1.09] strict — PRIMITIVES 원본만 base. 옛 _editorDefs 는 좌표 매칭 후 분류.
     if (_hitIsBase && bestBody && !bestBody.isPunct && Array.isArray(bestBody.jamos)) {
       const src = _bondMapNode(bestBody, bestIdx);
       if (src) {
@@ -17975,6 +17981,23 @@ function removeEditorBlock(blockName) {
   if (typeof buildEditorContent === 'function') buildEditorContent();
 }
 
+// [v1.09] 옛 _editorDefs 데이터 호환 — FACTORY_DEFAULTS 의 원본 좌표와 매칭해서 isBase 부여.
+//   명시 true/false 보존. undefined 만 좌표 매칭 → 일치하면 true, 아니면 false (추가 노드).
+function _annotateIsBaseFromFactory(ch, def) {
+  if (!def || !Array.isArray(def.nodes)) return;
+  const orig = (typeof FACTORY_DEFAULTS !== 'undefined') ? FACTORY_DEFAULTS[ch] : null;
+  const origSet = new Set();
+  if (orig && Array.isArray(orig.nodes)) {
+    orig.nodes.forEach(n => origSet.add(Math.round(n.x * 100) + ',' + Math.round(n.y * 100)));
+  }
+  def.nodes.forEach(n => {
+    if (!n) return;
+    if (n.isBase === true || n.isBase === false) return;  // 명시값 보존
+    const key = Math.round(n.x * 100) + ',' + Math.round(n.y * 100);
+    n.isBase = origSet.has(key);
+  });
+}
+
 function ensureEditorDef(ch) {
   if (!_editorDefs[ch]) {
     if (PRIMITIVES[ch]) {
@@ -17985,6 +18008,8 @@ function ensureEditorDef(ch) {
     // 처음 로드 시 한 번 그리드(0.5)에 정렬 — PRIMITIVES 원본의 미세 좌표(예: 0.3)를 정리
     if (typeof snapNodesToGrid === 'function') snapNodesToGrid(_editorDefs[ch]);
   }
+  // [v1.09] isBase 좌표 매칭 부여 — 옛 데이터 호환 (매번 호출되어도 명시값 보존)
+  _annotateIsBaseFromFactory(ch, _editorDefs[ch]);
   // margins 기본값 보장 (T/B/L/R 정수, 0 = 기본)
   if (!_editorDefs[ch].margins || typeof _editorDefs[ch].margins !== 'object') {
     _editorDefs[ch].margins = { T: 0, B: 0, L: 0, R: 0 };
