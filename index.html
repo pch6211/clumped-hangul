@@ -663,8 +663,9 @@
     </div>
     <!-- #13 D — 자모 디자인 편집 가이드(제목 삭제, 내용만). 창이 보일 때 함께 표시 -->
     <div class="guideList" id="jamoEditGuide">
-      <div class="guideLine"><b>선택</b> <span class="gk">클릭</span></div>
+      <div class="guideLine"><b>그리기/선택</b> <span class="gk">클릭</span></div>
       <div class="guideLine"><b>다중 선택</b> <span class="gk">배경 드래그</span></div>
+      <div class="guideLine"><b>편집 메뉴</b> <span class="gk">우클릭</span></div>
       <div class="guideLine"><b>이동</b> <span class="gk">⇄ ⇅</span></div>
       <div class="guideLine"><b>삭제</b> <span class="gk">Del</span></div>
       <div class="guideLine"><b>복사</b> <span class="gk">Ctrl C</span></div>
@@ -672,8 +673,6 @@
       <div class="guideLine"><b>붙여넣기</b> <span class="gk">Ctrl V</span></div>
       <div class="guideLine"><b>실행취소</b> <span class="gk">Ctrl Z</span></div>
       <div class="guideLine"><b>다시실행</b> <span class="gk">Ctrl Shift Z</span></div>
-      <div class="guideLine"><b>그리기</b> <span class="gk">클릭</span></div>
-      <div class="guideLine"><b>편집 메뉴</b> <span class="gk">우클릭</span></div>
     </div>
   </div>
   <!-- #13 Stage B — 모임꼴 독립 편집창 (자모 디자인창과 동시 등장). 기본 숨김(.stage),
@@ -14108,9 +14107,9 @@ function buildWorld(str) {
         if (n.tags && n.tags.length) o.tags = n.tags.slice();
         if (n.tagFilters) o.tagFilters = Object.assign({}, n.tagFilters);
         if (n.inv) o.inv = true;
-        // [감상모드 통합] 기본 디자인 노드 여부 — 명시적 false 이외는 base 로 간주.
-        //   서브디비전으로 추가된 노드만 isBase=false.
-        o.isBase = (n.isBase !== false);
+        // [v1.09] strict: 명시적 true 만 base. undefined/false 모두 추가 노드.
+        //   PRIMITIVES 원본 노드는 startup 시 isBase=true 강제. ensureEditorDef 도 좌표 매칭으로 부여.
+        o.isBase = (n.isBase === true);
         return o;
       });
       const edges = t.glyph.edges.map(e => ({
@@ -15728,8 +15727,10 @@ canvas.addEventListener('pointermove', e => {
   }
 });
 let _hoverJamo = null;  // [F4] 감상모드 호버 중인 자모 { body, idxs }
-// [v1.09] 출력 화면 노드 호버 툴팁 — .cwTooltip 동일 스타일.
+// [v1.09] 출력 화면 노드 호버 툴팁 — .cwTooltip 동일 스타일, 1초 delay (닫기 버튼 툴팁과 동일).
 let _viewTooltipEl = null;
+let _viewTipTimer = null;
+const _VIEW_TIP_DELAY = 1000;
 function _ensureViewTooltip() {
   if (_viewTooltipEl) return _viewTooltipEl;
   _viewTooltipEl = document.createElement('div');
@@ -15738,12 +15739,9 @@ function _ensureViewTooltip() {
   document.body.appendChild(_viewTooltipEl);
   return _viewTooltipEl;
 }
-function _showViewTooltip(cx, cy, text) {
-  const t = _ensureViewTooltip();
-  t.textContent = text;
-  t.style.color = (typeof currentFgColor === 'function') ? currentFgColor() : '';
-  t.style.background = (typeof currentBgColor === 'function') ? currentBgColor() : '';
-  t.classList.add('show');
+function _positionViewTip(cx, cy) {
+  const t = _viewTooltipEl;
+  if (!t) return;
   requestAnimationFrame(() => {
     const tr = t.getBoundingClientRect();
     let x = cx + 14, y = cy + 18;
@@ -15753,7 +15751,25 @@ function _showViewTooltip(cx, cy, text) {
     t.style.left = x + 'px'; t.style.top = y + 'px';
   });
 }
+function _showViewTooltip(cx, cy, text) {
+  const t = _ensureViewTooltip();
+  // 이미 표시 중 → 텍스트·위치만 즉시 갱신. 아니면 1초 후 표시.
+  if (t.classList.contains('show')) {
+    t.textContent = text;
+    _positionViewTip(cx, cy);
+    return;
+  }
+  if (_viewTipTimer) clearTimeout(_viewTipTimer);
+  _viewTipTimer = setTimeout(() => {
+    t.textContent = text;
+    t.style.color = (typeof currentFgColor === 'function') ? currentFgColor() : '';
+    t.style.background = (typeof currentBgColor === 'function') ? currentBgColor() : '';
+    t.classList.add('show');
+    _positionViewTip(cx, cy);
+  }, _VIEW_TIP_DELAY);
+}
 function _hideViewTooltip() {
+  if (_viewTipTimer) { clearTimeout(_viewTipTimer); _viewTipTimer = null; }
   if (_viewTooltipEl) _viewTooltipEl.classList.remove('show');
 }
 
@@ -17993,6 +18009,23 @@ function removeEditorBlock(blockName) {
   if (typeof buildEditorContent === 'function') buildEditorContent();
 }
 
+// [v1.09] _editorDefs 옛 데이터 호환 — FACTORY_DEFAULTS 의 원본 좌표와 매칭해서 isBase 부여.
+//   명시 true/false 는 보존. undefined 만 좌표 매칭 → 일치하면 true, 아니면 false (= 추가 노드).
+function _annotateIsBaseFromFactory(ch, def) {
+  if (!def || !Array.isArray(def.nodes)) return;
+  const orig = (typeof FACTORY_DEFAULTS !== 'undefined') ? FACTORY_DEFAULTS[ch] : null;
+  const origSet = new Set();
+  if (orig && Array.isArray(orig.nodes)) {
+    orig.nodes.forEach(n => origSet.add(Math.round(n.x * 100) + ',' + Math.round(n.y * 100)));
+  }
+  def.nodes.forEach(n => {
+    if (!n) return;
+    if (n.isBase === true || n.isBase === false) return;  // 명시값 보존
+    const key = Math.round(n.x * 100) + ',' + Math.round(n.y * 100);
+    n.isBase = origSet.has(key);
+  });
+}
+
 function ensureEditorDef(ch) {
   if (!_editorDefs[ch]) {
     if (PRIMITIVES[ch]) {
@@ -18003,6 +18036,8 @@ function ensureEditorDef(ch) {
     // 처음 로드 시 한 번 그리드(0.5)에 정렬 — PRIMITIVES 원본의 미세 좌표(예: 0.3)를 정리
     if (typeof snapNodesToGrid === 'function') snapNodesToGrid(_editorDefs[ch]);
   }
+  // [v1.09] isBase 좌표 매칭 부여 — 옛 저장 데이터 호환. FACTORY_DEFAULTS 의 원본 좌표와 일치하면 true.
+  _annotateIsBaseFromFactory(ch, _editorDefs[ch]);
   // margins 기본값 보장 (T/B/L/R 정수, 0 = 기본)
   if (!_editorDefs[ch].margins || typeof _editorDefs[ch].margins !== 'object') {
     _editorDefs[ch].margins = { T: 0, B: 0, L: 0, R: 0 };
