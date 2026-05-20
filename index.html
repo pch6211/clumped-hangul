@@ -324,7 +324,7 @@
     border-color: var(--editor-fg, currentColor);
   }
   /* [v1.09] HUD 박스 제거 — 가이드와 동일한 스타일 (테두리/배경/도그이어 없음, 패딩 0). */
-  .hud { position: fixed; top: 17px; bottom: auto; left: calc(var(--ui-gap) + 11px); right: auto; max-width: calc(100vw - var(--ui-gap) * 2 - 14px); font-family: sans-serif; font-size: 10px; line-height: 2; letter-spacing: 0.375px; z-index: 10; user-select: none;
+  .hud { position: fixed; top: 20px; bottom: auto; left: calc(var(--ui-gap) + 11px); right: auto; max-width: calc(100vw - var(--ui-gap) * 2 - 14px); font-family: sans-serif; font-size: 10px; line-height: 2; letter-spacing: 0.375px; z-index: 10; user-select: none;
     padding: 0; background: transparent; border: none; width: fit-content; box-sizing: border-box;
   }
   /* S 키로 설정창 열면 HUD 가 패널 폭만큼 우측 이동 (CSS transform, 즉시 이동) */
@@ -407,7 +407,7 @@
   .panel .groupTitle .die, #pcTextBar .groupTitle .die { display: inline-flex; align-items: center; justify-content: center; font-size: 14px; line-height: 1; height: 14px; cursor: pointer; user-select: none; padding: 0 2px; opacity: 1; vertical-align: middle; }
   .panel .groupTitle .die.rolling, #pcTextBar .groupTitle .die.rolling { pointer-events: none; }
   /* 가이드 세로 리스트 — [v1.09] 박스(테두리/배경/도그이어) 모두 제거, 패딩 0, 행간 1.5배. */
-  .guideList { margin-top: 10px; margin-bottom: 20px; direction: ltr; opacity: 1;
+  .guideList { margin-top: 13px; margin-bottom: 20px; direction: ltr; opacity: 1;
     padding: 0; box-sizing: border-box; width: fit-content; max-width: 100%; }
   .guideList, #introPanel .introBox {
     position: relative;
@@ -422,20 +422,19 @@
   .guideList .guideSub { margin-top: 12px; opacity: 1; font-size: 10px; letter-spacing: 0.5px; }
   /* 에디터창 가이드: 박스 위치는 그대로(우측, margin-left:auto)·텍스트만 좌측 정렬 */
   .editor .guideList { text-align: left; margin-left: auto; }  /* [v1.09] 모든 에디터 가이드 우측 정렬 */
-  /* 디자인창(stage) 안 가이드 — 2단 분리. 1단(좌측 column) -45px, 2단(우측 column) -30px 좌측 이동.
-     column-gap = 1단 - 2단 차이 = 15px 축소 (= 원래 16 + 15 → 1px 거리? 너무 좁음. 다른 방식: transform). */
+  /* 디자인창(stage) 안 가이드 — 2단 분리. 1단 -30px(이전 -45+15), column-gap 31px (이전 1+30 → 2단이 이전보다 30 우측). */
   .editor #jamoEditGuide,
   .editor #moimkkolGuide {
     display: grid; grid-template-columns: max-content max-content;
-    grid-auto-flow: column; column-gap: 1px;
-    transform: translateX(-45px);
+    grid-auto-flow: column; column-gap: 31px;
+    transform: translateX(-30px);
   }
   .editor #jamoEditGuide { grid-template-rows: repeat(5, auto); }
   .editor #moimkkolGuide { grid-template-rows: repeat(3, auto); }
   .editor .guideList .guideLine .gk { margin-left: 0; margin-right: 0; }  /* [v1.09] 콜론 뒤 공백 단일화 */
   /* #13 D — 편집창(.stage) 안 가이드: toolBtnBottomRow 가 canvasWrap 기준 absolute
      (top: calc(100% + 20px))로 흐름에서 빠짐 → 버튼행을 지나도록 원래 위 여백 60px. */
-  .editor .stage .guideList { margin-top: 50px; }  /* [v1.09] stage 가이드 -10px 위로 */
+  .editor .stage .guideList { margin-top: 53px; }  /* [v1.09] stage 가이드 -10 + 3 = -7px */
   /* 가이드 끄기(M) — body.guidesOff 면 모든 .guideList 숨김. 기본 HUD(#hudMain,
      .hudSection)는 .guideList 가 아니므로 항상 표시. */
   body.guidesOff .guideList { display: none !important; }
@@ -647,7 +646,7 @@
     <!-- #13 D — 자모 디자인 편집 가이드(제목 삭제, 내용만). 창이 보일 때 함께 표시 -->
     <div class="guideList" id="jamoEditGuide">
       <div class="guideLine"><b>그리기/선택</b> <span class="gk">클릭</span></div>
-      <div class="guideLine"><b>다중 선택</b> <span class="gk">배경 드래그</span></div>
+      <div class="guideLine"><b>다중 선택</b> <span class="gk">드래그</span></div>
       <div class="guideLine"><b>편집 메뉴</b> <span class="gk">우클릭</span></div>
       <div class="guideLine"><b>이동</b> <span class="gk">⇄ ⇅</span></div>
       <div class="guideLine"><b>삭제</b> <span class="gk">Del</span></div>
@@ -682,7 +681,7 @@
     <!-- #13 D — 한글 모임꼴 편집 가이드(제목 삭제, 내용만). 창이 보일 때 함께 표시 -->
     <div class="guideList" id="moimkkolGuide">
       <div class="guideLine"><b>선택</b> <span class="gk">클릭</span></div>
-      <div class="guideLine"><b>다중 선택</b> <span class="gk">배경 드래그</span></div>
+      <div class="guideLine"><b>다중 선택</b> <span class="gk">드래그</span></div>
       <div class="guideLine"><b>선택 해제</b> <span class="gk">배경 클릭</span></div>
       <div class="guideLine"><b>이동</b> <span class="gk">⇄ ⇅</span></div>
       <div class="guideLine"><b>실행취소</b> <span class="gk">Ctrl Z</span></div>
@@ -18084,9 +18083,12 @@ function openEditor() {
     overlay.style.color = currentFgColor();
     overlay.style.setProperty('--editor-bg', currentBgColor());
     buildEditorContent();
-    // 에디터 여는 순간 — 모든 _editorDefs를 그리드(0.5)에 한 번 정렬
+    // 에디터 여는 순간 — 모든 _editorDefs를 그리드(0.5)에 한 번 정렬 + [v1.09] isBase 좌표 매칭 부여
     Object.keys(_editorDefs).forEach(ch => {
-      if (_editorDefs[ch]) snapNodesToGrid(_editorDefs[ch]);
+      if (_editorDefs[ch]) {
+        snapNodesToGrid(_editorDefs[ch]);
+        if (typeof _annotateIsBaseFromFactory === 'function') _annotateIsBaseFromFactory(ch, _editorDefs[ch]);
+      }
     });
     // PRIMITIVES도 함께 동기화 (감상모드 즉시 반영)
     Object.keys(_editorDefs).forEach(ch => {
@@ -19697,6 +19699,14 @@ function applyDefaultJamoDefs() {
 applyDefaultJamoDefs();
 // 페이지 시작 시 자동 불러오기 — localStorage 가 있으면 사용자 수정본이 우선
 loadEditorDefsLocal();
+// [v1.09] 모든 _editorDefs 의 노드에 isBase 좌표 매칭 부여 + PRIMITIVES 동기화 — 호버/bond/detach 강조 strict 작동.
+//   load 직후 한 번. PRIMITIVES 의 노드도 isBase 정보 포함되어야 buildWorld 시 정확히 분류.
+Object.keys(_editorDefs).forEach(_ekCh => {
+  if (typeof _annotateIsBaseFromFactory === 'function') _annotateIsBaseFromFactory(_ekCh, _editorDefs[_ekCh]);
+  if (typeof PRIMITIVES !== 'undefined' && _editorDefs[_ekCh]) {
+    PRIMITIVES[_ekCh] = JSON.parse(JSON.stringify(_editorDefs[_ekCh]));
+  }
+});
 
 // ════════════════════════════════════════════════════════════════════════
 //  [기준 디자인 / Design Baseline] — 자모 편집창 '초기화'(#btnRevertDefault)가
