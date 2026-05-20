@@ -422,12 +422,13 @@
   .guideList .guideSub { margin-top: 12px; opacity: 1; font-size: 10px; letter-spacing: 0.5px; }
   /* 에디터창 가이드: 박스 위치는 그대로(우측, margin-left:auto)·텍스트만 좌측 정렬 */
   .editor .guideList { text-align: left; margin-left: auto; }  /* [v1.09] 모든 에디터 가이드 우측 정렬 */
-  /* 디자인창(stage) 안 가이드 — 2단 분리. 1단 -30px(이전 -45+15), column-gap 31px (이전 1+30 → 2단이 이전보다 30 우측). */
+  /* [v1.09] 디자인창 가이드 2단 — 1단 = 캔버스 좌측, 2단 = 캔버스 중앙. width 100% + 1fr 1fr. */
+  .editor .stage .guideList { margin-left: 0; width: 100%; }
   .editor #jamoEditGuide,
   .editor #moimkkolGuide {
-    display: grid; grid-template-columns: max-content max-content;
-    grid-auto-flow: column; column-gap: 31px;
-    transform: translateX(-30px);
+    display: grid; grid-template-columns: 1fr 1fr;
+    grid-auto-flow: column; column-gap: 0;
+    transform: none;
   }
   .editor #jamoEditGuide { grid-template-rows: repeat(5, auto); }
   .editor #moimkkolGuide { grid-template-rows: repeat(3, auto); }
@@ -506,7 +507,7 @@
   .editor .stage .meta { display: flex; gap: 8px; align-items: baseline; margin-bottom: 7px; justify-content: flex-start; line-height: 1; }
   .stageBtn { display: inline-flex; align-items: center; justify-content: center; font-size: 10px; line-height: 1; height: 14px; user-select: none; flex: 0 0 auto; vertical-align: middle; }
   .stageBtn.closeX { cursor: pointer; }
-  .stageBtn.dragHandle { cursor: grab; font-size: 10px; height: 10px; }  /* [v1.09] 주사위 15px × 0.65 ≈ 10px */
+  .stageBtn.dragHandle { cursor: grab; }  /* 오늘 수정(font-size·height) 제거 → 기본 .stageBtn(10px·14px) 그대로 */
   .stageBtn.dragHandle.dragging { cursor: grabbing; }
   .editor .stage .meta .label { flex: 1 1 auto; text-align: left; }
   /* 노드/엣지 두 항목 간 간격 — HUD 항목 간격(margin-right: 14px)과 동일 */
