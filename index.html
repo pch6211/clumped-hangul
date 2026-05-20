@@ -33,7 +33,7 @@
     }
     #mobileTextBar .mtbLabel { align-self: flex-start; display: inline-flex; align-items: center; gap: 4px; }
     /* 모바일 입력바 라벨 옆 주사위 — .panel .groupTitle .die 와 동일 규칙(가운데 정렬, 14px) */
-    #mobileTextBar .die { display: inline-flex; align-items: center; justify-content: center; font-size: 14px; line-height: 1; height: 14px; cursor: pointer; user-select: none; padding: 0 2px; opacity: 1; vertical-align: middle; }
+    #mobileTextBar .die { display: inline-flex; align-items: center; justify-content: center; font-size: 10px; line-height: 1; height: 14px; cursor: pointer; user-select: none; padding: 0 2px; opacity: 1; vertical-align: middle; }
     #mobileTextBar .die.rolling { pointer-events: none; }
     #mobileTextBar textarea {
       width: 100%; resize: none; overflow-y: auto;
@@ -48,7 +48,7 @@
       display: inline-flex; align-items: center; justify-content: center;
       position: fixed; top: 24px; left: 24px; z-index: 130;
       height: 14px; line-height: 1;
-      font-family: sans-serif; font-size: 14px;
+      font-family: sans-serif; font-size: 10px;
       color: var(--editor-fg, currentColor); background: transparent;
       cursor: pointer; user-select: none; pointer-events: auto;
       vertical-align: middle;
@@ -58,7 +58,7 @@
       display: inline-flex; align-items: center; justify-content: center;
       position: fixed; top: 24px; right: 24px; z-index: 130;
       height: 14px; line-height: 1;
-      font-family: sans-serif; font-size: 14px;
+      font-family: sans-serif; font-size: 10px;
       color: var(--editor-fg, currentColor); background: transparent;
       cursor: pointer; user-select: none; pointer-events: auto;
       vertical-align: middle; padding: 0 2px;
@@ -411,7 +411,7 @@
   .panel .colorBlock { }
   .panel .groupTitle, #pcTextBar .groupTitle { display: flex; justify-content: flex-start; align-items: center; margin-bottom: 4px; letter-spacing: 0.5px; opacity: 1; }
   .panel .groupTitle .titleText, #pcTextBar .groupTitle .titleText { text-align: left; }
-  .panel .groupTitle .die, #pcTextBar .groupTitle .die { display: inline-flex; align-items: center; justify-content: center; font-size: 14px; line-height: 1; height: 14px; cursor: pointer; user-select: none; padding: 0 2px; opacity: 1; vertical-align: middle; }
+  .panel .groupTitle .die, #pcTextBar .groupTitle .die { display: inline-flex; align-items: center; justify-content: center; font-size: 10px; line-height: 1; height: 14px; cursor: pointer; user-select: none; padding: 0 2px; opacity: 1; vertical-align: middle; }
   .panel .groupTitle .die.rolling, #pcTextBar .groupTitle .die.rolling { pointer-events: none; }
   /* 가이드 세로 리스트 (#8·#9) — 버튼 다음 줄, 항목당 한 줄. 설정창/에디터 공용 */
   /* 가이드 = 기본 HUD와 동일 문자 스타일 (letter-spacing 1px, line-height 1.6, 투명도 없음) */
