@@ -13,6 +13,8 @@
   html, body { width: 100%; height: 100%; overflow: hidden; background: #808080; }
   /* 하단 고정 텍스트 입력바 — 모바일 전용. 기본은 숨김(데스크탑에선 안 보임) */
   #mobileTextBar { display: none; }
+  /* 모바일 전용: 햄버거 메뉴(☰) / 패널 우상단 뒤로가기(←) — 데스크탑에서는 숨김 */
+  #mobileMenuBtn, .panelMobileBack { display: none; }
   /* 모바일 (≤ 600px) — 자동 감상모드만, UI 모두 숨김 + 하단 텍스트 입력바만 노출 */
   @media (max-width: 600px) {
     .panel, .editor, #hud, #cwTooltipEl, #introPanel, .ccFooter { display: none !important; }
@@ -33,6 +35,41 @@
       background: var(--editor-bg, transparent); color: var(--editor-fg, currentColor);
       border: 1px solid currentColor; border-radius: 0; outline: none;
       font-family: inherit; font-size: 10px; line-height: 1.4; letter-spacing: 0.5px;
+    }
+    /* 모바일 햄버거 메뉴 버튼(☰) — 우상단 고정. 속성창 열기. ✕/▩ 와 동일하게 특수문자 자체가 버튼. */
+    #mobileMenuBtn {
+      display: inline-flex; align-items: center; justify-content: center;
+      position: fixed; top: 8px; right: 12px; z-index: 130;
+      padding: 8px 12px; line-height: 1;
+      font-family: 'Noto Sans KR', sans-serif; font-size: 18px;
+      color: var(--editor-fg, currentColor); background: transparent;
+      cursor: pointer; user-select: none; pointer-events: auto;
+    }
+    /* 패널 = 풀스크린 오버레이 — 기본 모바일 룰(.panel display:none)을 .panel.open 으로 무력화 */
+    .panel.open {
+      display: block !important;
+      position: fixed; inset: 0;
+      top: 0; left: 0; right: 0; bottom: 0;
+      width: 100vw; height: 100vh; max-width: none;
+      padding: 48px 24px 24px;
+      background: var(--editor-bg, #fff);
+      color: var(--editor-fg, currentColor);
+      z-index: 200;
+      overflow-y: auto; overflow-x: hidden;
+      direction: ltr;  /* 모바일은 RTL 스크롤바 트릭 해제 */
+    }
+    .panel.open > * { direction: ltr; }
+    /* 패널 열렸을 때 햄버거·하단 입력바 숨김(중복 표시 방지) */
+    body.panel-open #mobileMenuBtn,
+    body.panel-open #mobileTextBar { display: none !important; }
+    /* 패널 우상단 뒤로가기(←) — 스크롤과 무관하게 우상단 고정 */
+    .panel.open .panelMobileBack {
+      display: inline-flex; align-items: center; justify-content: center;
+      position: fixed; top: 8px; right: 12px; z-index: 210;
+      padding: 8px 12px; line-height: 1;
+      font-family: 'Noto Sans KR', sans-serif; font-size: 18px;
+      color: var(--editor-fg, currentColor); background: var(--editor-bg, transparent);
+      cursor: pointer; user-select: none;
     }
   }
   #universe { position: fixed; inset: 0; width: 100vw; height: 100vh; display: block; background: transparent; cursor: default; }
@@ -490,6 +527,7 @@
   <div class="introDontShow" id="introDontShow" title="체크하면 다음부터 이 안내를 보지 않습니다"><span class="introChk">☐</span> 다시 보지 않기</div>
 </div>
 <div class="panel" id="panel">
+  <span class="panelMobileBack" id="panelMobileBack" title="감상화면으로 돌아가기">←</span>
   <div id="panel-body"></div>
   <div class="inlineExpand" id="globalInline"></div>
 </div>
@@ -15854,6 +15892,14 @@ function togglePanel() {
   const panel = document.getElementById('panel');
   const isOpen = panel.classList.toggle('open');
   panelOffsetX = isOpen ? PANEL_W : 0;
+  // 모바일: 패널이 풀스크린 오버레이로 캔버스를 가림 → 좌측 잘림(panelOffsetX) 불필요.
+  //   body.panel-open 클래스로 햄버거·하단 입력바 숨김 토글.
+  if (typeof isMobile === 'function' && isMobile()) {
+    panelOffsetX = 0;
+    document.body.classList.toggle('panel-open', isOpen);
+  } else {
+    document.body.classList.remove('panel-open');
+  }
   if (isOpen) buildPanel();
   else {
     sliderUpdaters.length = 0;
@@ -15863,6 +15909,11 @@ function togglePanel() {
       const el = document.getElementById(id);
       if (el) el.remove();
     });
+    // 모바일: 패널 닫을 때 하단 입력창 값을 현재 TEXT 와 동기화 (기본 문구면 placeholder 노출).
+    if (typeof isMobile === 'function' && isMobile()) {
+      const _mta = document.getElementById('mobileText');
+      if (_mta) _mta.value = (TEXT === MOBILE_NOTICE) ? '' : TEXT;
+    }
   }
   // 설정창 열림/닫힘에 따라 HUD 설정 섹션 표시/숨김 + 가로줄 갱신 (가이드 ON일 때만 노출)
   _applyGuideVisibility();
@@ -20544,6 +20595,11 @@ requestAnimationFrame(() => {
   _wireMobileTextarea();
   // 기본 문구이면 입력창은 비워두고 placeholder 만 보이게(사이트 공통 opacity 0.45).
   { const _m = document.getElementById('mobileText'); if (_m) _m.value = (TEXT === MOBILE_NOTICE) ? '' : TEXT; }
+  // 모바일 햄버거(☰) / 패널 뒤로가기(←) — 둘 다 togglePanel 호출
+  const _mbtn = document.getElementById('mobileMenuBtn');
+  if (_mbtn && !_mbtn._bound) { _mbtn.addEventListener('click', () => togglePanel()); _mbtn._bound = true; }
+  const _back = document.getElementById('panelMobileBack');
+  if (_back && !_back._bound) { _back.addEventListener('click', () => togglePanel()); _back._bound = true; }
   if (_MOBILE && !_mobileRTimer) {
     _mobileRTimer = setInterval(() => { if (typeof randomizeAll === 'function') randomizeAll(); }, 5000);
   }
@@ -20555,6 +20611,8 @@ requestAnimationFrame(() => {
   // [G1] 우하단 클러스터/광고 배선은 DOM 이후 별도 스크립트에서 처리(타이밍 안정).
 });
 </script>
+<!-- 모바일 전용 햄버거 메뉴 버튼 — 속성창(풀스크린 오버레이) 열기 -->
+<div id="mobileMenuBtn" title="속성 메뉴" role="button" aria-label="속성 메뉴 열기">☰</div>
 <!-- 모바일 전용 하단 고정 텍스트 입력바 (데스크탑 display:none) -->
 <div id="mobileTextBar"><span class="mtbLabel">텍스트</span><textarea id="mobileText" rows="1" translate="no" placeholder="뭉친 한글 Clumped Hangul"></textarea></div>
 <a class="ccFooter" href="https://github.com/pch6211/clumped-hangul/blob/main/LICENSE" target="_blank" rel="noopener noreferrer"
