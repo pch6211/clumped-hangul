@@ -543,11 +543,12 @@
   .editor .marginBottom { bottom: -10px; left: 50%; transform: translateX(-50%); }
   .editor .marginLeft   { left: -17px;   top: 50%;  transform: translateY(-50%); }
   .editor .marginRight  { right: -17px;  top: 50%;  transform: translateY(-50%); }
-  /* 등장 높이 입력 + 초기화/모두 지움 버튼 — 창 외부 같은 줄. 자모 디자인창은 한글 자모일 때 JS 가 숨김. */
-  .editor .editorBottomRow { display: flex; align-items: flex-end; gap: 12px; margin-top: 8px; }
+  /* 등장 높이 입력 + 초기화/모두 지움 버튼 — canvasWrap 기준 absolute (옛 위치). 좌측에 heightInputBlock, 우측에 버튼들. */
+  .editor .editorBottomRow { position: absolute; left: 0; right: 0; top: calc(100% + 20px); display: flex; align-items: flex-end; gap: 12px; }
+  .editor .editorBottomRow .heightInputBlock { margin-right: auto; }  /* 좌측 정렬, 버튼들 우측으로 밀어냄 */
   .editor .heightInputBlock { display: flex; flex-direction: column; align-items: flex-start; }
   .editor .heightInputBlock .groupTitle { line-height: 14px; margin-bottom: 4px; letter-spacing: 0.5px; opacity: 1; }
-  .editor .heightInputBlock .numBox { width: 40px; }
+  .editor .heightInputBlock .numBox { width: 25px; }
   /* 등장 높이 입력 좌측 ↑↓ 화살표 — 클릭 시 ±1 (네이티브 spinner 대체) */
   .editor .heightInputCtrl { display: flex; align-items: stretch; gap: 4px; }
   .editor .hArrowCol { display: flex; flex-direction: column; justify-content: center; user-select: none; }
@@ -637,24 +638,24 @@
     </div>
     <div class="canvasWrap">
       <canvas class="editorCanvas" id="editorCanvas" width="453" height="453"></canvas>
-    </div>
-    <!-- [v1.09] 등장 높이 + 초기화/모두 지움 — 창 외부 같은 줄. 한글 자모일 때 등장 높이 hidden. -->
-    <div class="editorBottomRow">
-      <div class="heightInputBlock" id="editorHeightBlock">
-        <div class="groupTitle"><span class="titleText">등장 높이</span></div>
-        <div class="heightInputCtrl">
-          <span class="hArrowCol">
-            <span class="hArrow" data-dir="1" title="+1">▲</span>
-            <span class="hArrow" data-dir="-1" title="-1">▼</span>
-          </span>
-          <input type="number" inputmode="numeric" class="numBox"
-                 id="editorHeightInput"
-                 title="등장 높이 — 양수는 위, 음수는 아래, 0은 정중앙" />
+      <!-- [v1.09] 등장 높이 + 초기화/모두 지움 — canvasWrap 안 absolute (옛 위치). -->
+      <div class="editorBottomRow">
+        <div class="heightInputBlock" id="editorHeightBlock">
+          <div class="groupTitle"><span class="titleText">등장 높이</span></div>
+          <div class="heightInputCtrl">
+            <span class="hArrowCol">
+              <span class="hArrow" data-dir="1" title="+1">▲</span>
+              <span class="hArrow" data-dir="-1" title="-1">▼</span>
+            </span>
+            <input type="number" inputmode="numeric" class="numBox"
+                   id="editorHeightInput"
+                   title="등장 높이 — 양수는 위, 음수는 아래, 0은 정중앙" />
+          </div>
         </div>
-      </div>
-      <div class="toolBtnBottomRow">
-        <button class="pillBtn" id="btnRevertDefault" title="현재 자모 디자인을 편집 전 상태로 복원">초기화</button>
-        <button class="pillBtn" id="btnClearAll" title="현재 자모의 모든 노드·획 삭제">모두 지움</button>
+        <div class="toolBtnBottomRow">
+          <button class="pillBtn" id="btnRevertDefault" title="현재 자모 디자인을 편집 전 상태로 복원">초기화</button>
+          <button class="pillBtn" id="btnClearAll" title="현재 자모의 모든 노드·획 삭제">모두 지움</button>
+        </div>
       </div>
     </div>
     <!-- #13 D — 자모 디자인 편집 가이드(제목 삭제, 내용만). 창이 보일 때 함께 표시 -->
@@ -685,23 +686,23 @@
     </div>
     <div class="canvasWrap">
       <canvas class="editorCanvas" id="moimkkolCanvas" width="453" height="453"></canvas>
-    </div>
-    <!-- [v1.09] 등장 높이 + 초기화 — 창 외부 같은 줄. 모임꼴은 항상 표시. -->
-    <div class="editorBottomRow">
-      <div class="heightInputBlock">
-        <div class="groupTitle"><span class="titleText">등장 높이</span></div>
-        <div class="heightInputCtrl">
-          <span class="hArrowCol">
-            <span class="hArrow" data-dir="1" title="+1">▲</span>
-            <span class="hArrow" data-dir="-1" title="-1">▼</span>
-          </span>
-          <input type="number" inputmode="numeric" class="numBox"
-                 id="moimkkolHeightInput"
-                 title="등장 높이 — 양수는 위, 음수는 아래, 0은 정중앙 (이 모임꼴 전체에 적용)" />
+      <!-- [v1.09] 등장 높이 + 초기화 — canvasWrap 안 absolute (옛 위치). -->
+      <div class="editorBottomRow">
+        <div class="heightInputBlock">
+          <div class="groupTitle"><span class="titleText">등장 높이</span></div>
+          <div class="heightInputCtrl">
+            <span class="hArrowCol">
+              <span class="hArrow" data-dir="1" title="+1">▲</span>
+              <span class="hArrow" data-dir="-1" title="-1">▼</span>
+            </span>
+            <input type="number" inputmode="numeric" class="numBox"
+                   id="moimkkolHeightInput"
+                   title="등장 높이 — 양수는 위, 음수는 아래, 0은 정중앙 (이 모임꼴 전체에 적용)" />
+          </div>
         </div>
-      </div>
-      <div class="toolBtnBottomRow">
-        <button class="pillBtn" id="btnMoimkkolResetPattern" title="이 모임꼴 패턴의 박스 배치를 기본값으로 되돌리기">초기화</button>
+        <div class="toolBtnBottomRow">
+          <button class="pillBtn" id="btnMoimkkolResetPattern" title="이 모임꼴 패턴의 박스 배치를 기본값으로 되돌리기">초기화</button>
+        </div>
       </div>
     </div>
     <!-- #13 D — 한글 모임꼴 편집 가이드(제목 삭제, 내용만). 창이 보일 때 함께 표시 -->
@@ -10698,7 +10699,7 @@ const JONG_LIST = ['','ㄱ','ㄲ','ㄳ','ㄴ','ㄵ','ㄶ','ㄷ','ㄹ','ㄺ','ㄻ
 const HORIZONTAL_VOWELS = ['ㅗ','ㅛ','ㅜ','ㅠ','ㅡ'];
 const MIXED_VOWELS = ['ㅘ','ㅙ','ㅚ','ㅝ','ㅞ','ㅟ','ㅢ'];
 
-let TEXT = '뭉친 한글 Clumped Hangul';
+let TEXT = '뭉친 한글';  // [v1.09] PC/모바일 공통 기본 문구
 
 // ── 랜덤 글귀 풀 (T 단축키) — PDF "멈춤 이후의 조형"에서 추출, 중복 제거 ──
 const _RANDOM_SENTENCES = [
@@ -17167,7 +17168,7 @@ function _reflowPopups() {
   });
 }
 // ── PC ↔ 모바일 전환: 글귀 자연스럽게 스왑 + 5초 R 토글 (창 크기 가로질러도 자연 전환) ──
-const MOBILE_NOTICE = '뭉친 한글 Clumped Hangul';   // 모바일 기본 문구 = PC 기본 문구와 동일 (한 줄, 행갈이 없음)
+const MOBILE_NOTICE = '뭉친 한글';   // [v1.09] PC/모바일 공통 기본 문구
 let _mobileMode = null;          // null=미정 / true=모바일 / false=PC
 let _pcText = TEXT;              // PC 모드에서 쓰던 글귀 기억 (초기 = 전역 기본값)
 let _mobileRTimer = null;
@@ -18804,13 +18805,20 @@ function toggleAddCharDialog() {
   lab1.textContent = 'U+코드 입력 (쉼표로 구분)';
   row1.appendChild(lab1);
   const inp = document.createElement('input');
-  inp.type = 'text';
+  // [v1.09] 비밀번호 매니저 팝업 차단 강화 — type 변경: text → search.
+  //   search 는 자동 채우기·비밀번호 매니저가 거의 트리거 안 함 (브라우저별 차이 있음).
+  //   placeholder, name, autocomplete 모두 매니저 회피용 속성 함께 설정.
+  inp.type = 'search';
   inp.placeholder = 'U+AC00, U+AC00, ···';
-  // 브라우저 비밀번호 저장 팝업 차단 + 자동 채우기 비활성화
   inp.autocomplete = 'off'; inp.autocorrect = 'off'; inp.autocapitalize = 'off'; inp.spellcheck = false;
-  inp.setAttribute('name', 'mh_codepoint_' + Math.random().toString(36).slice(2,8));  // 랜덤 name = 자동완성 매칭 방지
-  inp.setAttribute('data-lpignore', 'true');  // LastPass ignore
-  inp.setAttribute('data-1p-ignore', 'true');  // 1Password ignore
+  inp.setAttribute('name', 'mh_codepoint_' + Math.random().toString(36).slice(2,8));
+  inp.setAttribute('data-lpignore', 'true');  // LastPass
+  inp.setAttribute('data-1p-ignore', 'true');  // 1Password
+  inp.setAttribute('data-bwignore', 'true');   // Bitwarden
+  inp.setAttribute('data-dashlane-ignore', 'true');  // Dashlane
+  inp.setAttribute('aria-autocomplete', 'none');
+  inp.setAttribute('inputmode', 'text');
+  inp.setAttribute('role', 'textbox');
   const _commit = () => {
     const raw = inp.value.trim();
     if (!raw) return;
@@ -21253,7 +21261,7 @@ requestAnimationFrame(() => {
 <!-- [v1.09] 모바일 햄버거 줄 우측 — 전역 주사위(R = 전체 랜덤). 햄버거와 동일한 top/디자인. -->
 <span class="die" id="mobileMenuDie" title="전체 랜덤 (R)">⚂</span>
 <!-- 모바일 전용 하단 고정 텍스트 입력바 (데스크탑 display:none) -->
-<div id="mobileTextBar"><span class="mtbLabel">텍스트<span class="die" id="mtbDie" title="글귀 랜덤 (T)">⚂</span></span><textarea id="mobileText" rows="1" translate="no" placeholder="뭉친 한글 Clumped Hangul"></textarea></div>
+<div id="mobileTextBar"><span class="mtbLabel">텍스트<span class="die" id="mtbDie" title="글귀 랜덤 (T)">⚂</span></span><textarea id="mobileText" rows="1" translate="no" placeholder="뭉친 한글"></textarea></div>
 <a class="ccFooter" href="https://github.com/pch6211/clumped-hangul/blob/main/LICENSE" target="_blank" rel="noopener noreferrer"
    title="MIT License — 자유롭게 사용·수정·배포 가능">© 2026 Chulhee Park · MIT License</a>
 <!-- [G1] 의견 보내기 / 커피 사주기 — 크레딧 바로 위 우하단 고정 클러스터 (위치는 _g1Layout 가 크레딧 실측해 정렬) -->
