@@ -18449,9 +18449,9 @@ function _isInSelectionBox(def, x, y) {
     if (b) acc(b.x, b.y);
   });
   if (!isFinite(minX)) return false;
-  // [E5] 논리 좌표 단위 패딩 = 점선 박스 오프셋(3px)과 동일 비례 → 1칸 간격 노드 사이
-  //   획을 클릭하면 '선택 안쪽'이 아니라 그 획이 선택되도록 축소(점선 안 클릭 이동은 유지).
-  const pad = Math.max(editorHitRadius() * 3 / EDITOR_HIT_PX, 0.08);
+  // 논리 좌표 단위 패딩 = 점선 박스 오프셋(5px) 과 동일 비례 → 시각 박스와 hit 영역 일치.
+  //   1 칸 간격 노드 사이의 획을 클릭하면 '선택 안쪽'이 아니라 그 획이 선택되도록 적절히 축소.
+  const pad = Math.max(editorHitRadius() * 5 / EDITOR_HIT_PX, 0.08);
   return (x >= minX - pad && x <= maxX + pad && y >= minY - pad && y <= maxY + pad);
 }
 
@@ -18632,28 +18632,17 @@ function showEditorCtxMenu(screenX, screenY, opts) {
   } else if (!hasNode && !hasEdge) {
     items.push({ label: '붙여넣기', tip: '복사한 내용이 없습니다', disabled: true });
   }
-  // 투명하게 / 불투명하게 — 노드·엣지 통합 토글 (F15)
-  //   하나라도 invisible 이면 '불투명하게' (보이게), 없으면 '투명하게' (안 보이게).
-  //   동작: 선택된 노드 + 엣지 모두에 일괄 적용 (둘 중 하나만 있어도 동작).
-  if (hasNode || hasEdge) {
-    const nodeList = selNodes.slice();
-    if (nodeIdx != null && !nodeList.includes(nodeIdx)) nodeList.push(nodeIdx);
-    const anyInvNode = nodeList.some(ni => {
-      const n = def.nodes[ni];
-      return n && n.inv === true;
-    });
-    const anyInvEdge = selEdges.some(ei => {
+  // 투명하게 / 불투명하게 — 엣지가 선택에 포함될 때만 표시 (노드만 선택 시 표시 X).
+  //   노드 inv 는 _autoSyncNodeInvFromEdges 가 자동 처리 → 사용자가 직접 토글할 필요 없음.
+  if (hasEdge) {
+    const anyInv = selEdges.some(ei => {
       const e = def.edges[ei];
       return e && e.length > 2 && e[2] === 'inv';
     });
-    const anyInv = anyInvNode || anyInvEdge;
     items.push({
       label: anyInv ? '불투명하게' : '투명하게',
-      tip: anyInv ? '선택한 노드·획을 보이게' : '선택한 노드·획을 안 보이게 (물리만 작동)',
-      action: () => {
-        if (nodeList.length > 0) ctxBulkToggleNodeInv(nodeList, !anyInv);
-        if (selEdges.length > 0) ctxBulkToggleEdgeInv(selEdges, !anyInv);
-      }
+      tip: anyInv ? '선택한 획을 보이게 (양 끝 노드 자동 일반화)' : '선택한 획을 안 보이게 (물리만 작동, 양 끝 노드 모두 투명 엣지에만 연결 시 자동 투명화)',
+      action: () => ctxBulkToggleEdgeInv(selEdges, !anyInv)
     });
   }
   // [F14] 다중 선택 시 좌우 반전·상하 반전 (변형 UI 대체)
@@ -19228,6 +19217,7 @@ function commitEditorLive() {
   if (!_editorDefs[_editorSelected]) return;
   migrateTagField(_editorDefs[_editorSelected]);
   enforceNormalNodeInvariant(_editorDefs[_editorSelected]);
+  _autoSyncNodeInvFromEdges(_editorDefs[_editorSelected]);  // 투명 엣지만 연결된 노드 자동 투명화
   // 그리드 정렬은 에디터 열리는 순간 한 번만 — 여기서는 호출 안 함
   PRIMITIVES[_editorSelected] = JSON.parse(JSON.stringify(_editorDefs[_editorSelected]));
   if (world) world = buildWorld(currentText());
@@ -19260,6 +19250,29 @@ function enforceNormalNodeInvariant(def) {
     const a = def.nodes[e[0]], b = def.nodes[e[1]];
     if (a && a.inv) delete a.inv;
     if (b && b.inv) delete b.inv;
+  });
+}
+// 노드 inv 자동 동기화 — 어떤 노드에 연결된 모든 엣지가 inv 이면 그 노드도 inv 로 설정.
+//   normal 엣지가 하나라도 있으면 enforceNormalNodeInvariant 가 inv 를 제거하므로 충돌 없음.
+//   고립 노드는 사용자 설정 유지.
+function _autoSyncNodeInvFromEdges(def) {
+  if (!def || !Array.isArray(def.edges) || !Array.isArray(def.nodes)) return;
+  const stats = new Map();  // ni → { invCount, normCount }
+  for (let ei = 0; ei < def.edges.length; ei++) {
+    const e = def.edges[ei];
+    if (!e) continue;
+    const isInv = e.length > 2 && e[2] === 'inv';
+    [e[0], e[1]].forEach(ni => {
+      if (!stats.has(ni)) stats.set(ni, { invCount: 0, normCount: 0 });
+      const s = stats.get(ni);
+      if (isInv) s.invCount++; else s.normCount++;
+    });
+  }
+  def.nodes.forEach((n, ni) => {
+    if (!n) return;
+    const s = stats.get(ni);
+    if (!s) return;  // 고립 노드 — 기존 상태 유지
+    if (s.normCount === 0 && s.invCount > 0) n.inv = true;  // 모든 연결 엣지가 inv → 노드도 inv
   });
 }
 function loadEditorDefsLocal() {
@@ -19616,6 +19629,13 @@ function onEditorContextMenu(e) {
   if (selN.length === 0 && _editorSelectedNode != null) selN = [_editorSelectedNode];
   if (selE.length === 0 && _editorSelectedEdge >= 0) selE = [_editorSelectedEdge];
   const hasSel = (selN.length > 0 || selE.length > 0);
+  // 선택 박스 안 우클릭 — hit Node/Edge 검사보다 우선. 기존 선택 유지하고 메뉴 표시.
+  //   (박스 안에 우클릭 했는데 다른 노드/엣지가 선택되는 것 방지)
+  if (hasSel && _isInSelectionBox(def, p.x, p.y)) {
+    const single = (selN.length === 1 && selE.length === 0) ? selN[0] : null;
+    showEditorCtxMenu(e.clientX, e.clientY, { selNodes: selN, selEdges: selE, singleNode: single });
+    return;
+  }
   if (hitN >= 0) {
     // 노드 우클릭 — 선택 밖이면 그 노드만 선택, 안이면 유지
     if (!selN.includes(hitN)) {
@@ -20576,8 +20596,7 @@ function renderEditorCanvas() {
       if (b) _accum(b.x, b.y);
     });
     if (isFinite(minX)) {
-      // [F16] 선택 점선 박스 바깥 오프셋 = 그리드 1칸의 1/4 (캔버스 픽셀 단위). 화면 크기에 비례.
-      const padPx = Math.max(2, stepX / 4);
+      const padPx = 5;  // 자모 디자인창 선택 점선 박스 바깥 오프셋 (사용자 요청 5px 고정)
       const x1 = minX * stepX - padPx;
       const y1 = (minY + _GRID_Y_SHIFT) * stepY - padPx;
       const x2 = maxX * stepX + padPx;
