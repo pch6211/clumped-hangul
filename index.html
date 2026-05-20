@@ -338,7 +338,7 @@
   .panel::-webkit-scrollbar-button { display: none; height: 0; width: 0; }
   .panel.open { display: block; }
   /* 행: [bar 1fr][label_with_val 110px] */
-  .panel .row { display: grid; grid-template-columns: 1fr 80px; align-items: center; column-gap: 8px; height: 14px; margin-bottom: 2px; }
+  .panel .row { display: grid; grid-template-columns: 1fr 50px; align-items: center; column-gap: 8px; height: 14px; margin-bottom: 2px; }
   /* .row.disabled 클래스는 더 이상 사용하지 않음 */
   .panel .row .bar { position: relative; height: 8px; cursor: ew-resize; }
   .panel .row .bar::before { content: ''; position: absolute; inset: 0; background: currentColor; opacity: 0.16; }
@@ -15579,7 +15579,7 @@ function buildPanel() {
     const ts = document.createElement('span');
     ts.className = 'titleText';
     ts.style.lineHeight = '14px';
-    ts.textContent = '텍스트 ';
+    ts.textContent = '텍스트  ';  // 주사위와 사이 띄어쓰기 1개 추가 (nbsp)
     const td = document.createElement('span');
     td.className = 'die';
     td.id = 'panelTextDie';
@@ -15763,7 +15763,7 @@ function makeTitleWithDie(text, groupId) {
   const titleSpan = document.createElement('span');
   titleSpan.className = 'titleText';
   // 제목 + 띄어쓰기 + 주사위 (제목 우측 끝에 붙도록)
-  titleSpan.textContent = text + ' ';
+  titleSpan.textContent = text + '  ';  // 주사위와 사이 띄어쓰기 1개 추가 (nbsp)
   const die = document.createElement('span');
   die.className = 'die';
   die.textContent = randomDieFace();
