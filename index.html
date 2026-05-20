@@ -133,8 +133,9 @@
   #mhAdBox.mhDialog { z-index: 300; display: none; }
   #mhAdBox.mhDialog.shown { display: block; }
   /* 광고 슬롯 = 실제 AdSense 디스플레이 광고 크기(300×150) 고정 */
-  /* [v1.09] AdSense 승인 대기 중 — 광고 박스 자체 hide. 승인 후 아래 display:none 제거. */
-  #mhAdSlot { display: none !important; position: relative; width: 300px; height: 150px; overflow: hidden;
+  /* [v1.09] AdSense 승인 대기 중 — 광고 박스 + 제목/✕/▩ 버튼 전체 hide. 승인 후 아래 display:none 제거. */
+  #mhAdBox, #mhAdSlot { display: none !important; }
+  #mhAdSlot { position: relative; width: 300px; height: 150px; overflow: hidden;
     background: var(--editor-bg, #fff); box-sizing: content-box; }
   #mhAdSlot .adsbygoogle { display: inline-block; width: 300px; height: 150px; }
   /* 테두리는 ::after 오버레이로 광고(iframe) 위에 그림 — '테두리가 광고 위로' */
@@ -347,7 +348,7 @@
   .hud .hudItem:last-child { margin-right: 0; }
   .hud .hudItem b { font-weight: normal; }
   .hud .hudToggleBtn,
-  .hud .hudClickable { cursor: pointer; pointer-events: auto; position: relative; display: block; width: fit-content; }
+  .hud .hudClickable { cursor: pointer; pointer-events: auto; position: relative; display: block; width: fit-content; line-height: 1.4; }
   /* 클릭 가능 단축키 안내 밑줄 — .lbvVal 의 1px 점선 패턴과 동일 (currentColor 동기화) */
   .hud .hudClickable::after {
     content: ''; position: absolute; left: 0; right: 0; bottom: -2px; height: 1px;
@@ -470,7 +471,8 @@
   .editor.sidebar-hidden .sidebar { display: none !important; }
   /* 사이드바 = 입력창 + 자모 그리드 (우측, 설정창과 동일 높이/간격).
      bottom: var(--hud-h) — HUD 높이에 따라 자동 축소(설정창과 동일 동작). */
-  .editor .sidebar { position: fixed; right: calc(var(--ui-gap) - var(--sbw)); top: 24px; bottom: calc(var(--hud-h, 16px) + var(--g1-gap) - 50px); width: 309px; overflow-y: auto; overflow-x: hidden; padding-left: 8px; padding-right: 8px; pointer-events: auto; line-height: 1; scrollbar-width: thin; scrollbar-color: currentColor transparent; scrollbar-gutter: stable; box-sizing: border-box; }
+  /* bottom = #mhBottomBtns 윗선(44 + 28) 위로 25px = 97px (커피 사주기 버튼 위 25px) */
+  .editor .sidebar { position: fixed; right: calc(var(--ui-gap) - var(--sbw)); top: 24px; bottom: 97px; width: 309px; overflow-y: auto; overflow-x: hidden; padding-left: 8px; padding-right: 8px; pointer-events: auto; line-height: 1; scrollbar-width: thin; scrollbar-color: currentColor transparent; scrollbar-gutter: stable; box-sizing: border-box; }
   .editor .sidebar::-webkit-scrollbar { width: 8px; height: 8px; }
   .editor .sidebar::-webkit-scrollbar-track { background: transparent; }
   .editor .sidebar::-webkit-scrollbar-thumb { background: currentColor; opacity: 0.16; border-radius: 0; }
@@ -534,8 +536,11 @@
   .editor .marginBottom { bottom: -10px; left: 50%; transform: translateX(-50%); }
   .editor .marginLeft   { left: -17px;   top: 50%;  transform: translateY(-50%); }
   .editor .marginRight  { right: -17px;  top: 50%;  transform: translateY(-50%); }
-  /* 자모 디자인창 yShift(등장 높이) 입력은 사용자 요청에 따라 숨김. 모임꼴 디자인창 동일 입력은 유지. */
-  #editorHeightInput { display: none !important; }
+  /* 등장 높이 입력 + 초기화/모두 지움 버튼 — 창 외부 같은 줄. 자모 디자인창은 한글 자모일 때 JS 가 숨김. */
+  .editor .editorBottomRow { display: flex; align-items: flex-end; gap: 12px; margin-top: 8px; }
+  .editor .heightInputBlock { display: flex; flex-direction: column; align-items: flex-start; }
+  .editor .heightInputBlock .groupTitle { line-height: 14px; margin-bottom: 4px; letter-spacing: 0.5px; opacity: 1; }
+  .editor .heightInputBlock .numBox { width: 50px; }
   /* 캔버스 아래 버튼 행 — 원래대로 캔버스 하단에서 20px 아래 */
   .editor .toolBtnBottomRow { position: absolute; left: 0; right: 0; top: calc(100% + 20px); display: flex; flex-direction: row; gap: 8px; justify-content: flex-end; align-items: center; }
   .editor .toolBtnBottomRow .pillBtn { min-width: 70px; white-space: nowrap; }
@@ -583,21 +588,8 @@
 <div class="hud" id="hud">
   <div class="hudSection" id="hudMain"><span class="hudItem hudClickable" data-action="panel"><b>설정 창</b> S</span><span class="hudItem hudClickable" data-action="editor"><b>편집 창</b> E</span><span class="hudItem hudClickable" data-action="random"><b>랜덤 설정</b> R</span><span class="hudItem hudClickable" data-action="text"><b>랜덤 글귀</b> T</span><span class="hudItem hudClickable" data-action="auto"><b>자동</b> A</span><span class="hudItem hudClickable" data-action="reset"><b>리셋</b> B</span><span class="hudItem hudClickable" id="hudToggleBtn" title="가이드 표시 토글"><b>가이드 끄기</b> M</span><span class="hudItem"><b>자간</b> Alt ⇄</span><span class="hudItem"><b>행간</b> Alt ⇅</span><span class="hudItem"><b>수정</b> 획 당기기</span></div>
 </div>
-<div id="introPanel" style="display:none;">
-  <div class="introMeta">
-    <span class="introDialogTitle">뭉친 한글 Clumped Hangul v.1.09</span>
-    <span class="stageBtn dragHandle" id="introDragHandle" title="드래그해서 위치 이동">▩</span>
-    <span class="stageBtn closeX" id="introClose" title="닫기">✕</span>
-  </div>
-  <div class="introBox">
-    <div class="introBody">뭉친 한글은 한글의 모아쓰기를 물리적으로 구현한 시뮬레이션 공간입니다.</div>
-    <div class="introBody">한 글자는 하나의 중심을 가지고 있고, 자음과 모음을 중앙으로 끌어당깁니다.<br>중앙에서 만난 획들은 서로 밀거나 파고들며 그 글자만의 균형을 찾아갑니다.</div>
-    <div class="introBody">속성(S)에서 텍스트를 입력하고 여러 변수를 조절 할 수 있습니다.<br>마음에 드는 설정값, 이미지, 벡터 파일을 다운 받고 공유 할 수 있습니다.</div>
-    <div class="introBody" style="margin-bottom:0;">디자인 창(D)에서 문자를 디자인하거나 문자를 추가 할 수 있습니다.<br>한글 모임꼴의 초·중·종성의 크기와 위치를 편집할 수 있습니다.<br>문자와 모임꼴 디자인을 저장하거나 불러올 수 있습니다.</div>
-  </div>
-  <div class="introDontShow" id="introDontShow" title="체크하면 다음부터 이 안내를 보지 않습니다"><span class="introChk">☐</span> 다시 보지 않기</div>
-</div>
-<!-- PC 전용 외부 텍스트 입력 바 — 출력화면 하단 중앙. CC 푸터 bottom 과 동일 베이스라인. -->
+<!-- [v1.09] 초기 인트로 팝업 삭제 (사용자 요청). -->
+<!-- PC 전용 외부 텍스트 입력 바 — 화면 왼쪽 하단. -->
 <div id="pcTextBar"></div>
 <div class="panel" id="panel">
   <span class="panelMobileBack stageBtn closeX" id="panelMobileBack" title="닫기">✕</span>
@@ -631,12 +623,15 @@
     </div>
     <div class="canvasWrap">
       <canvas class="editorCanvas" id="editorCanvas" width="453" height="453"></canvas>
-      <!-- [작업3] 사방 여백(T/B/L/R) 입력 중 "맨 오른쪽" 한 칸만 부활 → 자모/기호의
-           "등장 높이(yShift)" 입력으로 재용도. 마침표·따옴표 등 강제 높이를 사용자가
-           직접 조절. 음수/양수 직접 입력 또는 클릭 후 ↑/↓ ±1. title = 커스텀 호버 설명. -->
-      <input type="number" inputmode="numeric" class="numBox marginInput marginRight"
-             id="editorHeightInput"
-             title="등장 높이 — 양수는 위, 음수는 아래, 0은 정중앙" />
+    </div>
+    <!-- [v1.09] 등장 높이 + 초기화/모두 지움 — 창 외부 같은 줄. 한글 자모일 때 등장 높이 hidden. -->
+    <div class="editorBottomRow">
+      <div class="heightInputBlock" id="editorHeightBlock">
+        <div class="groupTitle"><span class="titleText">등장 높이</span></div>
+        <input type="number" inputmode="numeric" class="numBox"
+               id="editorHeightInput"
+               title="등장 높이 — 양수는 위, 음수는 아래, 0은 정중앙" />
+      </div>
       <div class="toolBtnBottomRow">
         <button class="pillBtn" id="btnRevertDefault" title="현재 자모 디자인을 편집 전 상태로 복원">초기화</button>
         <button class="pillBtn" id="btnClearAll" title="현재 자모의 모든 노드·획 삭제">모두 지움</button>
@@ -670,10 +665,15 @@
     </div>
     <div class="canvasWrap">
       <canvas class="editorCanvas" id="moimkkolCanvas" width="453" height="453"></canvas>
-      <!-- [F2] 모임꼴 등장 높이(yShift) — 이 패턴(같은 모임꼴인 모든 한글)의 등장 위치·중력점 보정 -->
-      <input type="number" inputmode="numeric" class="numBox marginInput marginRight"
-             id="moimkkolHeightInput"
-             title="등장 높이 — 양수는 위, 음수는 아래, 0은 정중앙 (이 모임꼴 전체에 적용)" />
+    </div>
+    <!-- [v1.09] 등장 높이 + 초기화 — 창 외부 같은 줄. 모임꼴은 항상 표시. -->
+    <div class="editorBottomRow">
+      <div class="heightInputBlock">
+        <div class="groupTitle"><span class="titleText">등장 높이</span></div>
+        <input type="number" inputmode="numeric" class="numBox"
+               id="moimkkolHeightInput"
+               title="등장 높이 — 양수는 위, 음수는 아래, 0은 정중앙 (이 모임꼴 전체에 적용)" />
+      </div>
       <div class="toolBtnBottomRow">
         <button class="pillBtn" id="btnMoimkkolResetPattern" title="이 모임꼴 패턴의 박스 배치를 기본값으로 되돌리기">초기화</button>
       </div>
@@ -16337,11 +16337,11 @@ function togglePanel() {
   const _isMob = typeof isMobile === 'function' && isMobile();
   if (_isMob) {
     panelOffsetX = 0;
-    document.body.classList.toggle('panel-open', isOpen);
   } else {
     panelOffsetX = isOpen ? PANEL_W : 0;
-    document.body.classList.remove('panel-open');
   }
+  // PC/모바일 둘 다 body.panel-open 토글 — PC: HUD translateX 시프트, 모바일: 햄버거/입력바 숨김.
+  document.body.classList.toggle('panel-open', isOpen);
   if (isOpen) buildPanel();
   else {
     sliderUpdaters.length = 0;
@@ -18246,6 +18246,14 @@ function buildEditorContent() {
         _editFocus = 'jamo';  // #13 C2 — 자모 선택 = 키보드 포커스 자모 디자인
         _editorPen = null; _editorSelectedNode = null; _editorSelectedNodes = new Set();
         _editorSelectedEdge = -1; _editorSelectedEdges = new Set();  // msg3 — 자모 전환 시 선택 박스 해제
+        // [v1.09] 등장 높이 입력 표시 — 비한글(라틴·기호·이모지) 일 때만 표시. 한글 자모는 숨김.
+        {
+          const _hBlk = document.getElementById('editorHeightBlock');
+          if (_hBlk) {
+            const _isHangul = /^[가-힣ᄀ-ᇿㄱ-ㆎ]$/.test(j);
+            _hBlk.style.display = _isHangul ? 'none' : '';
+          }
+        }
         ensureEditorDef(j);
         // [작업4] 편집창을 '열 때' 데이터에 정확히 겹쳐 들어온 중복 노드를 한 점으로 정리.
         //   (임베드 'P' 처럼 (9,7)·(7,7)에 겹친 노드 + 길이0 엣지가 들어있던 문제. 기존엔
