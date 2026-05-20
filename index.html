@@ -15232,8 +15232,11 @@ canvas.addEventListener('pointerdown', e => {
     // [항목3·4] 잡은 노드가 한글 음절의 원본(획 끝) 노드면 "붙임 짓기" 세션 시작 —
     //   같은 글자 안의 다른 파트 원본 노드들만 후보(D-4: 다른 파트). 자격 미달이면
     //   _bond=null 로 두어 기존 드래그와 100% 동일하게 동작.
+    // [감상모드 통합] 기본 디자인 노드(isBase!==false)만 자석 모드 활성. 추가 노드(서브디비전)는 스프링 고정만.
     _bond = null;
-    if (bestBody && !bestBody.isPunct && Array.isArray(bestBody.jamos)) {
+    const _hitNode = (best) ? best : null;
+    const _hitIsBase = !!(_hitNode && _hitNode.isBase !== false);
+    if (_hitIsBase && bestBody && !bestBody.isPunct && Array.isArray(bestBody.jamos)) {
       const src = _bondMapNode(bestBody, bestIdx);
       if (src) {
         // [항목1] 한 디자인 꼭짓점(part+designIdx)당 후보는 1개만 — 분할로 생긴
@@ -15258,10 +15261,11 @@ canvas.addEventListener('pointerdown', e => {
     }
     // [항목4] 잡은 노드가 "붙어 있는 자모"에 속하면(그 자모의 어느 부위든) → 떼기 모드.
     //   정확히 붙은 점을 클릭하지 않아도, 그 자모의 아무 곳이나 잡고 끌면 붙어 있던
-    //   부위가 알아서 떨어짐. 붙임 짓기(_bond)보다 우선. 끌어서 융합반경 밖으로 놓으면
-    //   endDrag 에서 그 붙임의 s/n 태그·필터 토큰을 양쪽 디자인에서 영속 제거.
+    //   부위가 알아서 떨어짐. 끌어서 융합반경 밖으로 놓으면 endDrag 에서 그 붙임의
+    //   s/n 태그·필터 토큰을 양쪽 디자인에서 영속 제거.
+    // [감상모드 통합] 추가 노드(isBase===false)만 떼기 가능. 기본 노드는 떼기 대신 자석 후보 안내(위 _bond).
     _detach = null;
-    if (bestBody && Array.isArray(bestBody.magnetPairs) && Array.isArray(bestBody.jamos)) {
+    if (!_hitIsBase && bestBody && Array.isArray(bestBody.magnetPairs) && Array.isArray(bestBody.jamos)) {
       let _gJ = null;  // 잡은 노드가 속한 자모(파트)
       for (const j of bestBody.jamos) {
         if (j.nodeIndices && j.nodeIndices.indexOf(bestIdx) >= 0) { _gJ = j; break; }
@@ -15282,9 +15286,10 @@ canvas.addEventListener('pointerdown', e => {
         }
         if (_bestPair) {
           // sx/sy = 잡은 시점 커서. moved = 실제로 끌었는지(클릭과 구분).
+          // [감상모드 통합] _bond 와 _detach 는 위 _hitIsBase 분기로 이미 mutually exclusive.
+          //   (기본 노드면 _bond 만, 추가 노드면 _detach 만 세팅됨.)
           _detach = { body: bestBody, gi: _bestPair.gi, pi: _bestPair.pi,
                       sx: p.x, sy: p.y, moved: false };
-          _bond = null;  // 떼기 우선 — 새 붙임 짓기 비활성
         }
       }
     }
