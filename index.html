@@ -8,9 +8,9 @@
 <!-- Google AdSense 로더 (퍼블리셔 ca-pub-7237044319292911) — 우하단 광고 박스용 -->
 <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7237044319292911" rossorigin="anonymous"></script>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500&display=swap');
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  html, body { width: 100%; height: 100%; overflow: hidden; background: #808080; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #808080; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+  input, textarea, [contenteditable] { -webkit-user-select: text; user-select: text; }
   /* 하단 고정 텍스트 입력바 — 모바일 전용. 기본은 숨김(데스크탑에선 안 보임) */
   #mobileTextBar { display: none; }
   /* 모바일 전용: 햄버거 메뉴(☰) / 패널 우상단 뒤로가기(←) — 데스크탑에서는 숨김 */
@@ -25,7 +25,7 @@
       position: fixed; left: 0; right: 0; bottom: 0; z-index: 120;
       box-sizing: border-box; padding: 9px 24px 24px;
       background: transparent; color: var(--editor-fg, currentColor);
-      font-family: 'Noto Sans KR', sans-serif; font-size: 10px; letter-spacing: 0.5px;
+      font-family: sans-serif; font-size: 10px; letter-spacing: 0.5px;
       pointer-events: auto;
     }
     #mobileTextBar .mtbLabel { align-self: flex-start; display: inline-flex; align-items: center; gap: 4px; }
@@ -45,7 +45,7 @@
       display: inline-flex; align-items: center; justify-content: center;
       position: fixed; top: 8px; left: 24px; z-index: 130;
       padding: 8px 8px 8px 0; height: 14px; line-height: 1;
-      font-family: 'Noto Sans KR', sans-serif; font-size: 14px;
+      font-family: sans-serif; font-size: 14px;
       color: var(--editor-fg, currentColor); background: transparent;
       cursor: pointer; user-select: none; pointer-events: auto;
       vertical-align: middle;
@@ -81,7 +81,7 @@
       display: inline-flex; align-items: center; justify-content: center;
       position: fixed; top: 8px; right: calc((100vw / 3) + 12px); z-index: 210;
       padding: 8px 0 8px 8px; height: 14px; line-height: 1;
-      font-family: 'Noto Sans KR', sans-serif; font-size: 14px;
+      font-family: sans-serif; font-size: 14px;
       color: var(--editor-fg, currentColor); background: var(--editor-bg, transparent);
       cursor: pointer; user-select: none;
       vertical-align: middle;
@@ -99,7 +99,7 @@
   }
   .ccFooter {
     position: fixed; bottom: 22px; right: calc(var(--ui-gap) + var(--sbw));
-    font-family: 'Noto Sans KR', sans-serif; font-size: 10px;
+    font-family: sans-serif; font-size: 10px;
     line-height: 1.6; letter-spacing: 1px;
     z-index: 10; user-select: none; pointer-events: auto;
     padding: 2px 0;
@@ -170,7 +170,7 @@
        - 섹션 간 간격 20px (= .btnRow margin-top 통일값)
        - 색은 var(--editor-bg) / var(--editor-fg) — documentElement 에서 상속 */
   .mhDialog { position: fixed; z-index: 99999;
-    font-family: 'Noto Sans KR', sans-serif; font-size: 10px; letter-spacing: 0.5px; line-height: 1.4;
+    font-family: sans-serif; font-size: 10px; letter-spacing: 0.5px; line-height: 1.4;
     background: transparent; color: var(--editor-fg, currentColor);
     border: none; border-radius: 0;
     padding: 0;
@@ -277,7 +277,7 @@
   /* ── 후원 메뉴 — editorCtxMenu 와 동일한 디자인 (배경/보더/hover 반전) ── */
   .mhContextMenu { position: fixed; z-index: 500;
     display: none; flex-direction: column; align-items: flex-start;
-    font-family: 'Noto Sans KR', sans-serif; font-size: 10px; letter-spacing: 0.5px;
+    font-family: sans-serif; font-size: 10px; letter-spacing: 0.5px;
     user-select: none; pointer-events: auto;
   }
   .mhContextMenu.show { display: inline-flex; }
@@ -292,7 +292,7 @@
     color: var(--editor-bg, transparent);
     border-color: var(--editor-fg, currentColor);
   }
-  .hud { position: fixed; bottom: 22px; left: calc(var(--ui-gap) + var(--sbw)); right: auto; max-width: calc(100vw - var(--ui-gap) * 2 - var(--cc-width, 0px) - 14px); font-family: 'Noto Sans KR', sans-serif; font-size: 10px; line-height: 1.6; letter-spacing: 1px; z-index: 10; user-select: none; }
+  .hud { position: fixed; bottom: 22px; left: calc(var(--ui-gap) + var(--sbw)); right: auto; max-width: calc(100vw - var(--ui-gap) * 2 - var(--cc-width, 0px) - 14px); font-family: sans-serif; font-size: 10px; line-height: 1.6; letter-spacing: 1px; z-index: 10; user-select: none; }
   .hud .hint { pointer-events: none; }
   /* HUD 섹션 카드 — 메인 / 설정 / 에디터를 누적. 자연 콘텐츠 폭, max-width(.hud) 넘으면 자연스럽게 wrap.
      에디터 사이드바·설정창은 --hud-h 변수로 HUD 높이만큼 자기 영역을 줄임 → 시각적 충돌 회피. */
@@ -312,7 +312,7 @@
   /* #4 초기 소개 팝업 — 다른 팝업(.mhDialog) 벤치마크: 제목(버전)+이동(▩)+닫기(✕) meta 행,
      내용은 테두리 박스(.introBox)로 감싸고 동적 배경(var(--editor-bg)) 적용. 드래그 이동 가능. */
   /* 폭 = 가장 긴 줄에 맞춤(max-content) → 2번째 문단도 행갈이 안 됨. 좁은 화면은 max-width 로 클램프 */
-  #introPanel { position: fixed; z-index: 150; width: max-content; max-width: calc(100vw - 40px); font-family: 'Noto Sans KR', sans-serif; font-size: 10px; letter-spacing: 0.5px; line-height: 1.7; pointer-events: auto; box-sizing: border-box; color: var(--editor-fg, currentColor); }
+  #introPanel { position: fixed; z-index: 150; width: max-content; max-width: calc(100vw - 40px); font-family: sans-serif; font-size: 10px; letter-spacing: 0.5px; line-height: 1.7; pointer-events: auto; box-sizing: border-box; color: var(--editor-fg, currentColor); }
   #introPanel .introMeta { display: flex; gap: 8px; align-items: baseline; justify-content: flex-start; line-height: 1; margin-bottom: 7px; }
   /* 제목 크기 = 일반 팝업(.mhDialogTitle)과 동일 (font-size 미지정 → 10px 상속) */
   #introPanel .introMeta .introDialogTitle { flex: 1 1 auto; text-align: left; letter-spacing: 1px; font-weight: normal; }
@@ -326,7 +326,7 @@
   /* 설정 패널 — 미니멀, 배경 없음, 좌상단. 슬라이더는 좌측정렬, 라벨+값은 바 우측. */
   /* 설정 패널 — HUD가 차지하는 하단 높이를 빼고 그 위 영역에서만 표시. 내용 넘치면 세로 스크롤 */
   /* direction: rtl 트릭으로 스크롤바를 좌측에 배치. 내부 콘텐츠는 ltr 로 유지(아래 .panel > * 규칙). */
-  .panel { position: fixed; top: 24px; left: calc(var(--ui-gap) - var(--sbw)); bottom: var(--hud-h, 80px); z-index: 100; font-family: 'Noto Sans KR', sans-serif; font-size: 10px; line-height: 1; letter-spacing: 0.5px; background: transparent; padding: 0 0 0 8px; border: none; border-radius: 0; user-select: none; display: none; width: 288px; color: #000; overflow-y: auto; overflow-x: hidden; box-sizing: border-box; scrollbar-width: thin; scrollbar-color: currentColor transparent; scrollbar-gutter: stable; direction: rtl; }
+  .panel { position: fixed; top: 24px; left: calc(var(--ui-gap) - var(--sbw)); bottom: var(--hud-h, 80px); z-index: 100; font-family: sans-serif; font-size: 10px; line-height: 1; letter-spacing: 0.5px; background: transparent; padding: 0 0 0 8px; border: none; border-radius: 0; user-select: none; display: none; width: 288px; color: #000; overflow-y: auto; overflow-x: hidden; box-sizing: border-box; scrollbar-width: thin; scrollbar-color: currentColor transparent; scrollbar-gutter: stable; direction: rtl; }
   .panel > * { direction: ltr; }
   .panel::-webkit-scrollbar { width: 8px; height: 8px; }
   .panel::-webkit-scrollbar-track { background: transparent; }
@@ -408,11 +408,11 @@
   .panel .feedbackActions { display: flex; gap: 8px; justify-content: flex-start; margin-top: 0; }
   
   /* 커스텀 툴팁 — 페이지 배경색과 일치 */
-  .cwTooltip { position: fixed; z-index: 2147483647; pointer-events: none; padding: 4px 8px; border: 1px solid var(--editor-fg, currentColor); background: var(--editor-bg, transparent); color: var(--editor-fg, currentColor); font-family: 'Noto Sans KR', sans-serif; font-size: 10px; letter-spacing: 0.5px; line-height: 1.4; white-space: normal; max-width: 280px; opacity: 0; transition: opacity 0.12s; }
+  .cwTooltip { position: fixed; z-index: 2147483647; pointer-events: none; padding: 4px 8px; border: 1px solid var(--editor-fg, currentColor); background: var(--editor-bg, transparent); color: var(--editor-fg, currentColor); font-family: sans-serif; font-size: 10px; letter-spacing: 0.5px; line-height: 1.4; white-space: normal; max-width: 280px; opacity: 0; transition: opacity 0.12s; }
   .cwTooltip.show { opacity: 1; }
   .panel .pillBtn { display: inline-flex; align-items: center; justify-content: center; padding: 5px 14px; border: 1px solid currentColor; background: var(--editor-bg, transparent); color: currentColor; font-family: inherit; font-size: 10px; cursor: pointer; letter-spacing: 0.5px; border-radius: 999px; text-decoration: none; text-align: center; line-height: 1; height: 22px; box-sizing: border-box; }
   /* === 에디터 오버레이 (E) — 우측 정렬, 배경 투명, 편집 캔버스만 불투명 === */
-  .editor { position: fixed; inset: 0; z-index: 200; display: none; font-family: 'Noto Sans KR', sans-serif; font-size: 10px; letter-spacing: 0.5px; color: #000; pointer-events: none; }
+  .editor { position: fixed; inset: 0; z-index: 200; display: none; font-family: sans-serif; font-size: 10px; letter-spacing: 0.5px; color: #000; pointer-events: none; }
   .editor.open { display: block; }
   /* 사이드바 = 입력창 + 자모 그리드 (우측, 설정창과 동일 높이/간격).
      bottom: var(--hud-h) — HUD 높이에 따라 자동 축소(설정창과 동일 동작). */
@@ -430,7 +430,7 @@
   .editor .group + .group { margin-top: 14px; }
   /* 그룹 제목 — 설정창 .groupTitle(주사위 14px 때문에 박스 14px)과 동일한 수직 공간을 차지하도록 line-height: 14px.
      이렇게 하면 제목 박스 + margin-bottom(4px) 합이 설정창과 동일 → 첫 항목까지의 간격이 정확히 일치. */
-  .editor .groupLabel { display: block; line-height: 14px; margin-bottom: 4px; letter-spacing: 1px; text-align: right; }
+  .editor .groupLabel { display: flex; align-items: center; justify-content: space-between; line-height: 14px; margin-bottom: 4px; letter-spacing: 1px; text-align: left; }
   /* 1px 표 — v.1.04 모델(셀마다 4면 보더 + 음수 마진 공유 + gridFiller 마지막행 채움 +
      nth-child(10n)/nth-last-child(-n+10) 외곽 음수마진 0). 단 정사각·우측정렬 폐기:
      사용자 요청 — 에디터 사이드바 div 전체 폭으로 펼쳐지는 10열 표(셀=직사각, repeat(10,1fr)). */
@@ -464,14 +464,14 @@
   .editor .canvasWrap { width: 260px; height: 260px; border: 1px solid currentColor; position: relative; background: var(--editor-bg, transparent); box-sizing: border-box; }
   .editor canvas.editorCanvas { display: block; width: 100%; height: 100%; cursor: crosshair; }
   .editor .hint { }
-  .editor .editorHud { position: fixed; bottom: 14px; left: 18px; right: auto; font-family: 'Noto Sans KR', sans-serif; font-size: 10px; line-height: 1.6; letter-spacing: 1px; pointer-events: none; user-select: none; text-align: left; }
+  .editor .editorHud { position: fixed; bottom: 14px; left: 18px; right: auto; font-family: sans-serif; font-size: 10px; line-height: 1.6; letter-spacing: 1px; pointer-events: none; user-select: none; text-align: left; }
   /* 우측 정렬 + 버튼 간 간격은 설정창 btnRow 와 동일(gap: 6px) */
   .editor .btnRow { display: flex; gap: 8px; margin-top: 20px; flex-wrap: wrap; justify-content: flex-end; }
   .editor .pillBtn { display: inline-flex; align-items: center; justify-content: center; padding: 5px 14px; border: 1px solid currentColor; background: var(--editor-bg, transparent); color: currentColor; font-family: inherit; font-size: 10px; cursor: pointer; letter-spacing: 0.5px; border-radius: 999px; text-decoration: none; text-align: center; line-height: 1; height: 22px; box-sizing: border-box; }
   .editor .pillBtn.active { background: var(--editor-fg, currentColor); color: var(--editor-bg, transparent); }
   /* 공용 숫자 입력 박스 — 마진/태그필터/슬라이더 값 입력 모두 동일 디자인
      상하·좌우 패딩 동일(4px), 폭은 "999" 3자리가 딱 들어가는 크기 */
-  .numBox { width: 34px; height: 20px; font-family: 'Noto Sans KR', sans-serif; font-size: 10px; letter-spacing: 0.5px; text-align: center; background: var(--editor-bg, transparent); color: currentColor; border: 1px solid currentColor; border-radius: 0; outline: none; padding: 4px; box-sizing: border-box; line-height: 1; -moz-appearance: textfield; }
+  .numBox { width: 34px; height: 20px; font-family: sans-serif; font-size: 10px; letter-spacing: 0.5px; text-align: center; background: var(--editor-bg, transparent); color: currentColor; border: 1px solid currentColor; border-radius: 0; outline: none; padding: 4px; box-sizing: border-box; line-height: 1; -moz-appearance: textfield; }
   .numBox::-webkit-outer-spin-button, .numBox::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
   /* 자모 마진 입력 — 캔버스 사방 (numBox 기반, 위치만 추가) */
   .editor .canvasWrap { position: relative; }
@@ -484,7 +484,7 @@
   .editor .toolBtnBottomRow { position: absolute; left: 0; right: 0; top: calc(100% + 20px); display: flex; flex-direction: row; gap: 8px; justify-content: flex-end; align-items: center; }
   .editor .toolBtnBottomRow .pillBtn { min-width: 70px; white-space: nowrap; }
   /* 문자 추가 다이얼로그 — 사이드바 안에 인라인으로 나타나는 작은 폼 */
-  #addCharDialog { font-family: 'Noto Sans KR', sans-serif; font-size: 10px; letter-spacing: 0.5px; line-height: 1.4; color: currentColor; position: relative; }
+  #addCharDialog { font-family: sans-serif; font-size: 10px; letter-spacing: 0.5px; line-height: 1.4; color: currentColor; position: relative; }
   #addCharDialog .acdRow { display: block; margin-bottom: 8px; position: relative; }
   #addCharDialog select, #addCharDialog input[type="text"] { width: 100%; padding: 4px 6px; font-family: inherit; font-size: 10px; letter-spacing: 0.5px; background: var(--editor-bg, transparent); color: currentColor; border: 1px solid currentColor; border-radius: 0; outline: none; box-sizing: border-box; }
   #addCharDialog select { max-height: 200px; }
@@ -504,7 +504,7 @@
   /* 노드 우클릭 컨텍스트 메뉴 — 자모 버튼과 동일 스타일.
      각 항목은 자기 텍스트 폭만큼만 차지하며 좌측 정렬, 세로로 쌓임. hover 시 fg↔bg 반전. */
   .editor .editorCtxMenu { position: fixed; z-index: 500; display: none;
-    font-family: 'Noto Sans KR', sans-serif; font-size: 10px; letter-spacing: 0.5px;
+    font-family: sans-serif; font-size: 10px; letter-spacing: 0.5px;
     flex-direction: column; align-items: flex-start;
     user-select: none; pointer-events: auto;
   }
@@ -12348,7 +12348,7 @@ function renderMoimkkolCanvas() {
     if (b.jamo) {
       ctx.fillStyle = bg;
       const fontSize = Math.floor(Math.min(pw, ph) * 0.55);
-      ctx.font = fontSize + "px 'Noto Sans KR', sans-serif";
+      ctx.font = fontSize + "px sans-serif";
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText(b.jamo, px + pw / 2, py + ph / 2);
@@ -15557,30 +15557,6 @@ function buildPanel() {
   body.innerHTML = '';
   sliderUpdaters.length = 0;
 
-  // "설정" 제목 — 패널 최상단, 주사위(R = 전체 랜덤) 함께. 모바일·PC 공통 노출.
-  const settingsTitle = document.createElement('div');
-  settingsTitle.className = 'groupTitle';
-  settingsTitle.id = 'panelSettingsTitle';
-  {
-    const ts = document.createElement('span');
-    ts.className = 'titleText';
-    ts.style.lineHeight = '14px';
-    ts.textContent = '설정 ';
-    const sd = document.createElement('span');
-    sd.className = 'die';
-    sd.id = 'panelSettingsDie';
-    sd.textContent = DEFAULT_DIE;
-    sd.title = '전체 랜덤 (R)';
-    sd.addEventListener('click', (e) => {
-      e.stopPropagation();
-      if (sd.classList.contains('rolling')) return;
-      rollDie(sd, () => { if (typeof randomizeAll === 'function') randomizeAll(); });
-    });
-    settingsTitle.appendChild(ts);
-    settingsTitle.appendChild(sd);
-  }
-  body.appendChild(settingsTitle);
-
   // "텍스트" 제목 — 슬라이더 그룹 제목과 동일한 box-height(14px) + margin-bottom(4px).
   //   주사위(T = 글귀 랜덤) 동반.
   //   id 부여: 모바일에서는 외부 입력바로 일원화하므로 이 제목+입력창을 CSS 로 숨김.
@@ -17943,18 +17919,20 @@ function buildEditorContent() {
   _CATS.forEach(g => {
     const wrap = document.createElement('div');
     wrap.className = 'group';
-    const label = document.createElement('span');
+    const label = document.createElement('div');
     label.className = 'groupLabel';
-    label.textContent = g.label;
-    // 카테고리 라벨 우클릭 — '카테고리 이름 삭제' 메뉴
-    label.style.cursor = 'context-menu';
-    label.addEventListener('contextmenu', (ev) => {
-      ev.preventDefault();
+    const labelText = document.createElement('span');
+    labelText.textContent = g.label;
+    label.appendChild(labelText);
+    const closeBtn = document.createElement('span');
+    closeBtn.className = 'stageBtn closeX';
+    closeBtn.textContent = '✕';
+    closeBtn.title = g.label + ' 닫기';
+    closeBtn.addEventListener('click', (ev) => {
       ev.stopPropagation();
-      _showJamoCtxMenu(ev.clientX, ev.clientY, [
-        { label: g.label + ' 삭제', action: () => removeEditorBlock(g.label) }
-      ]);
+      removeEditorBlock(g.label);
     });
+    label.appendChild(closeBtn);
     wrap.appendChild(label);
     const grid = document.createElement('div');
     grid.className = 'jamoGrid';
