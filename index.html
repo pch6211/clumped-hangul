@@ -40,23 +40,24 @@
       font-family: inherit; font-size: 10px; line-height: 1.4; letter-spacing: 0.5px;
     }
     /* 모바일 햄버거 메뉴 버튼(☰) — 좌상단 고정. 속성창 열기. ✕/▩/⚀ 와 동일하게 특수문자 자체가 버튼.
-       버튼 왼쪽 끝 = 입력바 좌측 마진(24px)과 정렬. 크기·정렬 규칙은 .die(14px) 와 통일. */
+       위치: 입력바 좌·하 패딩(24px) 와 정렬 — top·left 24px 인셋. 크기·정렬 규칙은 .die(14px) 와 통일. */
     #mobileMenuBtn {
       display: inline-flex; align-items: center; justify-content: center;
-      position: fixed; top: 8px; left: 24px; z-index: 130;
-      padding: 8px 8px 8px 0; height: 14px; line-height: 1;
+      position: fixed; top: 24px; left: 24px; z-index: 130;
+      height: 14px; line-height: 1;
       font-family: sans-serif; font-size: 14px;
       color: var(--editor-fg, currentColor); background: transparent;
       cursor: pointer; user-select: none; pointer-events: auto;
       vertical-align: middle;
     }
-    /* 패널 = 화면 좌측 2/3 오버레이. 우측 1/3 영역은 캔버스(출력화면)가 보임.
-       우측 끝에 1px 선 = 패널 div 의 우측 경계. 좌우 여백은 모바일 입력바(24px)와 동일 톤. */
+    /* 패널 = 화면 좌측 3/4 오버레이. 우측 1/4 영역은 캔버스(출력화면)가 보임.
+       우측 끝에 1px 선 = 패널 div 의 우측 경계. 좌우 여백은 모바일 입력바(24px)와 동일 톤.
+       (3/4 폭 = 하단 SVG/PNG/SAVE/LOAD 4 버튼이 한 줄에 들어가도록 — F8) */
     .panel.open {
       display: block !important;
       position: fixed;
       top: 0; left: 0; bottom: 0; right: auto;
-      width: calc(100vw * 2 / 3); height: 100vh; max-width: none;
+      width: calc(100vw * 3 / 4); height: 100vh; max-width: none;
       padding: 48px 24px 24px;
       background: var(--editor-bg, #fff);
       color: var(--editor-fg, currentColor);
@@ -75,12 +76,12 @@
     .panel.open #panelTextTitle,
     .panel.open #mainText,
     .panel.open #panelGuide { display: none !important; }
-    /* 패널 우상단 뒤로가기(←) — 패널의 우측 경계(2/3 지점) 안쪽 12px 에 고정.
-       크기·정렬 규칙은 .die(14px) 와 통일. */
+    /* 패널 우상단 뒤로가기(←) — 패널의 우측 경계(3/4 지점) 안쪽 24px(패널 padding-right) 에 고정.
+       top 24px 도 패널 padding 과 동일. 크기·정렬 규칙은 .die(14px) 와 통일. */
     .panel.open .panelMobileBack {
       display: inline-flex; align-items: center; justify-content: center;
-      position: fixed; top: 8px; right: calc((100vw / 3) + 12px); z-index: 210;
-      padding: 8px 0 8px 8px; height: 14px; line-height: 1;
+      position: fixed; top: 24px; right: calc((100vw / 4) + 24px); z-index: 210;
+      height: 14px; line-height: 1;
       font-family: sans-serif; font-size: 14px;
       color: var(--editor-fg, currentColor); background: var(--editor-bg, transparent);
       cursor: pointer; user-select: none;
@@ -154,6 +155,8 @@
     .editor .jamoBtn, .editor .jamoGrid > .gridFiller {
       font-size: 7px;
     }
+    /* 모바일 한정 — 하단 4 버튼(SVG/PNG/SAVE/LOAD) 한 줄에 들어가도록 패딩 축소 (F8) */
+    .panel .pillBtn { padding: 5px 10px; }
     .panel { width: 198px; top: 16px; }
     .editor .sidebar { width: 188px; top: 16px; }
     .editor .stage { right: 222px; top: 16px; }
@@ -340,7 +343,7 @@
   .panel .row .bar { position: relative; height: 8px; cursor: ew-resize; }
   .panel .row .bar::before { content: ''; position: absolute; inset: 0; background: currentColor; opacity: 0.16; }
   .panel .row .bar .fill { position: absolute; left: 0; top: 0; bottom: 0; background: currentColor; }
-  .panel .row .lbv { font-family: inherit; opacity: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: left; letter-spacing: 0.5px; }
+  .panel .row .lbv { font-family: inherit; opacity: 1; white-space: nowrap; overflow: visible; text-align: left; letter-spacing: 0.5px; }
   .panel .gap { height: 10px; }
   /* 입력창 — resize 핸들 제거(resize: none). 높이는 JS 가 내용에 맞춰 자동 조정 */
   .panel textarea { width: 100%; resize: none; overflow-y: hidden; padding: 4px 6px; border: 1px solid currentColor; background: transparent; color: currentColor; font-family: inherit; font-size: 10px; line-height: 1.4; letter-spacing: 0.5px; outline: none; box-sizing: border-box; margin-bottom: 15px; opacity: 1; min-height: 24px; }
@@ -414,6 +417,8 @@
   /* === 에디터 오버레이 (E) — 우측 정렬, 배경 투명, 편집 캔버스만 불투명 === */
   .editor { position: fixed; inset: 0; z-index: 200; display: none; font-family: sans-serif; font-size: 10px; letter-spacing: 0.5px; color: #000; pointer-events: none; }
   .editor.open { display: block; }
+  /* 감상모드 우클릭 메뉴 진입 시 자모 선택 사이드바를 숨기고 디자인 편집창만 부유 */
+  .editor.sidebar-hidden .sidebar { display: none !important; }
   /* 사이드바 = 입력창 + 자모 그리드 (우측, 설정창과 동일 높이/간격).
      bottom: var(--hud-h) — HUD 높이에 따라 자동 축소(설정창과 동일 동작). */
   .editor .sidebar { position: fixed; right: calc(var(--ui-gap) - var(--sbw)); top: 24px; bottom: calc(var(--hud-h, 16px) + var(--g1-gap)); width: 309px; overflow-y: auto; overflow-x: hidden; padding-left: 8px; padding-right: 8px; pointer-events: auto; line-height: 1; scrollbar-width: thin; scrollbar-color: currentColor transparent; scrollbar-gutter: stable; box-sizing: border-box; }
@@ -15348,7 +15353,7 @@ canvas.addEventListener('contextmenu', e => {
       const _mk = _pk ? MOIMKKOL_CHARS.find(c => _moimkkolPatternKey(c) === _pk) : null;
       if (_mk) {
         items.push({
-          label: '모임꼴 편집',
+          label: '모임꼴 ' + _mk + ' 편집',
           action: () => _openEditorWithMoimkkol(_mk)
         });
       }
@@ -15493,6 +15498,7 @@ function _openEditorWithJamo(jamoChar) {
   if (!overlay.classList.contains('open')) {
     if (typeof openEditor === 'function') openEditor();
   }
+  overlay.classList.add('sidebar-hidden');  // 사이드바 숨김 — 디자인 편집창만 부유
   requestAnimationFrame(() => {
     const list = document.getElementById('editorJamoList');
     if (!list) return;
@@ -15509,6 +15515,7 @@ function _openEditorWithMoimkkol(moimkkolChar) {
   if (!overlay.classList.contains('open')) {
     if (typeof openEditor === 'function') openEditor();
   }
+  overlay.classList.add('sidebar-hidden');  // 사이드바 숨김 — 모임꼴 편집창만 부유
   requestAnimationFrame(() => {
     if (typeof openMoimkkolView === 'function') openMoimkkolView(moimkkolChar);
   });
@@ -15551,6 +15558,7 @@ const _groupRandomizers = {};
 
 const DICE_FACES = ['⚀','⚁','⚂','⚃','⚄','⚅'];
 const DEFAULT_DIE = '⚂';
+function randomDieFace() { return DICE_FACES[Math.floor(Math.random() * DICE_FACES.length)]; }
 
 function buildPanel() {
   const body = document.getElementById('panel-body');
@@ -15571,7 +15579,7 @@ function buildPanel() {
     const td = document.createElement('span');
     td.className = 'die';
     td.id = 'panelTextDie';
-    td.textContent = DEFAULT_DIE;
+    td.textContent = randomDieFace();
     td.title = '글귀 랜덤 (T)';
     td.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -15754,7 +15762,7 @@ function makeTitleWithDie(text, groupId) {
   titleSpan.textContent = text + ' ';
   const die = document.createElement('span');
   die.className = 'die';
-  die.textContent = DEFAULT_DIE;
+  die.textContent = randomDieFace();
   die.title = '클릭 — ' + text + ' 그룹만 랜덤';
   die.addEventListener('click', (e) => {
     e.stopPropagation();
@@ -16086,13 +16094,14 @@ function togglePanel() {
   if (typeof window._dismissIntro === 'function') window._dismissIntro();  // 설정창 열면 인트로 닫기(좌상단 겹침 방지)
   const panel = document.getElementById('panel');
   const isOpen = panel.classList.toggle('open');
-  panelOffsetX = isOpen ? PANEL_W : 0;
-  // 모바일: 패널이 좌측 2/3 만 가림 → 캔버스 텍스트가 우측 1/3 영역으로 흘러가도록
-  //   panelOffsetX 를 viewport 의 2/3 로 설정. body.panel-open 으로 햄버거·하단 입력바 숨김.
-  if (typeof isMobile === 'function' && isMobile()) {
-    panelOffsetX = isOpen ? Math.round(window.innerWidth * 2 / 3) : 0;
+  // 모바일: 패널은 캔버스 위 오버레이로만. panelOffsetX 0 유지 = 캔버스 폭·문자 출력 영역 그대로
+  //   (패널 열어도 글자 배치 리셋 안 됨, 패널이 가리는 부분은 시각적으로만 가려짐).
+  const _isMob = typeof isMobile === 'function' && isMobile();
+  if (_isMob) {
+    panelOffsetX = 0;
     document.body.classList.toggle('panel-open', isOpen);
   } else {
+    panelOffsetX = isOpen ? PANEL_W : 0;
     document.body.classList.remove('panel-open');
   }
   if (isOpen) buildPanel();
@@ -16105,7 +16114,7 @@ function togglePanel() {
       if (el) el.remove();
     });
     // 모바일: 패널 닫을 때 하단 입력창 값을 현재 TEXT 와 동기화 (기본 문구면 placeholder 노출).
-    if (typeof isMobile === 'function' && isMobile()) {
+    if (_isMob) {
       const _mta = document.getElementById('mobileText');
       if (_mta) _mta.value = (TEXT === MOBILE_NOTICE) ? '' : TEXT;
     }
@@ -16113,12 +16122,17 @@ function togglePanel() {
   // 설정창 열림/닫힘에 따라 HUD 설정 섹션 표시/숨김 + 가로줄 갱신 (가이드 ON일 때만 노출)
   _applyGuideVisibility();
   _updateHudDividers();
-  // 패널 열림/닫힘 → drawW 변경, 자동 재핏
-  if (typeof ensureFits === 'function') {
-    ensureFits();
+  // PC 한정 — 패널 열림/닫힘 → drawW 변경, 자동 재핏. 모바일은 캔버스 폭 유지 (F12) 로 스킵.
+  if (!_isMob) {
+    if (typeof ensureFits === 'function') {
+      ensureFits();
+      if (typeof sliderUpdaters !== 'undefined') sliderUpdaters.forEach(u => u());
+    }
+    if (world) world = buildWorld(currentText());
+  } else {
+    // 모바일: 슬라이더 UI 만 갱신 (현재 값 표시). world / 캔버스 폭은 그대로.
     if (typeof sliderUpdaters !== 'undefined') sliderUpdaters.forEach(u => u());
   }
-  if (world) world = buildWorld(currentText());
 }
 
 // ── 랜덤 (단발) — R 한 번 = 한 번 랜덤 도출 후 정지 ──
@@ -17711,6 +17725,7 @@ function openEditor() {
   if (overlay.classList.contains('open')) {
     closeEditor();
   } else {
+    overlay.classList.remove('sidebar-hidden');  // 일반 진입(E·HUD) — 사이드바 표시 복원
     overlay.style.color = currentFgColor();
     overlay.style.setProperty('--editor-bg', currentBgColor());
     buildEditorContent();
@@ -20810,6 +20825,7 @@ requestAnimationFrame(() => {
   // 모바일 입력바 "텍스트" 옆 주사위 — 글귀 랜덤(T) 트리거. 0.75초 굴림 애니메이션 후 applyRandomText.
   const _mtbDie = document.getElementById('mtbDie');
   if (_mtbDie && !_mtbDie._bound) {
+    _mtbDie.textContent = randomDieFace();  // 초기 면 랜덤 (F13)
     _mtbDie.addEventListener('click', (e) => {
       e.stopPropagation();
       if (_mtbDie.classList.contains('rolling')) return;
