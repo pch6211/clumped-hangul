@@ -19,20 +19,20 @@
     /* 세로 스택: "텍스트" 라벨 → (줄 띄고) → 입력창. 가로줄 없음. 좌우 여백 = 아래 여백(36px).
        바 자체는 투명(캔버스 비침), 입력창 안만 동적 배경색. */
     #mobileTextBar {
-      display: flex; flex-direction: column; align-items: stretch; gap: 10px;
+      display: flex; flex-direction: column; align-items: stretch; gap: 4px;
       position: fixed; left: 0; right: 0; bottom: 0; z-index: 120;
       box-sizing: border-box; padding: 9px 24px 24px;
       background: transparent; color: var(--editor-fg, currentColor);
-      font-family: 'Noto Sans KR', sans-serif; font-size: 12px; letter-spacing: 0.5px;
+      font-family: 'Noto Sans KR', sans-serif; font-size: 10px; letter-spacing: 0.5px;
       pointer-events: auto;
     }
     #mobileTextBar .mtbLabel { align-self: flex-start; }
     #mobileTextBar textarea {
       width: 100%; resize: none; overflow-y: auto;
-      max-height: 30vh; min-height: 22px; box-sizing: border-box; padding: 6px 8px;
+      max-height: 30vh; min-height: 22px; box-sizing: border-box; padding: 4px 6px;
       background: var(--editor-bg, transparent); color: var(--editor-fg, currentColor);
       border: 1px solid currentColor; border-radius: 0; outline: none;
-      font-family: inherit; font-size: 12px; line-height: 1.4; letter-spacing: 0.5px;  /* [F9] 16px = iOS 포커스 자동확대 방지 */
+      font-family: inherit; font-size: 10px; line-height: 1.4; letter-spacing: 0.5px;
     }
   }
   #universe { position: fixed; inset: 0; width: 100vw; height: 100vh; display: block; background: transparent; cursor: default; }
@@ -10562,7 +10562,7 @@ const JONG_LIST = ['','ㄱ','ㄲ','ㄳ','ㄴ','ㄵ','ㄶ','ㄷ','ㄹ','ㄺ','ㄻ
 const HORIZONTAL_VOWELS = ['ㅗ','ㅛ','ㅜ','ㅠ','ㅡ'];
 const MIXED_VOWELS = ['ㅘ','ㅙ','ㅚ','ㅝ','ㅞ','ㅟ','ㅢ'];
 
-let TEXT = '뭉친 한글\nClumped Hangul';
+let TEXT = '뭉친 한글 Clumped Hangul';
 
 // ── 랜덤 글귀 풀 (T 단축키) — PDF "멈춤 이후의 조형"에서 추출, 중복 제거 ──
 const _RANDOM_SENTENCES = [
@@ -15356,7 +15356,9 @@ function buildPanel() {
   const ta = document.createElement('textarea');
   ta.id = 'mainText';
   ta.rows = 1;
-  ta.value = TEXT;
+  // 기본 문구는 placeholder(샘플 톤)로만 노출 — 값은 비워서 사이트 공통 opacity 0.45 가 적용되게 함.
+  ta.placeholder = MOBILE_NOTICE;
+  ta.value = (TEXT === MOBILE_NOTICE) ? '' : TEXT;
   // scrollHeight 기반 자동 높이 — 입력 시 / 초기 / 폭 변경 시 호출
   const _adjustTaHeight = () => {
     ta.style.height = 'auto';
@@ -16640,7 +16642,7 @@ function _reflowPopups() {
   });
 }
 // ── PC ↔ 모바일 전환: 글귀 자연스럽게 스왑 + 5초 R 토글 (창 크기 가로질러도 자연 전환) ──
-const MOBILE_NOTICE = '뭉친 한글\nClumped Hangul';   // 모바일 기본 문구 = PC 기본 문구와 동일
+const MOBILE_NOTICE = '뭉친 한글 Clumped Hangul';   // 모바일 기본 문구 = PC 기본 문구와 동일 (한 줄, 행갈이 없음)
 let _mobileMode = null;          // null=미정 / true=모바일 / false=PC
 let _pcText = TEXT;              // PC 모드에서 쓰던 글귀 기억 (초기 = 전역 기본값)
 let _mobileRTimer = null;
@@ -16692,12 +16694,14 @@ function _applyMobileMode(force) {
   if (isMob) {
     if (TEXT !== MOBILE_NOTICE) _pcText = TEXT;      // 들어갈 때 PC 글귀 보존
     TEXT = MOBILE_NOTICE;
-    if (mta) mta.value = TEXT;
+    // 기본 문구일 때는 입력창을 비워 placeholder(샘플 텍스트 톤)가 보이도록.
+    if (mta) mta.value = '';
     if (!_mobileRTimer) _mobileRTimer = setInterval(() => { if (typeof randomizeAll === 'function') randomizeAll(); }, 5000);
   } else {
     TEXT = _pcText;                                   // 돌아올 때 PC 글귀 복원
-    if (pta) pta.value = TEXT;
-    if (mta) mta.value = TEXT;
+    // 기본 문구이면 placeholder 표시(빈 value), 사용자 글귀이면 그대로 표시.
+    if (pta) pta.value = (TEXT === MOBILE_NOTICE) ? '' : TEXT;
+    if (mta) mta.value = (TEXT === MOBILE_NOTICE) ? '' : TEXT;
     if (_mobileRTimer) { clearInterval(_mobileRTimer); _mobileRTimer = null; }
   }
   if (typeof _autoRegisterUnknownChars === 'function') _autoRegisterUnknownChars(TEXT);
@@ -20538,7 +20542,8 @@ requestAnimationFrame(() => {
   // ── 모바일 하단 입력바 배선(모드 무관 1회) + 초기 모바일이면 5초 R 시작 ──
   //   PC↔모바일 전환은 resize 의 _applyMobileMode 가 글귀 스왑·타이머 토글 처리.
   _wireMobileTextarea();
-  { const _m = document.getElementById('mobileText'); if (_m) _m.value = TEXT; }
+  // 기본 문구이면 입력창은 비워두고 placeholder 만 보이게(사이트 공통 opacity 0.45).
+  { const _m = document.getElementById('mobileText'); if (_m) _m.value = (TEXT === MOBILE_NOTICE) ? '' : TEXT; }
   if (_MOBILE && !_mobileRTimer) {
     _mobileRTimer = setInterval(() => { if (typeof randomizeAll === 'function') randomizeAll(); }, 5000);
   }
@@ -20551,7 +20556,7 @@ requestAnimationFrame(() => {
 });
 </script>
 <!-- 모바일 전용 하단 고정 텍스트 입력바 (데스크탑 display:none) -->
-<div id="mobileTextBar"><span class="mtbLabel">텍스트</span><textarea id="mobileText" rows="1" translate="no"></textarea></div>
+<div id="mobileTextBar"><span class="mtbLabel">텍스트</span><textarea id="mobileText" rows="1" translate="no" placeholder="뭉친 한글 Clumped Hangul"></textarea></div>
 <a class="ccFooter" href="https://github.com/pch6211/clumped-hangul/blob/main/LICENSE" target="_blank" rel="noopener noreferrer"
    title="MIT License — 자유롭게 사용·수정·배포 가능">© 2026 Chulhee Park · MIT License</a>
 <!-- [G1] 의견 보내기 / 커피 사주기 — 크레딧 바로 위 우하단 고정 클러스터 (위치는 _g1Layout 가 크레딧 실측해 정렬) -->
