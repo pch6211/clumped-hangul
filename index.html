@@ -338,7 +338,7 @@
   .panel::-webkit-scrollbar-button { display: none; height: 0; width: 0; }
   .panel.open { display: block; }
   /* 행: [bar 1fr][label_with_val 110px] */
-  .panel .row { display: grid; grid-template-columns: 1fr 110px; align-items: center; column-gap: 8px; height: 14px; margin-bottom: 2px; }
+  .panel .row { display: grid; grid-template-columns: 1fr 80px; align-items: center; column-gap: 8px; height: 14px; margin-bottom: 2px; }
   /* .row.disabled 클래스는 더 이상 사용하지 않음 */
   .panel .row .bar { position: relative; height: 8px; cursor: ew-resize; }
   .panel .row .bar::before { content: ''; position: absolute; inset: 0; background: currentColor; opacity: 0.16; }
@@ -15913,7 +15913,7 @@ function makeBarRow(label, mn, mx, step, getter, setter, opts) {
   row.className = 'row';
   row.innerHTML =
     '<div class="bar"><div class="fill"></div></div>' +
-    '<span class="lbv"><span class="lbvLabel"></span> <span class="lbvVal" style="cursor:pointer; text-decoration:underline; text-decoration-thickness:1px; text-underline-offset:2px;"></span></span>';
+    '<span class="lbv"><span class="lbvLabel"></span> <span class="lbvVal" style="cursor:pointer; text-decoration:underline; text-decoration-thickness:0.5px; text-underline-offset:2px;"></span></span>';
   const lbv = row.querySelector('.lbv');
   const lbvLabel = row.querySelector('.lbvLabel');
   const lbvVal = row.querySelector('.lbvVal');
