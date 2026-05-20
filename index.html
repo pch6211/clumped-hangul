@@ -56,7 +56,7 @@
     /* [v1.09] 모바일 전역 주사위 (R = 전체 랜덤) — 햄버거 같은 줄 우상단 고정 */
     #mobileMenuDie {
       display: inline-flex; align-items: center; justify-content: center;
-      position: fixed; top: 24px; right: 24px; z-index: 130;
+      position: fixed; top: 24px; right: 24px; z-index: 220;  /* 패널(200) 위 */
       height: 14px; line-height: 1;
       font-family: sans-serif; font-size: 14px;
       color: var(--editor-fg, currentColor); background: transparent;
@@ -64,7 +64,7 @@
       vertical-align: middle; padding: 0 2px;
     }
     /* 패널 열렸을 때 햄버거·주사위·하단 입력바 숨김 */
-    body.panel-open #mobileMenuDie { display: none !important; }
+    /* 패널 열렸을 때 햄버거·하단 입력바 숨김. [v1.09] 주사위(#mobileMenuDie)는 자리 유지. */
     /* 패널 = 화면 좌측 3/4 오버레이. 우측 1/4 영역은 캔버스(출력화면)가 보임.
        우측 끝에 1px 선 = 패널 div 의 우측 경계. 좌우 여백은 모바일 입력바(24px)와 동일 톤.
        (3/4 폭 = 하단 SVG/PNG/SAVE/LOAD 4 버튼이 한 줄에 들어가도록 — F8) */
@@ -73,7 +73,7 @@
       position: fixed;
       top: 0; left: 0; bottom: 0; right: auto;
       width: calc(100vw * 3 / 4); height: 100vh; max-width: none;
-      padding: 48px 24px 24px;
+      padding: 24px 24px 24px;  /* [v1.09] ✕ 닫기 버튼 삭제 → padding-top 48 → 24 (콘텐츠 위로 24px 이동) */
       background: var(--editor-bg, #fff);
       color: var(--editor-fg, currentColor);
       border-right: 1px solid var(--editor-fg, currentColor);
@@ -413,33 +413,17 @@
   .panel .groupTitle .titleText, #pcTextBar .groupTitle .titleText { text-align: left; }
   .panel .groupTitle .die, #pcTextBar .groupTitle .die { display: inline-flex; align-items: center; justify-content: center; font-size: 14px; line-height: 1; height: 14px; cursor: pointer; user-select: none; padding: 0 2px; opacity: 1; vertical-align: middle; }
   .panel .groupTitle .die.rolling, #pcTextBar .groupTitle .die.rolling { pointer-events: none; }
-  /* 가이드 세로 리스트 (#8·#9) — 버튼 다음 줄, 항목당 한 줄. 설정창/에디터 공용 */
-  /* 가이드 = 기본 HUD와 동일 문자 스타일 (letter-spacing 1px, line-height 1.6, 투명도 없음) */
-  /* #3 — 기본 HUD(#hudMain, .hudSection) 제외 모든 가이드(.guideList): 모든 내용이
-     버튼과 동일한 테두리(1px solid currentColor + 둥근 모서리) 한 박스 안에 들어감.
-     폭은 텍스트(가장 긴 줄)에 맞춰 늘었다 줄었다 (width:fit-content).
-     위 여백 = 버튼 간격 8px (모든 가이드가 버튼 하단에 위치 → 통일). */
+  /* 가이드 세로 리스트 — [v1.09] 박스(테두리/배경/도그이어) 모두 제거, 패딩 0, 행간 1.5배. */
   .guideList { margin-top: 20px; margin-bottom: 20px; direction: ltr; opacity: 1;
-    padding: 10px 14px; box-sizing: border-box; width: fit-content; max-width: 100%; }
-  /* === 우하단 도그이어(접힘) 1px 외곽선 — .guideList & 인트로 박스 공통 ===
-     4면은 진짜 CSS 1px border → 화면 크기와 무관하게 항상 정확히 1px(clip-path 미사용 = 서브픽셀 요동 없음).
-     접힘 코너는 고정 12px ::after(절대 스케일 안 됨): 테마bg 로 사각 코너 지우고
-     윗변+왼변 1px = 접힘 주름 L선, 135° 그라디언트 = 잘린 대각선(띠 0.7px → 얇게 보정). */
+    padding: 0; box-sizing: border-box; width: fit-content; max-width: 100%; }
   .guideList, #introPanel .introBox {
     position: relative;
-    background: var(--editor-bg, transparent);
-    border: 1px solid currentColor;
+    background: transparent;
+    border: none;
     border-radius: 0;
   }
-  .guideList::after, #introPanel .introBox::after {
-    content: ""; position: absolute; right: -1px; bottom: -1px;
-    width: 12px; height: 12px; box-sizing: border-box; pointer-events: none;
-    background-color: var(--editor-bg, transparent);
-    background-image: linear-gradient(135deg, transparent calc(50% - 0.45px), currentColor calc(50% - 0.45px), currentColor calc(50% + 0.45px), transparent calc(50% + 0.45px));
-    border-top: 1px solid currentColor;
-    border-left: 1px solid currentColor;
-  }
-  .guideList .guideLine { font-size: 10px; letter-spacing: 0.5px; line-height: 1.6; white-space: nowrap; opacity: 1; }
+  /* 도그이어 ::after 제거 (사용자 요청) */
+  .guideList .guideLine { font-size: 10px; letter-spacing: 0.5px; line-height: 2.4; white-space: nowrap; opacity: 1; }
   .guideList .guideLine b { font-weight: normal; }
   .guideList .guideLine .gk { opacity: 1; margin-left: 0; }  /* [v1.09] 콜론 뒤 margin-left 4 → 0 (공백 단일화) */
   .guideList .guideSub { margin-top: 12px; opacity: 1; font-size: 10px; letter-spacing: 0.5px; }
@@ -545,10 +529,10 @@
   .editor .marginBottom { bottom: -10px; left: 50%; transform: translateX(-50%); }
   .editor .marginLeft   { left: -17px;   top: 50%;  transform: translateY(-50%); }
   .editor .marginRight  { right: -17px;  top: 50%;  transform: translateY(-50%); }
-  /* 등장 높이 + 초기화/모두 지움 — 한 줄 가운데 정렬 (입력 + 화살표 + 버튼). */
+  /* [v1.09] 등장 높이 + 초기화/모두 지움 — 단일 row, 한 줄 가운데 정렬. 모두 세로 가운데. */
   .editor .editorBottomRow { position: absolute; left: 0; right: 0; top: calc(100% + 20px); display: flex; align-items: center; justify-content: center; gap: 8px; }
-  .editor .editorBottomRow .heightInputBlock { display: flex; align-items: center; gap: 4px; }
-  .editor .editorBottomRow .heightInputBlock .groupTitle { display: none; }  /* 제목 제거 — 한 줄 단순화 */
+  .editor .editorBottomRow .titleText { line-height: 1; }
+  .editor .editorBottomRow .hArrowCol { display: flex; flex-direction: column; justify-content: center; align-items: center; }
   .editor .heightInputBlock { display: flex; flex-direction: column; align-items: flex-start; }
   .editor .heightInputBlock .groupTitle { line-height: 14px; margin-bottom: 4px; letter-spacing: 0.5px; opacity: 1; }
   .editor .heightInputBlock .numBox { width: 25px; }
@@ -561,8 +545,8 @@
   /* .toolBtnBottomRow — .editorBottomRow flex row 안에서 normal flow (등장 높이 옆) */
   .editor .toolBtnBottomRow { display: flex; flex-direction: row; gap: 8px; justify-content: flex-end; align-items: center; }
   .editor .toolBtnBottomRow .pillBtn { min-width: 70px; white-space: nowrap; }
-  /* 문자 추가 다이얼로그 — 사이드바 안에 인라인. 카테고리 제목과 동일한 12.5px 들여쓰기. */
-  #addCharDialog { font-family: sans-serif; font-size: 10px; letter-spacing: 0.5px; line-height: 1.4; color: currentColor; position: relative; padding-left: 12.5px; padding-right: 12.5px; }
+  /* 문자 추가 다이얼로그 — 좌측 12.5px 들여쓰기 (카테고리 제목과 정렬), 우측 0 (사이드바 padding 까지 확장). */
+  #addCharDialog { font-family: sans-serif; font-size: 10px; letter-spacing: 0.5px; line-height: 1.4; color: currentColor; position: relative; padding-left: 12.5px; padding-right: 0; }
   #addCharDialog .acdRow { display: block; margin-bottom: 8px; position: relative; }
   #addCharDialog select, #addCharDialog input[type="text"] { width: 100%; padding: 4px 6px; font-family: inherit; font-size: 10px; letter-spacing: 0.5px; background: var(--editor-bg, transparent); color: currentColor; border: 1px solid currentColor; border-radius: 0; outline: none; box-sizing: border-box; }
   #addCharDialog select { max-height: 200px; }
@@ -641,19 +625,16 @@
     </div>
     <div class="canvasWrap">
       <canvas class="editorCanvas" id="editorCanvas" width="453" height="453"></canvas>
-      <!-- [v1.09] 한 줄 가운데 정렬: 입력 + 화살표 + 초기화 + 모두 지움. -->
-      <div class="editorBottomRow">
-        <div class="heightInputBlock" id="editorHeightBlock" title="등장 높이 — 양수는 위, 음수는 아래, 0은 정중앙">
-          <input type="number" inputmode="numeric" class="numBox" id="editorHeightInput" />
-          <span class="hArrowCol">
-            <span class="hArrow" data-dir="1" title="+1">▲</span>
-            <span class="hArrow" data-dir="-1" title="-1">▼</span>
-          </span>
-        </div>
-        <div class="toolBtnBottomRow">
-          <button class="pillBtn" id="btnRevertDefault" title="현재 자모 디자인을 편집 전 상태로 복원">초기화</button>
-          <button class="pillBtn" id="btnClearAll" title="현재 자모의 모든 노드·획 삭제">모두 지움</button>
-        </div>
+      <!-- [v1.09] 단일 row: 등장 높이 제목 + 입력 + 화살표 + 초기화 + 모두 지움. 모두 세로 가운데. -->
+      <div class="editorBottomRow" id="editorHeightBlock" title="등장 높이 — 양수는 위, 음수는 아래, 0은 정중앙">
+        <span class="titleText">등장 높이</span>
+        <input type="number" inputmode="numeric" class="numBox" id="editorHeightInput" />
+        <span class="hArrowCol">
+          <span class="hArrow" data-dir="1" title="+1">▲</span>
+          <span class="hArrow" data-dir="-1" title="-1">▼</span>
+        </span>
+        <button class="pillBtn" id="btnRevertDefault" title="현재 자모 디자인을 편집 전 상태로 복원">초기화</button>
+        <button class="pillBtn" id="btnClearAll" title="현재 자모의 모든 노드·획 삭제">모두 지움</button>
       </div>
     </div>
     <!-- #13 D — 자모 디자인 편집 가이드(제목 삭제, 내용만). 창이 보일 때 함께 표시 -->
@@ -681,18 +662,15 @@
     </div>
     <div class="canvasWrap">
       <canvas class="editorCanvas" id="moimkkolCanvas" width="453" height="453"></canvas>
-      <!-- [v1.09] 한 줄 가운데 정렬: 입력 + 화살표 + 초기화. -->
-      <div class="editorBottomRow">
-        <div class="heightInputBlock" title="등장 높이 — 양수는 위, 음수는 아래, 0은 정중앙 (이 모임꼴 전체에 적용)">
-          <input type="number" inputmode="numeric" class="numBox" id="moimkkolHeightInput" />
-          <span class="hArrowCol">
-            <span class="hArrow" data-dir="1" title="+1">▲</span>
-            <span class="hArrow" data-dir="-1" title="-1">▼</span>
-          </span>
-        </div>
-        <div class="toolBtnBottomRow">
-          <button class="pillBtn" id="btnMoimkkolResetPattern" title="이 모임꼴 패턴의 박스 배치를 기본값으로 되돌리기">초기화</button>
-        </div>
+      <!-- [v1.09] 단일 row: 등장 높이 제목 + 입력 + 화살표 + 초기화. -->
+      <div class="editorBottomRow" title="등장 높이 — 양수는 위, 음수는 아래, 0은 정중앙 (이 모임꼴 전체에 적용)">
+        <span class="titleText">등장 높이</span>
+        <input type="number" inputmode="numeric" class="numBox" id="moimkkolHeightInput" />
+        <span class="hArrowCol">
+          <span class="hArrow" data-dir="1" title="+1">▲</span>
+          <span class="hArrow" data-dir="-1" title="-1">▼</span>
+        </span>
+        <button class="pillBtn" id="btnMoimkkolResetPattern" title="이 모임꼴 패턴의 박스 배치를 기본값으로 되돌리기">초기화</button>
       </div>
     </div>
     <!-- #13 D — 한글 모임꼴 편집 가이드(제목 삭제, 내용만). 창이 보일 때 함께 표시 -->
@@ -18097,23 +18075,19 @@ function openEditor() {
 let _editorStagePopup = null;
 let _moimkkolStagePopup = null;
 function setupEditorStageDrag() {
-  // [v1.09] 등장 높이 입력칸 좌측 ↑▲ ▼ 화살표 — 클릭 시 input.value ±1, 'input' 이벤트 트리거.
-  ['editorHeightBlock','moimkkolStage'].forEach(parentId => {
-    const parent = document.getElementById(parentId);
-    if (!parent) return;
-    parent.querySelectorAll('.hArrow').forEach(arr => {
-      if (arr._wired) return; arr._wired = true;
-      arr.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const blk = arr.closest('.heightInputBlock');
-        if (!blk) return;
-        const inp = blk.querySelector('input[type="number"]');
-        if (!inp) return;
-        const dir = parseFloat(arr.getAttribute('data-dir') || '0') || 0;
-        const v = (parseFloat(inp.value || '0') || 0) + dir;
-        inp.value = v;
-        inp.dispatchEvent(new Event('input', { bubbles: true }));
-      });
+  // [v1.09] 등장 높이 ▲▼ 화살표 — 클릭 시 input.value ±1, 'input' 이벤트 트리거.
+  document.querySelectorAll('.editor .editorBottomRow .hArrow').forEach(arr => {
+    if (arr._wired) return; arr._wired = true;
+    arr.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const row = arr.closest('.editorBottomRow');
+      if (!row) return;
+      const inp = row.querySelector('input[type="number"]');
+      if (!inp) return;
+      const dir = parseFloat(arr.getAttribute('data-dir') || '0') || 0;
+      const v = (parseFloat(inp.value || '0') || 0) + dir;
+      inp.value = v;
+      inp.dispatchEvent(new Event('input', { bubbles: true }));
     });
   });
   const _STAGE_GAP = 20;  // 두 stage 가로 스택 간격 (사용자 요청 25 → 20 = +5px 우측)
