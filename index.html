@@ -116,7 +116,7 @@
   .ccFooter {
     position: fixed; bottom: 22px; right: calc(var(--ui-gap) + var(--sbw));
     font-family: sans-serif; font-size: 10px;
-    line-height: 1.6; letter-spacing: 1px;
+    line-height: 1.6; letter-spacing: 0.5px;
     z-index: 10; user-select: none; pointer-events: auto;
     padding: 2px 0;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
@@ -221,7 +221,7 @@
   }
   /* meta 행 — editor stage 와 동일 패턴 */
   .mhDialog .mhMeta { display: flex; gap: 8px; align-items: baseline; justify-content: flex-start; line-height: 1; margin-bottom: 7px; }
-  .mhDialog .mhMeta .mhDialogTitle { flex: 1 1 auto; text-align: left; letter-spacing: 1px; font-weight: normal; }
+  .mhDialog .mhMeta .mhDialogTitle { flex: 1 1 auto; text-align: left; letter-spacing: 0.5px; font-weight: normal; }
   /* 본문 textarea — .panel textarea / .editor .sidebar textarea 와 동일 외관 */
   .mhDialog textarea {
     width: var(--panel-input-width, 100%); resize: none; padding: 4px 6px;
@@ -323,7 +323,7 @@
     color: var(--editor-bg, transparent);
     border-color: var(--editor-fg, currentColor);
   }
-  .hud { position: fixed; top: 27px; bottom: auto; left: calc(var(--ui-gap) + 11px); right: auto; max-width: calc(100vw - var(--ui-gap) * 2 - 14px); font-family: sans-serif; font-size: 10px; line-height: 1.6; letter-spacing: 1px; z-index: 10; user-select: none;
+  .hud { position: fixed; top: 27px; bottom: auto; left: calc(var(--ui-gap) + 11px); right: auto; max-width: calc(100vw - var(--ui-gap) * 2 - 14px); font-family: sans-serif; font-size: 10px; line-height: 1.6; letter-spacing: 0.5px; z-index: 10; user-select: none;
     padding: 10px 14px; background: var(--editor-bg, transparent); border: 1px solid currentColor; width: fit-content; box-sizing: border-box;
   }
   /* S 키로 설정창 열면 HUD 가 패널 폭만큼 우측 이동 (CSS transform, 즉시 이동) */
@@ -368,7 +368,7 @@
   #introPanel { position: fixed; z-index: 150; width: max-content; max-width: calc(100vw - 40px); font-family: sans-serif; font-size: 10px; letter-spacing: 0.5px; line-height: 1.7; pointer-events: auto; box-sizing: border-box; color: var(--editor-fg, currentColor); }
   #introPanel .introMeta { display: flex; gap: 8px; align-items: baseline; justify-content: flex-start; line-height: 1; margin-bottom: 7px; }
   /* 제목 크기 = 일반 팝업(.mhDialogTitle)과 동일 (font-size 미지정 → 10px 상속) */
-  #introPanel .introMeta .introDialogTitle { flex: 1 1 auto; text-align: left; letter-spacing: 1px; font-weight: normal; }
+  #introPanel .introMeta .introDialogTitle { flex: 1 1 auto; text-align: left; letter-spacing: 0.5px; font-weight: normal; }
   /* 테두리/배경은 위 도그이어 공통 블록이 담당. 여기선 패딩만 */
   #introPanel .introBox { padding: 14px 16px; box-sizing: border-box; }
   #introPanel .introBody { margin-bottom: 12px; line-height: 1.7; white-space: nowrap; }
@@ -439,10 +439,10 @@
     border-top: 1px solid currentColor;
     border-left: 1px solid currentColor;
   }
-  .guideList .guideLine { font-size: 10px; letter-spacing: 1px; line-height: 1.6; white-space: nowrap; opacity: 1; }
+  .guideList .guideLine { font-size: 10px; letter-spacing: 0.5px; line-height: 1.6; white-space: nowrap; opacity: 1; }
   .guideList .guideLine b { font-weight: normal; }
   .guideList .guideLine .gk { opacity: 1; margin-left: 0; }  /* [v1.09] 콜론 뒤 margin-left 4 → 0 (공백 단일화) */
-  .guideList .guideSub { margin-top: 12px; opacity: 1; font-size: 10px; letter-spacing: 1px; }
+  .guideList .guideSub { margin-top: 12px; opacity: 1; font-size: 10px; letter-spacing: 0.5px; }
   /* 에디터창 가이드: 박스 위치는 그대로(우측, margin-left:auto)·텍스트만 좌측 정렬 */
   .editor .guideList { text-align: left; margin-left: auto; }
   .editor .guideList .guideLine .gk { margin-left: 0; margin-right: 0; }  /* [v1.09] 콜론 뒤 공백 단일화 */
@@ -495,7 +495,7 @@
   .editor .group + .group { margin-top: 14px; }
   /* 그룹 제목 — 설정창 .groupTitle(주사위 14px 때문에 박스 14px)과 동일한 수직 공간을 차지하도록 line-height: 14px.
      이렇게 하면 제목 박스 + margin-bottom(4px) 합이 설정창과 동일 → 첫 항목까지의 간격이 정확히 일치. */
-  .editor .groupLabel { display: flex; align-items: center; justify-content: space-between; line-height: 14px; margin-bottom: 4px; letter-spacing: 1px; text-align: left; padding-left: 12.5px; }
+  .editor .groupLabel { display: flex; align-items: center; justify-content: space-between; line-height: 14px; margin-bottom: 4px; letter-spacing: 0.5px; text-align: left; padding-left: 12.5px; }
   /* 1px 표 — v.1.04 모델(셀마다 4면 보더 + 음수 마진 공유 + gridFiller 마지막행 채움 +
      nth-child(10n)/nth-last-child(-n+10) 외곽 음수마진 0). 단 정사각·우측정렬 폐기:
      사용자 요청 — 에디터 사이드바 div 전체 폭으로 펼쳐지는 10열 표(셀=직사각, repeat(10,1fr)). */
@@ -529,7 +529,7 @@
   .editor .canvasWrap { width: 260px; height: 260px; border: 1px solid currentColor; position: relative; background: var(--editor-bg, transparent); box-sizing: border-box; }
   .editor canvas.editorCanvas { display: block; width: 100%; height: 100%; cursor: crosshair; }
   .editor .hint { }
-  .editor .editorHud { position: fixed; bottom: 14px; left: 18px; right: auto; font-family: sans-serif; font-size: 10px; line-height: 1.6; letter-spacing: 1px; pointer-events: none; user-select: none; text-align: left; }
+  .editor .editorHud { position: fixed; bottom: 14px; left: 18px; right: auto; font-family: sans-serif; font-size: 10px; line-height: 1.6; letter-spacing: 0.5px; pointer-events: none; user-select: none; text-align: left; }
   /* 우측 정렬 + 버튼 간 간격은 설정창 btnRow 와 동일(gap: 6px) */
   .editor .btnRow { display: flex; gap: 8px; margin-top: 20px; flex-wrap: wrap; justify-content: flex-end; }
   .editor .pillBtn { display: inline-flex; align-items: center; justify-content: center; padding: 5px 14px; border: 1px solid currentColor; background: var(--editor-bg, transparent); color: currentColor; font-family: inherit; font-size: 10px; cursor: pointer; letter-spacing: 0.5px; border-radius: 999px; text-decoration: none; text-align: center; line-height: 1; height: 22px; box-sizing: border-box; }
