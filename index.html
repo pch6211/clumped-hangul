@@ -441,11 +441,11 @@
   }
   .guideList .guideLine { font-size: 10px; letter-spacing: 1px; line-height: 1.6; white-space: nowrap; opacity: 1; }
   .guideList .guideLine b { font-weight: normal; }
-  .guideList .guideLine .gk { opacity: 1; margin-left: 4px; }
+  .guideList .guideLine .gk { opacity: 1; margin-left: 0; }  /* [v1.09] 콜론 뒤 margin-left 4 → 0 (공백 단일화) */
   .guideList .guideSub { margin-top: 12px; opacity: 1; font-size: 10px; letter-spacing: 1px; }
   /* 에디터창 가이드: 박스 위치는 그대로(우측, margin-left:auto)·텍스트만 좌측 정렬 */
   .editor .guideList { text-align: left; margin-left: auto; }
-  .editor .guideList .guideLine .gk { margin-left: 4px; margin-right: 0; }
+  .editor .guideList .guideLine .gk { margin-left: 0; margin-right: 0; }  /* [v1.09] 콜론 뒤 공백 단일화 */
   /* #13 D — 편집창(.stage) 안 가이드: toolBtnBottomRow 가 canvasWrap 기준 absolute
      (top: calc(100% + 20px))로 흐름에서 빠짐 → 버튼행을 지나도록 원래 위 여백 60px. */
   .editor .stage .guideList { margin-top: 60px; }
@@ -603,7 +603,7 @@
 <body>
 <canvas id="universe"></canvas>
 <div class="hud" id="hud">
-  <div class="hudSection" id="hudMain"><span class="hudItem hudClickable" data-action="random"><b>랜덤 설정</b> R</span><span class="hudItem hudClickable" data-action="text"><b>랜덤 글귀</b> T</span><span class="hudItem hudClickable" data-action="auto"><b>자동</b> A</span><span class="hudItem hudClickable" data-action="reset"><b>리셋</b> B</span><span class="hudItem hudClickable" data-action="panel"><b>설정 창</b> S</span><span class="hudItem hudClickable" data-action="editor"><b>편집 창</b> E</span><span class="hudItem"><b>자간</b> Alt ⇄</span><span class="hudItem"><b>행간</b> Alt ⇅</span><span class="hudItem"><b>점 강조</b> 자모 호버</span><span class="hudItem"><b>붙이기</b> 기본 점 끌기</span><span class="hudItem"><b>떼기</b> 추가 점 끌기</span><span class="hudItem"><b>편집 메뉴</b> 문자 우 클릭</span><span class="hudItem hudClickable" id="hudToggleBtn" title="가이드 표시 토글"><b>가이드 끄기</b> M</span></div>
+  <div class="hudSection" id="hudMain"><span class="hudItem hudClickable" data-action="random"><b>랜덤 설정</b> R</span><span class="hudItem hudClickable" data-action="text"><b>랜덤 글귀</b> T</span><span class="hudItem hudClickable" data-action="auto"><b>자동</b> A</span><span class="hudItem hudClickable" data-action="reset"><b>리셋</b> B</span><span class="hudItem hudClickable" data-action="panel"><b>설정 창</b> S</span><span class="hudItem hudClickable" data-action="editor"><b>편집 창</b> E</span><span class="hudItem"><b>자간</b> Alt ⇄</span><span class="hudItem"><b>행간</b> Alt ⇅</span><span class="hudItem"><b>편집 메뉴</b> 문자 우 클릭</span><span class="hudItem hudClickable" id="hudToggleBtn" title="가이드 표시 토글"><b>가이드 끄기</b> M</span></div>
 </div>
 <!-- [v1.09] 초기 인트로 팝업 삭제 (사용자 요청). -->
 <!-- PC 전용 외부 텍스트 입력 바 — 화면 왼쪽 하단. -->
@@ -665,7 +665,6 @@
     <div class="guideList" id="jamoEditGuide">
       <div class="guideLine"><b>선택</b> <span class="gk">클릭</span></div>
       <div class="guideLine"><b>다중 선택</b> <span class="gk">배경 드래그</span></div>
-      <div class="guideLine"><b>선택 해제</b> <span class="gk">배경 클릭</span></div>
       <div class="guideLine"><b>이동</b> <span class="gk">⇄ ⇅</span></div>
       <div class="guideLine"><b>삭제</b> <span class="gk">Del</span></div>
       <div class="guideLine"><b>복사</b> <span class="gk">Ctrl C</span></div>
@@ -674,8 +673,7 @@
       <div class="guideLine"><b>실행취소</b> <span class="gk">Ctrl Z</span></div>
       <div class="guideLine"><b>다시실행</b> <span class="gk">Ctrl Shift Z</span></div>
       <div class="guideLine"><b>그리기</b> <span class="gk">클릭</span></div>
-      <div class="guideLine"><b>획나누기</b> <span class="gk">선택 획 클릭</span></div>
-      <div class="guideLine"><b>투명획</b> <span class="gk">우클릭 - 투명획</span></div>
+      <div class="guideLine"><b>편집 메뉴</b> <span class="gk">우클릭</span></div>
     </div>
   </div>
   <!-- #13 Stage B — 모임꼴 독립 편집창 (자모 디자인창과 동시 등장). 기본 숨김(.stage),
@@ -957,6 +955,14 @@ const SPECIAL_PRIMITIVES = {
   '』':{nodes:[{x:4.5,y:3},{x:4.5,y:5},{x:3,y:5},{x:4,y:3},{x:4,y:4.5},{x:3,y:4.5}],edges:[[0,1],[1,2],[3,4],[4,5]],strokes:[[0,1,2],[3,4,5]]}  // 』
 };
 Object.assign(PRIMITIVES, ENGLISH_UPPER_PRIMITIVES, ENGLISH_LOWER_PRIMITIVES, SPECIAL_PRIMITIVES);
+// [v1.09] PRIMITIVES 원본 노드 모두 isBase=true 강제 — 호버 강조 + bond 의 strict 분류 위해.
+//   서브디비전·편집창 추가 노드는 isBase=false. 사용자 _editorDefs 옛 데이터는 isBase 없음 (undefined → 추가 노드 취급).
+Object.keys(PRIMITIVES).forEach(_pkCh => {
+  const _pkP = PRIMITIVES[_pkCh];
+  if (_pkP && Array.isArray(_pkP.nodes)) {
+    _pkP.nodes.forEach(_pkN => { if (_pkN && _pkN.isBase === undefined) _pkN.isBase = true; });
+  }
+});
 
 // ── 좌표계 ×2 마이그레이션 (0.5단위 그리드 → 정수 그리드) ──
 //   디자인 데이터는 ×2한 정수 좌표로 저장·편집(EDITOR_GRID 18, GRID_STEP 1).
@@ -14791,11 +14797,11 @@ function draw() {
       const _ic = (typeof _bondInvColor === 'function') ? _bondInvColor() : currentFgColor();
       ctx.fillStyle = _ic; ctx.strokeStyle = _ic;
       const _hr = Math.max((PARAMS.nodeR || 0) / 2, 3);
-      // 호버 강조 = 기본 디자인 노드(isBase !== false) 전부. 한글/비한글 모두 동일 룰.
-      //   (이전의 magnetPairs 자석 필터 제거 — 사용자 요청)
+      // 호버 강조 = PRIMITIVES 원본 노드만 (strict: isBase === true).
+      //   추가 노드(서브디비전·편집창·옛 저장 데이터 undefined) → 강조 X.
       _hoverJamo.idxs.forEach(i => {
         const n = _hb.nodes[i];
-        if (!n || n.inv || n.isBase === false) return;
+        if (!n || n.inv || n.isBase !== true) return;
         drawNodeShape(n, _hr);
       });
       ctx.restore();
@@ -15490,7 +15496,7 @@ canvas.addEventListener('pointerdown', e => {
     // [감상모드 통합] 기본 디자인 노드(isBase!==false)만 자석 모드 활성. 추가 노드(서브디비전)는 스프링 고정만.
     _bond = null;
     const _hitNode = (best) ? best : null;
-    const _hitIsBase = !!(_hitNode && _hitNode.isBase !== false);
+    const _hitIsBase = !!(_hitNode && _hitNode.isBase === true);  // [v1.09] strict — PRIMITIVES 원본만 base, 그 외 (서브디비전·편집창·옛 저장) 모두 추가 노드 취급
     if (_hitIsBase && bestBody && !bestBody.isPunct && Array.isArray(bestBody.jamos)) {
       const src = _bondMapNode(bestBody, bestIdx);
       if (src) {
@@ -15705,11 +15711,51 @@ canvas.addEventListener('pointermove', e => {
     } else {
       _hoverJamo = null;
     }
+    // [v1.09] 노드 호버 시 툴팁 — 그 노드에 가능한 마우스 동작 안내.
+    if (_hoverJamo && _hb.nodes[_hi]) {
+      const _hn = _hb.nodes[_hi];
+      const _isB = _hn.isBase === true;
+      const _tip = _isB
+        ? '기본 점 — 끌기: 다른 자모와 자석 붙이기 / 우클릭: 편집 메뉴'
+        : '추가 점 — 끌기: 글자에서 떼기 / 우클릭: 편집 메뉴';
+      _showViewTooltip(e.clientX, e.clientY, _tip);
+    } else {
+      _hideViewTooltip();
+    }
   } else {
     _hoverJamo = null;
+    _hideViewTooltip();
   }
 });
 let _hoverJamo = null;  // [F4] 감상모드 호버 중인 자모 { body, idxs }
+// [v1.09] 출력 화면 노드 호버 툴팁 — .cwTooltip 동일 스타일.
+let _viewTooltipEl = null;
+function _ensureViewTooltip() {
+  if (_viewTooltipEl) return _viewTooltipEl;
+  _viewTooltipEl = document.createElement('div');
+  _viewTooltipEl.id = 'viewTooltipEl';
+  _viewTooltipEl.className = 'cwTooltip';
+  document.body.appendChild(_viewTooltipEl);
+  return _viewTooltipEl;
+}
+function _showViewTooltip(cx, cy, text) {
+  const t = _ensureViewTooltip();
+  t.textContent = text;
+  t.style.color = (typeof currentFgColor === 'function') ? currentFgColor() : '';
+  t.style.background = (typeof currentBgColor === 'function') ? currentBgColor() : '';
+  t.classList.add('show');
+  requestAnimationFrame(() => {
+    const tr = t.getBoundingClientRect();
+    let x = cx + 14, y = cy + 18;
+    if (x + tr.width  > window.innerWidth  - 8) x = window.innerWidth  - tr.width  - 8;
+    if (y + tr.height > window.innerHeight - 8) y = window.innerHeight - tr.height - 8;
+    if (x < 8) x = 8; if (y < 8) y = 8;
+    t.style.left = x + 'px'; t.style.top = y + 'px';
+  });
+}
+function _hideViewTooltip() {
+  if (_viewTooltipEl) _viewTooltipEl.classList.remove('show');
+}
 
 // [감상모드 통합] 캔버스 우클릭 컨텍스트 메뉴 — .mhContextMenu 패턴 (커피 메뉴와 동일 디자인).
 //   editorCtxMenu 는 .editor 자식이라 편집창 닫혀있으면 안 보임 → 별도 #viewCanvasCtxMenu 생성.
