@@ -13866,7 +13866,7 @@ function buildWorld(str) {
     }
     // word — 모바일: 단어별 행갈이 OFF + 글자별 자동 줄바꿈 ON / 데스크탑: 단어별 행갈이 ON
     const addW = (cur.length === 0 ? 0 : letterSpacing) + u.width;
-    const _isMobileWrap = false;  // 모바일도 PC와 동일하게 단어별 행갈이 사용(사용자 스펙)
+    const _isMobileWrap = (typeof isMobile === 'function') && isMobile();  // 모바일 = 글자별 줄바꿈, PC = 단어별 행갈이
     if (!_isMobileWrap && cur.length > 0 && curW + addW > usableW) pushLine();
     if (cur.length > 0) curW += letterSpacing;
     u.items.forEach((it, i) => {
