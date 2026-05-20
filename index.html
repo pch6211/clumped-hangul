@@ -12621,7 +12621,7 @@ const PANEL_GROUPS = [
     ['shape',       '점 모양',   0, 100, 1],
     ['nodeR',       '점 크기',   0,  30, 1],
     ['lineW',       '획 굵기',   0,  30, 1],
-    ['borderWidth', '테두리',    0,  30, 1],
+    ['borderWidth', '테두리', -30, 30, 1],
     ['cornerR',     '부드럽게',  0,  20, 1]
   ]},
   { id: 'bg', title: '배경 색', items: [
@@ -14474,7 +14474,7 @@ function drawSmoothedBodies(targetCtx, bodies, fg, bg) {
 }
 
 function _bordersOn() {
-  return (PARAMS.borderWidth || 0) > 0;
+  return Math.abs(PARAMS.borderWidth || 0) > 0;
 }
 // [E3] 테두리 = 글자를 채우지 않고 윤곽선 하나로 감쌈. 두께 = '테두리' 슬라이더(borderWidth).
 //   윤곽 = 글자 실루엣 가장자리 바로 바깥의 두께 bW 밴드 = paintSil(bW) − paintSil(0).
@@ -14483,8 +14483,11 @@ function _bordersOn() {
 //   래스터 효과(SVG 벡터로 표현 불가 — 부드럽게와 동일) → 화면·PNG 전용.
 function drawBorders(targetCtx, bodies, fg) {
   if (!_bordersOn() || !bodies) return;
-  const bW = Math.max(0, PARAMS.borderWidth || 0);
+  // 양방향 슬라이더 (-30~+30): 두께 = 절댓값. 음수 = 정상색, 양수 = 동적 투명획 색(반전).
+  const _bwRaw = PARAMS.borderWidth || 0;
+  const bW = Math.abs(_bwRaw);
   if (bW <= 0) return;
+  const _borderColor = (_bwRaw > 0 && typeof _bondInvColor === 'function') ? _bondInvColor() : fg;
   const W = cssW, H = cssH, S = 2;          // S = 슈퍼샘플(크리스프 다운스케일)
   const MW = W * S, MH = H * S;
   const lineW = PARAMS.lineW;
@@ -14576,8 +14579,8 @@ function drawBorders(targetCtx, bodies, fg) {
     rctx.putImageData(im, 0, 0);
   }
   rctx.globalCompositeOperation = 'source-in';
-  rctx.fillStyle = fg;
-  rctx.fillRect(0, 0, MW, MH);               // 밴드를 글자색으로
+  rctx.fillStyle = _borderColor;
+  rctx.fillRect(0, 0, MW, MH);               // 밴드를 테두리 색으로 (양수=반전, 음수=정상)
   rctx.globalCompositeOperation = 'source-over';
   targetCtx.save();
   targetCtx.imageSmoothingEnabled = true;
