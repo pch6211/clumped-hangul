@@ -10,6 +10,8 @@
 <!-- <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7237044319292911" rossorigin="anonymous"></script> -->
 <!-- QRious 라이브러리 — 로컬 QR 생성 (외부 API fallback 의 ~1s 네트워크 지연 제거) -->
 <script src="https://cdn.jsdelivr.net/npm/qrious@4.0.2/dist/qrious.min.js"></script>
+<!-- Umami 분석 — 페이지뷰 + 커스텀 이벤트(PNG/SVG 다운로드, 설정·디자인 저장/로드) -->
+<script defer src="https://cloud.umami.is/script.js" data-website-id="1323ccba-8187-4424-aee4-78bc74bdb882"></script>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   html, body { width: 100%; height: 100%; overflow: hidden; background: #808080; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
@@ -7696,6 +7698,7 @@ function _makePersistentDraggablePopup(el, opts) {
 
 function saveSVG() {
   if (!world) return;
+  try { if (typeof umami !== 'undefined' && umami && typeof umami.track === 'function') umami.track('SVG 다운로드'); } catch(_) {}
   // 에디터·자모 선택창이 열려있으면 닫기
   const _ed = document.getElementById('editor');
   if (_ed && _ed.classList.contains('open')) closeEditor();
@@ -7751,6 +7754,7 @@ function saveSVG() {
 // PNG 저장 — 배경 투명, 글자만 / 설정창 너비만큼 좌측 잘라냄 / 해상도 2배
 function savePNG() {
   if (!world) return;
+  try { if (typeof umami !== 'undefined' && umami && typeof umami.track === 'function') umami.track('PNG 다운로드'); } catch(_) {}
   // 에디터·자모 선택창이 열려있으면 닫기
   const _ed = document.getElementById('editor');
   if (_ed && _ed.classList.contains('open')) closeEditor();
@@ -9464,6 +9468,7 @@ function _downloadJSON(obj, filename) {
 //     { designs: {char: def, ...}, characters: ['0','1',...], userAdded: [...], removedDefaults: [...], meta: {...} }
 //   하위 호환: payload 가 옛 포맷({char: def, ...})이면 load 가 자동 감지
 function exportPrimitivesJSON() {
+  try { if (typeof umami !== 'undefined' && umami && typeof umami.track === 'function') umami.track('디자인 저장'); } catch(_) {}
   let userAdded = [], removedDefaults = [], activeList = [];
   try {
     const raw1 = localStorage.getItem(EDITOR_USER_CHARS_KEY);
@@ -9501,6 +9506,7 @@ function exportPrimitivesJSON() {
 
 // ── 에디터 LOAD: 자모 디자인 JSON 불러오기 ──
 function triggerJamoLoad() {
+  try { if (typeof umami !== 'undefined' && umami && typeof umami.track === 'function') umami.track('디자인 로드'); } catch(_) {}
   const inp = document.getElementById('editorLoadInput');
   if (!inp) return;
   inp.value = '';
@@ -9590,6 +9596,7 @@ function triggerJamoLoad() {
 // ── 메인 SAVE: 설정값 (슬라이더·색·탄성·텍스트) JSON 저장 ──
 // [v1.10b] text 도 함께 저장 (사용자 요청).
 function saveSettings() {
+  try { if (typeof umami !== 'undefined' && umami && typeof umami.track === 'function') umami.track('설정 저장'); } catch(_) {}
   const settings = {
     schema: 'mungchin-hangul-settings-v1',
     params: Object.assign({}, PARAMS),
@@ -9604,6 +9611,7 @@ function saveSettings() {
 
 // ── 메인 LOAD: 설정값 JSON 불러오기 ──
 function triggerSettingsLoad() {
+  try { if (typeof umami !== 'undefined' && umami && typeof umami.track === 'function') umami.track('설정 로드'); } catch(_) {}
   const inp = document.createElement('input');
   inp.type = 'file';
   inp.accept = 'application/json,.json';
