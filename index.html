@@ -343,7 +343,9 @@
   /* [v1.09] PC 전용 외부 텍스트 입력바 — 화면 좌측 상단(HUD 와 위치 교환). 설정창 폭(288px) 와 동일.
        top: 24px 로 설정창 top 과 동일 y 에서 시작 — '텍스트' 라벨이 설정창 첫 그룹 '밀도' 라벨과 같은 행 높이. */
   /* [v1.10b] 폭 고정 200px (사용자 요청 — 가변 폭 폐기). textarea 가 부모 폭 100% 사용. */
-  #pcTextBar { position: fixed; left: calc(var(--ui-gap) - var(--sbw) + 11px); transform: none; top: 24px; bottom: auto; width: 200px; max-width: calc(100vw - 32px); z-index: 90; font-family: sans-serif; font-size: 10px; letter-spacing: 0.5px; line-height: 1.4; color: currentColor; pointer-events: auto; box-sizing: border-box; padding-left: 8px; }
+  #pcTextBar { position: fixed; left: calc(var(--ui-gap) - var(--sbw) + 11px); transform: none; top: 24px; bottom: auto; width: 200px; max-width: calc(100vw - 32px); z-index: 90; font-family: sans-serif; font-size: 10px; letter-spacing: 0.5px; line-height: 1.4; color: currentColor; pointer-events: none; box-sizing: border-box; padding-left: 8px; }
+  /* 컨테이너 배경 영역은 클릭 통과 — 자식(제목·주사위·textarea)만 클릭 받음. HUD 항목이 textbar 아래에 겹쳐 보일 때 빈 영역에서 HUD 클릭 못 받던 문제 방지. */
+  #pcTextBar > *, #pcTextBar .die, #pcTextBar textarea { pointer-events: auto; }
   /* 제목은 설정창 내부 .groupTitle 와 동일 디자인 (className 으로 위임). 별도 override 없음. */
   #pcTextBar #mainText { width: 100%; resize: none; overflow-y: hidden; padding: 4px 6px; border: 1px solid currentColor; background: transparent; color: currentColor; font-family: inherit; font-size: 10px; line-height: 1.4; letter-spacing: 0.5px; outline: none; box-sizing: border-box; min-height: 24px; opacity: 1; scrollbar-width: thin; scrollbar-color: currentColor transparent; }
   #pcTextBar #mainText::-webkit-scrollbar { width: 8px; height: 8px; }
@@ -835,7 +837,7 @@ const MH_CFG = {
     detachThreshold: 0,     // [F5] 떼기 힘 임계 — 노드크기 × 이 값 이상 끌어야 분리 (관리자 2026-05-22 조정: 3 → 0)
     springBoost: 0,         // [F6] 스프링 추가값 — 당기거나 구부린 상태를 더 강하게 잡아주는 보강(0=기존)
     bondPickFactor: 0.5,  // [항목5] 마우스 누름 붙임 자석 반경 배수 (관리자 2026-05-19 조정)
-    bondLooseGlobal: 1,   // [v1.10d] 모든 본드 위치 무관 (0=off, 1=on 기본). on 이면 _filtOK 가 @part 무시.
+    bondLooseGlobal: 0,   // [v1.10d→배포] 모든 본드 위치 무관 (0=off 기본, 1=on). on 이면 _filtOK 가 @part 무시.
     // 최적화 — 랜덤 시 자동 보정에 쓰이는 가중치/임계값
     lsHorizFactor: 0.4,  // 자간 보정 (관리자 2026-05-22 조정: 1 → 0.4)
     lhVertFactor: 0.2,   // 행간 보정 (관리자 2026-05-21 조정: 0.1 → 0.2)
@@ -2214,6 +2216,8 @@ try {
     });
   }
 } catch (_) {}
+// [배포] 본드 위치 무관 강제 OFF — 옛 관리자 세션에서 1 로 저장된 localStorage 도 무시
+PARAMS.bondLooseGlobal = 0;
 
 // 슬라이더 그룹: 밀도 → 골격 → 간격 → 탄성 → 꾸밈 → 배경 색 → 글자 색
 //   각 그룹별 주사위(⚀-⚅) 클릭 시 해당 그룹만 랜덤
@@ -7472,6 +7476,8 @@ const ADMIN_VARS = [
 ];
 
 function openAdminDialog() {
+  // [배포] 관리자 모드 진입 차단 — 10클릭 트리거가 호출되어도 다이얼로그 안 열림. 디버깅 시 이 줄만 주석.
+  return;
   const old = document.getElementById('mhAdminDialog');
   if (old) { old.remove(); return; }
   const box = document.createElement('div');
