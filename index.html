@@ -14695,8 +14695,8 @@ function draw() {
   ctx.fillRect(0, 0, cssW, cssH);
   document.body.style.background = bg;
 
-  // [E3] 테두리 ON (borderWidth > 0): 글자를 채우지 않고 윤곽선만 표시 — 그린 뒤 즉시 종료.
-  if (_bordersOn()) { drawBorders(ctx, world.bodies, fg); return; }
+  // [E3] 테두리 ON (borderWidth > 0): 글자를 채우지 않고 윤곽선만 표시 — 그린 뒤 인터랙션 오버레이 후 종료.
+  if (_bordersOn()) { drawBorders(ctx, world.bodies, fg); drawInteractionOverlay(); return; }
 
   // 부드럽게 활성 시 픽셀 마스크 모드
   const useOutline = (PARAMS.cornerR > 0);
@@ -14709,6 +14709,7 @@ function draw() {
   if (useOutline) {
     // 부드럽게 모드 — 픽셀 마스크 + blur로 부드러운 외곽
     drawSmoothedBodies(ctx, world.bodies, fg, bg);
+    drawInteractionOverlay();
     return;
   }
 
@@ -14734,51 +14735,59 @@ function draw() {
       if (r > 0) drawNodeShape(n, r);
     });
   });
-  // [항목3·4 개선] 붙임 짓기 — 잡은 노드 + 선택 가능한(같은 글자 다른 파트 원본)
-  //   노드를 "점 모양·점 크기 반영"(drawNodeShape) + 동적 투명획 색 도형으로 표시.
-  //   둘 다 같은 스타일(스펙) — 마우스 놓기 전까지 후보 사이 자유 이동. 표시 전용.
+  drawInteractionOverlay();
+}
+
+// [v1.09] 호버·붙임·떼기 인터랙션 표시 — draw() 의 일반 경로 + drawBorders/drawSmoothedBodies
+//   조기 return 직전에도 호출되어, 테두리/부드럽게 모드에서도 인터랙션 피드백 표시.
+//   ctx.save/restore 로 부드럽게 모드의 transform/filter 영향 격리.
+function drawInteractionOverlay() {
+  ctx.save();
+  // 부드럽게 모드 등이 변경했을 가능성 있는 transform 을 다시 DPR 기본값으로 강제
+  const dpr = window.devicePixelRatio || 1;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.filter = 'none';
+  ctx.globalAlpha = 1;
+  ctx.globalCompositeOperation = 'source-over';
+  ctx.setLineDash([]);
+
+  // [항목3·4 개선] 붙임 후보 + 잡은 노드 강조 — _bond 활성 시
   if (typeof _bond !== 'undefined' && _bond && _bond.body) {
     const _ic = _bondInvColor();
-    ctx.save();
-    ctx.setLineDash([]);
     ctx.fillStyle = _ic; ctx.strokeStyle = _ic;
-    const _r = Math.max((PARAMS.nodeR || 0) / 2, 3);  // 점 크기 반영(가시성 하한 3px)
-    const _selIdx = (_bond._partnerIdx != null) ? _bond._partnerIdx : -1;  // 지금 선택된(붙을) 노드
+    const _r = Math.max((PARAMS.nodeR || 0) / 2, 3);
+    const _selIdx = (_bond._partnerIdx != null) ? _bond._partnerIdx : -1;
     _bond.cands.forEach(c => {
-      if (c.idx === _selIdx) return;  // 선택 노드는 아래에서 강조로 따로 그림
-      const n = _bond.body.nodes[c.idx]; if (n) drawNodeShape(n, _r);  // 선택 가능 노드
+      if (c.idx === _selIdx) return;
+      const n = _bond.body.nodes[c.idx]; if (n) drawNodeShape(n, _r);
     });
     const _sn = _bond.body.nodes[_bond.srcIdx];
-    if (_sn && _bond.srcIdx !== _selIdx) drawNodeShape(_sn, _r);  // 내가 잡은 노드
-    // [선택 노드 강조] 지금 붙을 노드 = 동적 글자색 코어만 → 다른 후보(단색 점)와 구분.
+    if (_sn && _bond.srcIdx !== _selIdx) drawNodeShape(_sn, _r);
     if (_selIdx >= 0) {
       const _selN = _bond.body.nodes[_selIdx];
       if (_selN) {
-        ctx.fillStyle = currentFgColor();    // 동적 글자색 코어(선택 표시) — 대비색 링 없음
+        ctx.fillStyle = currentFgColor();
         drawNodeShape(_selN, _r * 1.25);
       }
     }
-    ctx.restore();
   }
-  // [F4] 감상모드 호버 — 잡지(드래그)·붙임 중이 아니면, 호버한 자모의 기본노드를
-  //   동적 투명획 색으로 강조(드래그 선택 가능한 점 안내). 붙임 강조와 색·스타일 동일.
+  // [F4] 감상모드 호버 — 잡지(드래그)·붙임 중이 아니면 호버한 자모의 기본 노드 강조
   else if (typeof _hoverJamo !== 'undefined' && _hoverJamo && _hoverJamo.body
            && (typeof draggedNode === 'undefined' || !draggedNode)) {
     const _hb = _hoverJamo.body;
     if (world.bodies.indexOf(_hb) >= 0) {
-      ctx.save();
-      ctx.setLineDash([]);
       const _ic = (typeof _bondInvColor === 'function') ? _bondInvColor() : currentFgColor();
       ctx.fillStyle = _ic; ctx.strokeStyle = _ic;
       const _hr = Math.max((PARAMS.nodeR || 0) / 2, 3);
-      // [v1.09] 호버 강조 = FACTORY_DEFAULTS 원본 노드만 (isBase === true). 1 디자인 꼭짓점당 1 dedupe.
-      //   서브디비전·편집창 추가·옛 데이터 추가 노드는 강조 X.
+      // [v1.09] 호버 강조 = FACTORY_DEFAULTS 원본 디자인 꼭짓점만.
+      //   isBase===true + _bondMapNode 매핑 성공 노드만 (= 분할 중간점·추가 노드 제외).
+      //   1 디자인 꼭짓점당 1 dedupe — bond candidate 와 동일한 게이트.
       const _hbest = new Map();
       _hoverJamo.idxs.forEach(i => {
         const n = _hb.nodes[i];
         if (!n || n.inv || n.isBase !== true) return;
         const m = (typeof _bondMapNode === 'function') ? _bondMapNode(_hb, i) : null;
-        if (!m) { _hbest.set('idx#' + i, { idx: i, nd2: 0 }); return; }
+        if (!m) return;  // 매핑 실패 = 디자인 꼭짓점이 아님 → 강조 제외 (호버 = bond 후보 일치)
         const key = m.part + '#' + m.designIdx;
         const prev = _hbest.get(key);
         if (!prev || m.nd2 < prev.nd2) _hbest.set(key, { idx: i, nd2: m.nd2 });
@@ -14787,9 +14796,9 @@ function draw() {
         const n = _hb.nodes[c.idx];
         if (n) drawNodeShape(n, _hr);
       });
-      ctx.restore();
     }
   }
+  ctx.restore();
 }
 
 // ── 각도 유연성 — 슬라이더 값↑이면 탄성↓ ──
