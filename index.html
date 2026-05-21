@@ -4605,6 +4605,8 @@ function _hidePxMeasure() {
   if (_pxMeasureOverlay) _pxMeasureOverlay.style.display = 'none';
 }
 function _canStartMeasure(target) {
+  // 배포용 MUTE — 개발 디버그 도구이므로 일반 사용자에게는 비활성. 디버깅 시 이 줄만 주석 처리.
+  return false;
   if (!target || target.nodeType !== 1) return false;
   const tag = (target.tagName || '').toLowerCase();
   if (['button','a','input','textarea','select','label','option','img'].indexOf(tag) >= 0) return false;
