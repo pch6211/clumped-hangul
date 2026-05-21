@@ -1511,6 +1511,13 @@ function applyRandomText() {
       document.documentElement.style.setProperty('--pc-textbar-h', h + 'px');
     }
   }
+  // 모바일 입력바도 동기화 — 안 그러면 주사위 클릭 시 화면 텍스트는 바뀌지만 입력창은 옛 값 그대로.
+  const mta = document.getElementById('mobileText');
+  if (mta) {
+    mta.value = (TEXT === MOBILE_NOTICE) ? '' : TEXT;
+    mta.style.height = 'auto';
+    mta.style.height = Math.min(mta.scrollHeight || 24, window.innerHeight * 0.3) + 'px';
+  }
   if (world) world = buildWorld(currentText());
   if (typeof _refreshUsedInTextHighlight === 'function') _refreshUsedInTextHighlight();  // [항목1·2]
 }
