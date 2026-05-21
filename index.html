@@ -343,7 +343,9 @@
   /* [v1.09] PC 전용 외부 텍스트 입력바 — 화면 좌측 상단(HUD 와 위치 교환). 설정창 폭(288px) 와 동일.
        top: 24px 로 설정창 top 과 동일 y 에서 시작 — '텍스트' 라벨이 설정창 첫 그룹 '밀도' 라벨과 같은 행 높이. */
   /* [v1.10b] 폭 고정 200px (사용자 요청 — 가변 폭 폐기). textarea 가 부모 폭 100% 사용. */
-  #pcTextBar { position: fixed; left: calc(var(--ui-gap) - var(--sbw) + 11px); transform: none; top: 24px; bottom: auto; width: 200px; max-width: calc(100vw - 32px); z-index: 90; font-family: sans-serif; font-size: 10px; letter-spacing: 0.5px; line-height: 1.4; color: currentColor; pointer-events: auto; box-sizing: border-box; padding-left: 8px; }
+  #pcTextBar { position: fixed; left: calc(var(--ui-gap) - var(--sbw) + 11px); transform: none; top: 24px; bottom: auto; width: 200px; max-width: calc(100vw - 32px); z-index: 90; font-family: sans-serif; font-size: 10px; letter-spacing: 0.5px; line-height: 1.4; color: currentColor; pointer-events: none; box-sizing: border-box; padding-left: 8px; }
+  /* 컨테이너 배경 영역은 클릭 통과 — 자식(제목·주사위·textarea)만 클릭 받음. HUD 항목이 textbar 아래에 겹쳐 보일 때 빈 영역에서 HUD 클릭 못 받던 문제 방지. */
+  #pcTextBar > *, #pcTextBar .die, #pcTextBar textarea { pointer-events: auto; }
   /* 제목은 설정창 내부 .groupTitle 와 동일 디자인 (className 으로 위임). 별도 override 없음. */
   #pcTextBar #mainText { width: 100%; resize: none; overflow-y: hidden; padding: 4px 6px; border: 1px solid currentColor; background: transparent; color: currentColor; font-family: inherit; font-size: 10px; line-height: 1.4; letter-spacing: 0.5px; outline: none; box-sizing: border-box; min-height: 24px; opacity: 1; scrollbar-width: thin; scrollbar-color: currentColor transparent; }
   #pcTextBar #mainText::-webkit-scrollbar { width: 8px; height: 8px; }
