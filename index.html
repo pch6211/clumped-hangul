@@ -10,6 +10,8 @@
 <!-- <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7237044319292911" rossorigin="anonymous"></script> -->
 <!-- QRious 라이브러리 — 로컬 QR 생성 (외부 API fallback 의 ~1s 네트워크 지연 제거) -->
 <script src="https://cdn.jsdelivr.net/npm/qrious@4.0.2/dist/qrious.min.js"></script>
+<!-- Umami 분석 — 페이지뷰 + 커스텀 이벤트(PNG/SVG 다운로드, 설정·디자인 저장/로드) -->
+<script defer src="https://cloud.umami.is/script.js" data-website-id="1323ccba-8187-4424-aee4-78bc74bdb882"></script>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   html, body { width: 100%; height: 100%; overflow: hidden; background: #808080; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
@@ -650,7 +652,7 @@
 <div class="hud" id="hud">
   <!-- [v1.10b 후속] 텍스트 교정 + 토글 라벨 + 툴팁(1초 공통). 단축키 재배치: E 제거, M=문자 창, G=가이드 끄기.
        획 수정 '획' 자리에 20px 직선 미리보기, 획 잇기 자리에 노드 모양 미리보기(글자 크기). -->
-  <div class="hudSection" id="hudMain"><span class="hudItem hudClickable" data-action="auto" title="텍스트와 설정값을 5초 마다 임의로 지정합니다."><b>자동 재생</b> A</span><span class="hudItem hudClickable" data-action="reset" title="글자를 다시 출력합니다."><b>글자 리셋</b> B</span><span class="hudItem hudClickable" data-action="panel"><b>설정 창 열기</b> S</span><span class="hudItem hudClickable" data-action="editor"><b>문자 창 열기</b> E</span><span class="hudItem hudClickable" data-action="random"><b>임의 설정 값</b> R</span><span class="hudItem hudClickable" data-action="text"><b>임의 텍스트</b> T</span><span class="hudItem"><b>자간·행간</b>&nbsp; Alt ⇆ ⇅</span><span class="hudItem" title="글자 모양을 임시로 수정합니다"><b>획 수정</b> <canvas id="hudLinePreview" class="hudLinePreview" aria-hidden="true"></canvas> 당기기</span><span class="hudItem" title="같은 모임꼴에서 해당 자모는 항상 붙어서 출력됩니다."><b>획 잇기</b> <canvas id="hudHlPreview" class="hudHlPreview" aria-hidden="true"></canvas> 끼리 붙이기</span><span class="hudItem" title="디자인 창을 열거나 붙은 획을 뗄 수 있습니다."><b>편집 메뉴</b>&nbsp; 글자 우클릭</span><span class="hudItem hudClickable" id="hudToggleBtn" title="가이드 표시 토글"><b>가이드 끄기</b> M</span></div>
+  <div class="hudSection" id="hudMain"><span class="hudItem hudClickable" data-action="auto" title="텍스트와 설정값을 5초 마다 임의로 지정합니다."><b>자동 재생</b> A</span><span class="hudItem hudClickable" data-action="reset" title="글자를 다시 출력합니다."><b>글자 리셋</b> B</span><span class="hudItem hudClickable" data-action="panel"><b>설정 창 열기</b> S</span><span class="hudItem hudClickable" data-action="editor"><b>문자 창 열기</b> E</span><span class="hudItem hudClickable" data-action="random"><b>임의 설정 값</b> R</span><span class="hudItem hudClickable" data-action="text"><b>임의 텍스트</b> T</span><span class="hudItem"><b>자간·행간</b>&nbsp; Alt ⇆ ⇅</span><span class="hudItem" title="글자 모양을 임시로 수정합니다"><b>획 수정</b> <canvas id="hudLinePreview" class="hudLinePreview" aria-hidden="true"></canvas> 당기기</span><span class="hudItem" title="같은 모임꼴에서 해당 자모는 항상 붙어서 출력됩니다."><b>획 잇기</b> <canvas id="hudHlPreview" class="hudHlPreview" aria-hidden="true"></canvas> 끼리 붙이기</span><span class="hudItem" title="마지막 획 잇기를 되돌립니다."><b>획 잇기 취소</b>&nbsp; Ctrl Z</span><span class="hudItem" title="디자인 창을 열거나 붙은 획을 뗄 수 있습니다."><b>편집 메뉴</b>&nbsp; 글자 우클릭</span><span class="hudItem hudClickable" id="hudToggleBtn" title="가이드 표시 토글"><b>가이드 끄기</b> M</span></div>
 </div>
 <!-- [v1.09] 초기 인트로 팝업 삭제 (사용자 요청). -->
 <!-- PC 전용 외부 텍스트 입력 바 — 화면 왼쪽 하단. -->
@@ -1508,6 +1510,13 @@ function applyRandomText() {
       const h = host.getBoundingClientRect().height;
       document.documentElement.style.setProperty('--pc-textbar-h', h + 'px');
     }
+  }
+  // 모바일 입력바도 동기화 — 안 그러면 주사위 클릭 시 화면 텍스트는 바뀌지만 입력창은 옛 값 그대로.
+  const mta = document.getElementById('mobileText');
+  if (mta) {
+    mta.value = (TEXT === MOBILE_NOTICE) ? '' : TEXT;
+    mta.style.height = 'auto';
+    mta.style.height = Math.min(mta.scrollHeight || 24, window.innerHeight * 0.3) + 'px';
   }
   if (world) world = buildWorld(currentText());
   if (typeof _refreshUsedInTextHighlight === 'function') _refreshUsedInTextHighlight();  // [항목1·2]
@@ -4596,6 +4605,8 @@ function _hidePxMeasure() {
   if (_pxMeasureOverlay) _pxMeasureOverlay.style.display = 'none';
 }
 function _canStartMeasure(target) {
+  // 배포용 MUTE — 개발 디버그 도구이므로 일반 사용자에게는 비활성. 디버깅 시 이 줄만 주석 처리.
+  return false;
   if (!target || target.nodeType !== 1) return false;
   const tag = (target.tagName || '').toLowerCase();
   if (['button','a','input','textarea','select','label','option','img'].indexOf(tag) >= 0) return false;
@@ -7696,6 +7707,7 @@ function _makePersistentDraggablePopup(el, opts) {
 
 function saveSVG() {
   if (!world) return;
+  try { if (typeof umami !== 'undefined' && umami && typeof umami.track === 'function') umami.track('SVG 다운로드'); } catch(_) {}
   // 에디터·자모 선택창이 열려있으면 닫기
   const _ed = document.getElementById('editor');
   if (_ed && _ed.classList.contains('open')) closeEditor();
@@ -7751,6 +7763,7 @@ function saveSVG() {
 // PNG 저장 — 배경 투명, 글자만 / 설정창 너비만큼 좌측 잘라냄 / 해상도 2배
 function savePNG() {
   if (!world) return;
+  try { if (typeof umami !== 'undefined' && umami && typeof umami.track === 'function') umami.track('PNG 다운로드'); } catch(_) {}
   // 에디터·자모 선택창이 열려있으면 닫기
   const _ed = document.getElementById('editor');
   if (_ed && _ed.classList.contains('open')) closeEditor();
@@ -9464,6 +9477,7 @@ function _downloadJSON(obj, filename) {
 //     { designs: {char: def, ...}, characters: ['0','1',...], userAdded: [...], removedDefaults: [...], meta: {...} }
 //   하위 호환: payload 가 옛 포맷({char: def, ...})이면 load 가 자동 감지
 function exportPrimitivesJSON() {
+  try { if (typeof umami !== 'undefined' && umami && typeof umami.track === 'function') umami.track('디자인 저장'); } catch(_) {}
   let userAdded = [], removedDefaults = [], activeList = [];
   try {
     const raw1 = localStorage.getItem(EDITOR_USER_CHARS_KEY);
@@ -9501,6 +9515,7 @@ function exportPrimitivesJSON() {
 
 // ── 에디터 LOAD: 자모 디자인 JSON 불러오기 ──
 function triggerJamoLoad() {
+  try { if (typeof umami !== 'undefined' && umami && typeof umami.track === 'function') umami.track('디자인 로드'); } catch(_) {}
   const inp = document.getElementById('editorLoadInput');
   if (!inp) return;
   inp.value = '';
@@ -9590,6 +9605,7 @@ function triggerJamoLoad() {
 // ── 메인 SAVE: 설정값 (슬라이더·색·탄성·텍스트) JSON 저장 ──
 // [v1.10b] text 도 함께 저장 (사용자 요청).
 function saveSettings() {
+  try { if (typeof umami !== 'undefined' && umami && typeof umami.track === 'function') umami.track('설정 저장'); } catch(_) {}
   const settings = {
     schema: 'mungchin-hangul-settings-v1',
     params: Object.assign({}, PARAMS),
@@ -9604,6 +9620,7 @@ function saveSettings() {
 
 // ── 메인 LOAD: 설정값 JSON 불러오기 ──
 function triggerSettingsLoad() {
+  try { if (typeof umami !== 'undefined' && umami && typeof umami.track === 'function') umami.track('설정 로드'); } catch(_) {}
   const inp = document.createElement('input');
   inp.type = 'file';
   inp.accept = 'application/json,.json';
