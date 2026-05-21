@@ -1485,13 +1485,13 @@ const _RANDOM_WORDS_NEW = [
   "quite",
   "toxic"
 ];
-// [v1.10b] 가중치 분포 — 단글자 1/8, 새 단어 풀 1/5, 나머지(~67.5%) 다단어 문장.
+// 가중치 분포 — 단글자 30%, 단어 40%, 문장 30%.
 function pickRandomText() {
   const r = Math.random();
   const _pick = (arr) => (arr && arr.length) ? arr[Math.floor(Math.random() * arr.length)] : '';
-  if (r < 0.125) return _pick(_RANDOM_WORDS);          // 1/8 — 단글자
-  if (r < 0.125 + 0.2) return _pick(_RANDOM_WORDS_NEW); // 1/5 — 새 단어 풀
-  return _pick(_RANDOM_SENTENCES);                      // 나머지 — 다단어 문장
+  if (r < 0.3) return _pick(_RANDOM_WORDS);              // 30% — 단글자
+  if (r < 0.7) return _pick(_RANDOM_WORDS_NEW);          // 40% — 단어 풀
+  return _pick(_RANDOM_SENTENCES);                        // 30% — 다단어 문장
 }
 function applyRandomText() {
   const t = pickRandomText();
