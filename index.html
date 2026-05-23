@@ -1354,9 +1354,9 @@ const _RANDOM_WORDS_NEW = [
   "quite",
   "toxic"
 ];
-// [v1.12b] PC/모바일 가중치 분기 — 화면 폭·세로비 기반.
-//   PC (가로 ≥ 600px, landscape): 단글자 10% / 단어 30% / 문장 60% — 긴 텍스트 위주.
-//   모바일 (세로 우세 또는 폭 < 600px, portrait): 단글자 60% / 단어 30% / 문장 10% — 짧은 텍스트 위주.
+// [v1.12b] PC/모바일 가중치 분기 — 화면 세로>가로 = 모바일 (사용자 정의).
+//   PC (가로 ≥ 세로, landscape): 단글자 10% / 단어 30% / 문장 60% — 긴 텍스트 위주.
+//   모바일 (세로 > 가로, portrait): 단글자 60% / 단어 30% / 문장 10% — 짧은 텍스트 위주.
 //   각 카테고리마다 셔플 큐 보유 — 한 사이클(=배열 길이) 안에서는 중복 없음.
 //   큐 소진 시 자동 재셔플하여 다음 사이클 시작. 시작 직후 동일 항목 연속을 피하려 fisher-yates 사용.
 const _shuffleQueues = new WeakMap();
@@ -1376,7 +1376,7 @@ function _pickFromShuffleQueue(arr) {
 }
 function pickRandomText() {
   const r = Math.random();
-  const _mob = (window.innerHeight > window.innerWidth) || (window.innerWidth < 600);
+  const _mob = window.innerHeight > window.innerWidth;
   if (_mob) {
     // 모바일: 단글자 60% / 단어 30% / 문장 10%
     if (r < 0.6) return _pickFromShuffleQueue(_RANDOM_WORDS);
