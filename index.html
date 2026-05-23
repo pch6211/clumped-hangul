@@ -388,6 +388,18 @@
   #pxMeasureOverlay { position: fixed; inset: 0; pointer-events: none; z-index: 2147483646; display: none; }
   #pxMeasureOverlay svg { position: absolute; left: 0; top: 0; width: 100%; height: 100%; }
   .cwTooltip.show { opacity: 1; }
+  /* [v1.11b 테스트] A/B 테스트 도크 — 우상단 작은 박스. 결정 후 제거 예정. */
+  #testDock { position: fixed; top: 24px; right: 16px; z-index: 95; font-family: sans-serif; font-size: 10px; letter-spacing: 0.5px; line-height: 1.4; color: currentColor; background: var(--editor-bg, transparent); border: 1px solid currentColor; padding: 6px 8px; box-sizing: border-box; pointer-events: auto; user-select: none; display: flex; flex-direction: column; gap: 4px; min-width: 150px; }
+  #testDock .testRow { display: flex; align-items: center; gap: 4px; white-space: nowrap; }
+  #testDock .testLabel { display: inline-block; min-width: 46px; opacity: 0.9; }
+  #testDock .testBtn { display: inline-flex; align-items: center; justify-content: center; padding: 2px 6px; border: 1px solid currentColor; background: transparent; color: currentColor; font-family: inherit; font-size: 10px; cursor: pointer; letter-spacing: 0.5px; border-radius: 0; line-height: 1; height: 18px; box-sizing: border-box; }
+  #testDock .testBtn.active { background: currentColor; color: var(--editor-bg, transparent); }
+  #testDock .testSlider { -webkit-appearance: none; appearance: none; flex: 1 1 auto; height: 8px; background: transparent; cursor: ew-resize; padding: 0; margin: 0; min-width: 60px; }
+  #testDock .testSlider::-webkit-slider-runnable-track { height: 8px; background: currentColor; opacity: 0.16; border: 0; }
+  #testDock .testSlider::-moz-range-track { height: 8px; background: currentColor; opacity: 0.16; border: 0; }
+  #testDock .testSlider::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 4px; height: 12px; margin-top: -2px; background: currentColor; border: 0; border-radius: 0; cursor: ew-resize; }
+  #testDock .testSlider::-moz-range-thumb { width: 4px; height: 12px; background: currentColor; border: 0; border-radius: 0; cursor: ew-resize; }
+  #testDock .testVal { display: inline-block; min-width: 28px; text-align: right; opacity: 0.9; }
   .panel .pillBtn { display: inline-flex; align-items: center; justify-content: center; padding: 5px 14px; border: 1px solid currentColor; background: var(--editor-bg, transparent); color: currentColor; font-family: inherit; font-size: 10px; cursor: pointer; letter-spacing: 0.5px; border-radius: 999px; text-decoration: none; text-align: center; line-height: 1; height: 22px; box-sizing: border-box; }
   /* === 에디터 오버레이 (E) — 우측 정렬, 배경 투명, 편집 캔버스만 불투명 === */
   /* [v1.09] 모임꼴/문자 디자인창 독립화 — .editor 자체는 항상 display:block(pointer-events:none).
@@ -534,6 +546,12 @@
 <!-- [v1.09] 초기 인트로 팝업 삭제 (사용자 요청). -->
 <!-- PC 전용 외부 텍스트 입력 바 — 화면 왼쪽 하단. -->
 <div id="pcTextBar"></div>
+<!-- [v1.11b 테스트] 자간/부드럽게 A/B 테스트 도크 — 결정 후 제거 예정 -->
+<div id="testDock">
+  <div class="testRow"><span class="testLabel">자간 모드</span><button class="testBtn" data-test="ls" data-val="0" title="현재 동작: 글자 BBox 사이 간격 = letterSpacing">A: BBox</button><button class="testBtn" data-test="ls" data-val="1" title="모든 글자가 동일 폭 슬롯에 중앙 정렬 (monospace 식). 시각 자간이 균일해짐">B: 슬롯</button></div>
+  <div class="testRow"><span class="testLabel">자간 ×</span><input class="testSlider" type="range" min="0" max="100" step="1" value="100" data-test="lsScale"><span class="testVal" id="testLsScaleVal">1.00</span></div>
+  <div class="testRow"><span class="testLabel">부드럽게</span><button class="testBtn" data-test="smooth" data-val="0" title="ctx.filter='blur(...)' 사용 — 빠름. Safari 17.x 이하 미동작">기본</button><button class="testBtn" data-test="smooth" data-val="1" title="JS 박스블러 — 모든 브라우저/iPad 동작, 약간 느림">JS</button></div>
+</div>
 <!-- [v1.10b] ABC 테스트 결과 — 방안 B(동적 max + 합제한) 채택, 기본 골격 랜덤으로 통합. ABC 버튼 제거. -->
 <div class="panel" id="panel">
   <!-- [v1.09] 모바일 ✕ 닫기 버튼 삭제 (사용자 요청). 우측 캔버스 영역 탭으로 닫기 사용. -->
@@ -734,7 +752,11 @@ const MH_CFG = {
     smoothScale: 2,      // 슈퍼샘플링 배율
     blurFactor: 0.4,     // blur 강도
     alphaThreshold: 128, // 알파 임계
-    wallOn: false        // 화면 가장자리 벽 반발 (실험적 비활성화 — 기본 false)
+    wallOn: false,       // 화면 가장자리 벽 반발 (실험적 비활성화 — 기본 false)
+    // [v1.11b 테스트] A/B 비교용 임시 파라미터 — 결정 후 정식 통합 또는 제거 예정.
+    _testLsMode: 0,      // 자간 알고리즘: 0=BBox 간격 일정(현재), 1=슬롯 폭 일정(monospace)
+    _testLsScale: 1,     // 자간 배율 0.0 ~ 1.0 — 최종 letterSpacing 에 곱함
+    _testSmoothMode: 0   // 부드럽게 블러: 0=ctx.filter (네이티브 빠름·Safari17- 미지원), 1=JS 박스블러 (호환·약간 느림)
   }
 };
 
@@ -3654,7 +3676,9 @@ function buildWorld(str) {
   // 통일된 점 간격을 글자 렌더링 SCALE 기준으로 사용
   const SCALE = Math.max(PARAMS.pointDist, 4);
   // 자간/행간 — 슬라이더 값 그대로 사용. 자동 보정은 randomizeAll에서만 적용.
-  const letterSpacing = PARAMS.letterSpacing;
+  // [v1.11b 테스트] _testLsScale (0~1) 로 최종 자간에 배율 적용 — A/B 비교용
+  const _lsScale = (PARAMS._testLsScale != null) ? PARAMS._testLsScale : 1;
+  const letterSpacing = PARAMS.letterSpacing * _lsScale;
   const lineHeight = Math.max(40, PARAMS.lineHeight);
   const spaceWidth = SCALE * 1; // 공백 — 글자폭의 절반 (이전 *2의 절반)
   // 6개 자모별 길이 슬라이더는 buildToken 내부에서 PARAMS 직접 참조
@@ -3739,6 +3763,14 @@ function buildWorld(str) {
     //   (요청 "성공 시 모든 자간/행간 동일 계산"의 전역 확대는 후속 단계 — F7 은 비한글 우선)
     return { type: 'glyph', token: t, width: Math.max(w, SCALE * 0.5) };
   });
+
+  // [v1.11b 테스트] 자간 모드 B (슬롯 폭 일정): 모든 글자가 동일 advance 폭 사용 →
+  //   글자 BBox 폭 차이로 인한 자간 불균질 인식 해소. 각 글리프는 슬롯 중앙에 정렬.
+  if ((PARAMS._testLsMode | 0) === 1) {
+    let _maxGW = 0;
+    items.forEach(it => { if (it.type === 'glyph' && it.width > _maxGW) _maxGW = it.width; });
+    if (_maxGW > 0) items.forEach(it => { if (it.type === 'glyph') it.width = _maxGW; });
+  }
 
   // 단어 단위로 묶기: 공백/줄바꿈이 분리자
   const units = []; // { type: 'word'|'space'|'newline', items?, width? }
@@ -4217,6 +4249,61 @@ function drawNodeShape(n, r) {
   ctx.fill();
 }
 
+// [v1.11b 테스트] iPad/Safari (17.x 이하 + iOS Safari 모두) 의 ctx.filter='blur(...)' 미지원
+//   대응용 JS 박스블러 (분리형 슬라이딩 윈도 × 3패스 ≈ Gaussian). 알파 채널만 처리.
+//   픽셀당 O(1) 슬라이딩 윈도 → 반경 무관 일정 시간. 화면 픽셀 수에만 비례.
+function _jsBoxBlurAlpha(imgData, radiusPx) {
+  const W = imgData.width, H = imgData.height;
+  if (W <= 0 || H <= 0) return;
+  const r = Math.max(1, Math.round(radiusPx));
+  const d = imgData.data;
+  const N = W * H;
+  let src = new Float32Array(N);
+  let dst = new Float32Array(N);
+  for (let i = 0, j = 3; i < N; i++, j += 4) src[i] = d[j];
+  const div = 2 * r + 1;
+  const ITER = 3;
+  for (let k = 0; k < ITER; k++) {
+    // 가로 패스
+    for (let y = 0; y < H; y++) {
+      const row = y * W;
+      let sum = 0;
+      for (let x = -r; x <= r; x++) {
+        const sx = x < 0 ? 0 : (x >= W ? W - 1 : x);
+        sum += src[row + sx];
+      }
+      for (let x = 0; x < W; x++) {
+        dst[row + x] = sum / div;
+        const lx = x - r;
+        const rx = x + r + 1;
+        sum -= src[row + (lx < 0 ? 0 : lx)];
+        sum += src[row + (rx >= W ? W - 1 : rx)];
+      }
+    }
+    { const t = src; src = dst; dst = t; }
+    // 세로 패스
+    for (let x = 0; x < W; x++) {
+      let sum = 0;
+      for (let y = -r; y <= r; y++) {
+        const sy = y < 0 ? 0 : (y >= H ? H - 1 : y);
+        sum += src[sy * W + x];
+      }
+      for (let y = 0; y < H; y++) {
+        dst[y * W + x] = sum / div;
+        const ly = y - r;
+        const ry = y + r + 1;
+        sum -= src[(ly < 0 ? 0 : ly) * W + x];
+        sum += src[(ry >= H ? H - 1 : ry) * W + x];
+      }
+    }
+    { const t = src; src = dst; dst = t; }
+  }
+  for (let i = 0, j = 3; i < N; i++, j += 4) {
+    const v = src[i];
+    d[j] = v < 0 ? 0 : (v > 255 ? 255 : v);
+  }
+}
+
 // ── 부드럽게 (픽셀 마스크 + blur + threshold) — 변수 슬라이더 노출 ──
 function smoothedTotalWidth() { return Math.max(0, PARAMS.lineW || 0); }
 
@@ -4301,15 +4388,27 @@ function drawSmoothedBodies(targetCtx, bodies, fg, bg) {
   // 모퉁이 둥글리기 — blur + threshold
   if (cornerR > 0) {
     mctx.setTransform(1, 0, 0, 1, 0, 0);  // scale 해제
-    mctx.filter = 'blur(' + (cornerR * BLUR_F * SCALE) + 'px)';
-    mctx.drawImage(mask, 0, 0);
-    mctx.filter = 'none';
-    const imgData = mctx.getImageData(0, 0, W * SCALE, H * SCALE);
-    const d = imgData.data;
-    for (let i = 0; i < d.length; i += 4) {
-      d[i + 3] = d[i + 3] > A_THR ? 255 : 0;
+    const _blurPx = cornerR * BLUR_F * SCALE;
+    if ((PARAMS._testSmoothMode | 0) === 1) {
+      // [테스트] JS 박스블러 — Safari/iPad 호환 경로
+      const imgData = mctx.getImageData(0, 0, W * SCALE, H * SCALE);
+      _jsBoxBlurAlpha(imgData, _blurPx);
+      const d = imgData.data;
+      for (let i = 0; i < d.length; i += 4) {
+        d[i + 3] = d[i + 3] > A_THR ? 255 : 0;
+      }
+      mctx.putImageData(imgData, 0, 0);
+    } else {
+      mctx.filter = 'blur(' + _blurPx + 'px)';
+      mctx.drawImage(mask, 0, 0);
+      mctx.filter = 'none';
+      const imgData = mctx.getImageData(0, 0, W * SCALE, H * SCALE);
+      const d = imgData.data;
+      for (let i = 0; i < d.length; i += 4) {
+        d[i + 3] = d[i + 3] > A_THR ? 255 : 0;
+      }
+      mctx.putImageData(imgData, 0, 0);
     }
-    mctx.putImageData(imgData, 0, 0);
   }
 
   // [E3] 테두리는 drawSmoothedBodies 와 무관한 독립 함수 drawBorders 가 처리(부드럽게 비종속).
@@ -4437,13 +4536,23 @@ function drawBorders(targetCtx, bodies, fg) {
   if (cornerR > 0) {
     const BLUR_F = Math.max(0, PARAMS.blurFactor || 0.5);
     const A_THR = Math.max(0, Math.min(255, Math.round(PARAMS.alphaThreshold ?? 128)));
-    rctx.filter = 'blur(' + (cornerR * BLUR_F * S) + 'px)';
-    rctx.drawImage(_bdRing, 0, 0);
-    rctx.filter = 'none';
-    const im = rctx.getImageData(0, 0, MW, MH);
-    const dd = im.data;
-    for (let k = 0; k < dd.length; k += 4) dd[k + 3] = dd[k + 3] > A_THR ? 255 : 0;
-    rctx.putImageData(im, 0, 0);
+    const _blurPx = cornerR * BLUR_F * S;
+    if ((PARAMS._testSmoothMode | 0) === 1) {
+      // [테스트] JS 박스블러 — Safari/iPad 호환 경로 (윤곽 밴드도 동일 처리)
+      const im = rctx.getImageData(0, 0, MW, MH);
+      _jsBoxBlurAlpha(im, _blurPx);
+      const dd = im.data;
+      for (let k = 0; k < dd.length; k += 4) dd[k + 3] = dd[k + 3] > A_THR ? 255 : 0;
+      rctx.putImageData(im, 0, 0);
+    } else {
+      rctx.filter = 'blur(' + _blurPx + 'px)';
+      rctx.drawImage(_bdRing, 0, 0);
+      rctx.filter = 'none';
+      const im = rctx.getImageData(0, 0, MW, MH);
+      const dd = im.data;
+      for (let k = 0; k < dd.length; k += 4) dd[k + 3] = dd[k + 3] > A_THR ? 255 : 0;
+      rctx.putImageData(im, 0, 0);
+    }
   }
   rctx.globalCompositeOperation = 'source-in';
   rctx.fillStyle = _borderColor;
@@ -12012,6 +12121,49 @@ function setupCustomTooltips() {
   document.addEventListener('touchcancel', _hideTooltipNow, true);
 }
 
+// [v1.11b 테스트] 자간/부드럽게 A/B 테스트 도크 초기화 — 버튼/슬라이더 상태 동기화 + 이벤트 바인딩.
+function setupTestDock() {
+  const dock = document.getElementById('testDock');
+  if (!dock) return;
+  const _refreshActive = () => {
+    dock.querySelectorAll('.testBtn[data-test="ls"]').forEach(b => {
+      b.classList.toggle('active', (b.dataset.val | 0) === (PARAMS._testLsMode | 0));
+    });
+    dock.querySelectorAll('.testBtn[data-test="smooth"]').forEach(b => {
+      b.classList.toggle('active', (b.dataset.val | 0) === (PARAMS._testSmoothMode | 0));
+    });
+    const sl = dock.querySelector('.testSlider[data-test="lsScale"]');
+    if (sl) sl.value = Math.round((PARAMS._testLsScale != null ? PARAMS._testLsScale : 1) * 100);
+    const v = document.getElementById('testLsScaleVal');
+    if (v) v.textContent = (PARAMS._testLsScale != null ? PARAMS._testLsScale : 1).toFixed(2);
+  };
+  dock.addEventListener('click', (e) => {
+    const btn = e.target.closest('.testBtn');
+    if (!btn) return;
+    const test = btn.dataset.test, val = btn.dataset.val | 0;
+    if (test === 'ls') {
+      PARAMS._testLsMode = val;
+      if (world) world = buildWorld(currentText());
+    } else if (test === 'smooth') {
+      PARAMS._testSmoothMode = val;
+      // 부드럽게는 다음 draw() 에서 자동 반영 — 별도 rebuild 불필요
+    }
+    _refreshActive();
+  });
+  const slider = dock.querySelector('.testSlider[data-test="lsScale"]');
+  if (slider) {
+    const onInput = () => {
+      PARAMS._testLsScale = (parseInt(slider.value, 10) || 0) / 100;
+      const v = document.getElementById('testLsScaleVal');
+      if (v) v.textContent = PARAMS._testLsScale.toFixed(2);
+      if (world) world = buildWorld(currentText());
+    };
+    slider.addEventListener('input', onInput);
+    slider.addEventListener('change', onInput);
+  }
+  _refreshActive();
+}
+
 requestAnimationFrame(() => {
   const _MOBILE = (typeof isMobile === 'function') && isMobile();
   // [v1.10b] 모바일 강제 기본문구 덮어쓰기 폐기 — loadTextLocal() 으로 복원된 사용자 텍스트를
@@ -12019,6 +12171,7 @@ requestAnimationFrame(() => {
   _mobileMode = _MOBILE;
   rebuild();
   setupCustomTooltips();
+  setupTestDock();
   if (typeof setupPcTextBar === 'function') setupPcTextBar();  // PC 외부 텍스트바 초기 빌드 (한 번)
   tick();
   // 시작 시 R(전체 랜덤) 1회만 — 자동 루프는 off (사용자가 A로 켜기 전까지 고정)
