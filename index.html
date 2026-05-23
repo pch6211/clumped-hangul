@@ -2790,7 +2790,10 @@ function subdivideJamoOriented(jamo, kH, kV) {
   if (E === 0) return deepClone(jamo);
   const counts = new Array(E).fill(0);
   for (let k = 0; k < E; k++) {
-    const a = jamo.nodes[jamo.edges[k][0]], b = jamo.nodes[jamo.edges[k][1]];
+    const e = jamo.edges[k];
+    // [v1.12b] 투명획 분절 금지 — 슬라이더(가로/세로)·모임꼴 박스 칸수 모두 inv 엣지는 노드 추가 안 함.
+    if (e.length > 2 && e[2] === 'inv') continue;
+    const a = jamo.nodes[e[0]], b = jamo.nodes[e[1]];
     const dx = Math.abs(b.x - a.x), dy = Math.abs(b.y - a.y);
     if (dx + dy < 0.001) continue;  // 0 길이 엣지 제외
     const r = Math.atan2(dy, dx) / (Math.PI / 2);  // 0=가로, 1=세로
@@ -2865,18 +2868,22 @@ function addRandomNodesOnEdges(jamo, count) {
   }), edges: [], strokes: jamo.strokes.map(s => s.slice()) };
   const edgesMut = jamo.edges.map(e => e.slice());
   for (let i = 0; i < count; i++) {
-    let ei = 0, bestLen = -1;
+    let ei = -1, bestLen = -1;
     for (let k = 0; k < edgesMut.length; k++) {
-      const aN = out.nodes[edgesMut[k][0]], bN = out.nodes[edgesMut[k][1]];
+      const _e = edgesMut[k];
+      // [v1.12b] 투명획 노드추가 금지 — inv 엣지는 후보에서 제외.
+      if (_e.length > 2 && _e[2] === 'inv') continue;
+      const aN = out.nodes[_e[0]], bN = out.nodes[_e[1]];
       const len = Math.hypot(bN.x - aN.x, bN.y - aN.y);
       if (len > bestLen) { bestLen = len; ei = k; }
     }
+    if (ei < 0) break;  // 가용 일반 엣지가 없음 (모두 투명) → 더 추가 못 함
     const [a, b] = edgesMut[ei];
     const t = 0.5;
     const na = out.nodes[a], nb = out.nodes[b];
     const newIdx = out.nodes.length;
     const _origEdge = edgesMut[ei];
-    const _isInv = _origEdge.length > 2 && _origEdge[2] === 'inv';
+    const _isInv = _origEdge.length > 2 && _origEdge[2] === 'inv';  // 위 필터로 항상 false 지만 안전 보존
     const _newN = { x: na.x + (nb.x - na.x) * t, y: na.y + (nb.y - na.y) * t };
     if (_isInv) _newN.inv = true;
     if (na.jSrc) _newN.jSrc = na.jSrc;
