@@ -8201,12 +8201,34 @@ function saveSVG() {
   const bg = currentBgColor();
   const lineW = PARAMS.lineW;
   const nodeR = PARAMS.nodeR / 2;
+  // [v1.12b] SVG 부드럽게 — 캔버스의 JS 박스블러 + 알파 임계값 파이프라인을
+  //   SVG feGaussianBlur + feComponentTransfer(linear, steep slope) + feFlood + feComposite 로 근사.
+  //   캔버스 픽셀 라이드의 SCALE 슈퍼샘플은 SVG 벡터에서는 불필요 → 표시 픽셀 단위 그대로.
+  const _smR = Math.max(0, PARAMS.cornerR || 0);
+  const _BLUR_F = Math.max(0, PARAMS.blurFactor || 0.5);
+  const _A_THR = Math.max(0, Math.min(255, Math.round(PARAMS.alphaThreshold ?? 128)));
+  const _useSmooth = _smR > 0;
   const parts = [];
   parts.push('<?xml version="1.0" encoding="UTF-8"?>');
   parts.push('<svg xmlns="http://www.w3.org/2000/svg" viewBox="' + X + ' 0 ' + W + ' ' + H + '" width="' + W + '" height="' + H + '">');
   parts.push('<rect x="' + X + '" y="0" width="' + W + '" height="' + H + '" fill="' + bg + '"/>');
-  parts.push('<g fill="' + fg + '" stroke="' + fg + '" stroke-linecap="round">');
-  // SVG: 일반 획·노드 (부드럽게는 SVG에 적용 안 됨 — 픽셀 처리 한정)
+  if (_useSmooth) {
+    const _stdDev = _smR * _BLUR_F;
+    const _T = _A_THR / 255;
+    const _slope = 50;                    // 가파른 기울기 → 임계값 근방에서 사실상 step
+    const _intercept = 0.5 - _slope * _T; // y = slope·x + intercept, x=T 에서 y=0.5
+    const _pad = Math.ceil(_stdDev * 4 + 4);  // 블러 확산 여유 (가우시안 꼬리 ≈ 3σ)
+    parts.push('<defs>');
+    parts.push('<filter id="mhSmooth" filterUnits="userSpaceOnUse" x="' + (X - _pad) + '" y="' + (-_pad) + '" width="' + (W + 2 * _pad) + '" height="' + (H + 2 * _pad) + '" color-interpolation-filters="sRGB">');
+    parts.push('<feGaussianBlur in="SourceAlpha" stdDeviation="' + _stdDev.toFixed(3) + '" result="b"/>');
+    parts.push('<feComponentTransfer in="b" result="m"><feFuncA type="linear" slope="' + _slope + '" intercept="' + _intercept.toFixed(4) + '"/></feComponentTransfer>');
+    parts.push('<feFlood flood-color="' + fg + '" result="c"/>');
+    parts.push('<feComposite in="c" in2="m" operator="in"/>');
+    parts.push('</filter>');
+    parts.push('</defs>');
+  }
+  parts.push('<g fill="' + fg + '" stroke="' + fg + '" stroke-linecap="round"' + (_useSmooth ? ' filter="url(#mhSmooth)"' : '') + '>');
+  // SVG: 일반 획·노드 (부드럽게는 _useSmooth 시 SVG <filter> 로 적용)
   world.bodies.forEach(body => {
     body.edges.forEach(e => {
       if (e.transparent) return;  // 투명 획 비표시
