@@ -219,9 +219,10 @@
   /* [v1.09] PC 전용 외부 텍스트 입력바 — 화면 좌측 상단(HUD 와 위치 교환). 설정창 폭(288px) 와 동일.
        top: 24px 로 설정창 top 과 동일 y 에서 시작 — '텍스트' 라벨이 설정창 첫 그룹 '밀도' 라벨과 같은 행 높이. */
   /* [v1.10b] 폭 고정 200px (사용자 요청 — 가변 폭 폐기). textarea 가 부모 폭 100% 사용. */
-  #pcTextBar { position: fixed; left: calc(var(--ui-gap) - var(--sbw) + 11px); transform: none; top: 24px; bottom: auto; width: 200px; max-width: calc(100vw - 32px); z-index: 90; font-family: sans-serif; font-size: 10px; letter-spacing: 0.5px; line-height: 1.4; color: currentColor; pointer-events: auto; box-sizing: border-box; padding-left: 8px; }
+  #pcTextBar { position: fixed; left: calc(var(--ui-gap) - var(--sbw) + 11px); transform: none; top: 24px; bottom: auto; width: -moz-fit-content; width: fit-content; max-width: min(200px, calc(100vw - 32px)); z-index: 90; font-family: sans-serif; font-size: 10px; letter-spacing: 0.5px; line-height: 1.4; color: currentColor; pointer-events: auto; box-sizing: border-box; padding-left: 8px; }
   /* 제목은 설정창 내부 .groupTitle 와 동일 디자인 (className 으로 위임). 별도 override 없음. */
-  #pcTextBar #mainText { width: 100%; resize: none; overflow-y: hidden; padding: 4px 6px; border: 1px solid currentColor; background: transparent; color: currentColor; font-family: inherit; font-size: 10px; line-height: 1.4; letter-spacing: 0.5px; outline: none; box-sizing: border-box; min-height: 24px; opacity: 1; scrollbar-width: thin; scrollbar-color: currentColor transparent; }
+  /* [v1.11b] 입력창 — 동적 배경(--editor-bg) + 텍스트 폭에 딱 맞춰 자동 조절(JS 가 inline width 부여, max 200px). */
+  #pcTextBar #mainText { width: auto; max-width: min(200px, calc(100vw - 32px)); resize: none; overflow-y: hidden; padding: 4px 6px; border: 1px solid currentColor; background: var(--editor-bg, transparent); color: currentColor; font-family: inherit; font-size: 10px; line-height: 1.4; letter-spacing: 0.5px; outline: none; box-sizing: border-box; min-height: 24px; min-width: 18px; opacity: 1; scrollbar-width: thin; scrollbar-color: currentColor transparent; }
   #pcTextBar #mainText::-webkit-scrollbar { width: 8px; height: 8px; }
   #pcTextBar #mainText::-webkit-scrollbar-thumb { background: currentColor; opacity: 0.16; }
   #pcTextBar #mainText::placeholder { color: inherit; opacity: 0.45; }
@@ -1385,7 +1386,8 @@ function applyRandomText() {
   const ta = document.getElementById('mainText');
   if (ta) {
     ta.value = TEXT;
-    // 프로그램적 변경이라 input 이벤트가 발생하지 않음 → 자동 높이 직접 재조정
+    // 프로그램적 변경이라 input 이벤트가 발생하지 않음 → 자동 높이·폭 직접 재조정
+    if (typeof _adjustMainTextWidth === 'function') _adjustMainTextWidth(ta);
     ta.style.height = 'auto';
     ta.style.height = ta.scrollHeight + 'px';
     // [v1.10b] 입력바 컨테이너 높이 변동을 --pc-textbar-h 에 동기화 → HUD top 이 따라 내려감.
@@ -5986,6 +5988,44 @@ const DICE_FACES = ['⚀','⚁','⚂','⚃','⚄','⚅'];
 const DEFAULT_DIE = '⚂';
 function randomDieFace() { return DICE_FACES[Math.floor(Math.random() * DICE_FACES.length)]; }
 
+// [v1.11b] #mainText 폭을 입력 텍스트(또는 placeholder) 폭에 딱 맞게 조절.
+//   숨김 미러 div 로 가장 긴 줄을 측정 → ta.style.width 인라인 부여. max 200px(또는 viewport-32).
+//   max 도달 시 자동 행갈이(높이는 _adjustTaHeight 가 별도로 처리).
+let _mainTextMirror = null;
+function _adjustMainTextWidth(ta) {
+  if (!ta) ta = document.getElementById('mainText');
+  if (!ta) return;
+  if (!_mainTextMirror) {
+    _mainTextMirror = document.createElement('div');
+    _mainTextMirror.setAttribute('aria-hidden', 'true');
+    _mainTextMirror.style.cssText = 'position:absolute;left:-9999px;top:-9999px;visibility:hidden;white-space:pre;pointer-events:none;';
+    document.body.appendChild(_mainTextMirror);
+  }
+  const m = _mainTextMirror;
+  const cs = getComputedStyle(ta);
+  m.style.fontFamily = cs.fontFamily;
+  m.style.fontSize = cs.fontSize;
+  m.style.fontWeight = cs.fontWeight;
+  m.style.fontStyle = cs.fontStyle;
+  m.style.letterSpacing = cs.letterSpacing;
+  m.style.lineHeight = cs.lineHeight;
+  m.style.padding = cs.padding;
+  m.style.border = cs.border;
+  m.style.boxSizing = cs.boxSizing;
+  const txt = ta.value || ta.placeholder || '';
+  const lines = txt.split('\n');
+  let maxW = 0;
+  for (const line of lines) {
+    m.textContent = line.length ? line : ' ';
+    if (m.offsetWidth > maxW) maxW = m.offsetWidth;
+  }
+  // CSS max-width 와 동일한 상한 — JS 에서도 명시(인라인 width 가 max-width 보다 우선되므로 직접 clamp).
+  const maxW_ = Math.min(200, window.innerWidth - 32);
+  // +1 픽셀 안전 마진(반올림/서브픽셀 회피)
+  const w = Math.min(maxW_, Math.max(18, maxW + 1));
+  ta.style.width = w + 'px';
+}
+
 // [7번] PC 전용 외부 텍스트 입력바 — 출력화면 하단 중앙(#pcTextBar). 페이지 init 시 한 번 호출.
 //   panel.open 여부와 무관하게 항상 표시 (모바일에선 CSS 로 hidden).
 function setupPcTextBar() {
@@ -6029,6 +6069,7 @@ function setupPcTextBar() {
     document.documentElement.style.setProperty('--pc-textbar-h', h + 'px');
   };
   const _adjustTaHeight = () => {
+    if (typeof _adjustMainTextWidth === 'function') _adjustMainTextWidth(ta);
     ta.style.height = 'auto';
     ta.style.height = ta.scrollHeight + 'px';
     _syncTextBarHeight();
@@ -6055,7 +6096,8 @@ function setupPcTextBar() {
   // [v1.10b] Enter = 행갈이(브라우저 기본 동작). 입력 종료는 blur(다른 곳 클릭) 로 처리.
   host.appendChild(ta);
   requestAnimationFrame(_adjustTaHeight);
-  window.addEventListener('resize', _syncTextBarHeight);
+  // [v1.11b] 화면 폭 변경 시 max-width(min(200px, vw-32))가 달라질 수 있으므로 폭도 함께 재조정
+  window.addEventListener('resize', _adjustTaHeight);
 }
 
 function buildPanel() {
@@ -11957,6 +11999,17 @@ function setupCustomTooltips() {
     if (_ttTimer) { clearTimeout(_ttTimer); _ttTimer = null; }
     if (tt.classList.contains('show')) tt.classList.remove('show');
   }, true);  // capture phase — 핸들러 체인에서 가장 먼저 실행
+  // [v1.11b] 모바일 터치에서는 mouseout 이 자연 발생하지 않아 — 손을 뗀 뒤에도 호버 툴팁이 화면에 잔존.
+  //   touchstart → mouseover 합성 → 1초 후 툴팁 show. 그 사이 touchend 가 와도 mouseout 미발생.
+  //   → pointerup/touchend/touchcancel 시점에 타이머·표시 모두 강제 해제.
+  const _hideTooltipNow = () => {
+    if (_ttTimer) { clearTimeout(_ttTimer); _ttTimer = null; }
+    if (tt.classList.contains('show')) tt.classList.remove('show');
+  };
+  document.addEventListener('pointerup', _hideTooltipNow, true);
+  document.addEventListener('pointercancel', _hideTooltipNow, true);
+  document.addEventListener('touchend', _hideTooltipNow, true);
+  document.addEventListener('touchcancel', _hideTooltipNow, true);
 }
 
 requestAnimationFrame(() => {
