@@ -219,9 +219,10 @@
   /* [v1.09] PC 전용 외부 텍스트 입력바 — 화면 좌측 상단(HUD 와 위치 교환). 설정창 폭(288px) 와 동일.
        top: 24px 로 설정창 top 과 동일 y 에서 시작 — '텍스트' 라벨이 설정창 첫 그룹 '밀도' 라벨과 같은 행 높이. */
   /* [v1.10b] 폭 고정 200px (사용자 요청 — 가변 폭 폐기). textarea 가 부모 폭 100% 사용. */
-  #pcTextBar { position: fixed; left: calc(var(--ui-gap) - var(--sbw) + 11px); transform: none; top: 24px; bottom: auto; width: 200px; max-width: calc(100vw - 32px); z-index: 90; font-family: sans-serif; font-size: 10px; letter-spacing: 0.5px; line-height: 1.4; color: currentColor; pointer-events: auto; box-sizing: border-box; padding-left: 8px; }
+  #pcTextBar { position: fixed; left: calc(var(--ui-gap) - var(--sbw) + 11px); transform: none; top: 24px; bottom: auto; width: -moz-fit-content; width: fit-content; max-width: min(200px, calc(100vw - 32px)); z-index: 90; font-family: sans-serif; font-size: 10px; letter-spacing: 0.5px; line-height: 1.4; color: currentColor; pointer-events: auto; box-sizing: border-box; padding-left: 8px; }
   /* 제목은 설정창 내부 .groupTitle 와 동일 디자인 (className 으로 위임). 별도 override 없음. */
-  #pcTextBar #mainText { width: 100%; resize: none; overflow-y: hidden; padding: 4px 6px; border: 1px solid currentColor; background: transparent; color: currentColor; font-family: inherit; font-size: 10px; line-height: 1.4; letter-spacing: 0.5px; outline: none; box-sizing: border-box; min-height: 24px; opacity: 1; scrollbar-width: thin; scrollbar-color: currentColor transparent; }
+  /* [v1.11b] 입력창 — 동적 배경(--editor-bg) + 텍스트 폭에 딱 맞춰 자동 조절(JS 가 inline width 부여, max 200px). */
+  #pcTextBar #mainText { width: auto; max-width: min(200px, calc(100vw - 32px)); resize: none; overflow-y: hidden; padding: 4px 6px; border: 1px solid currentColor; background: var(--editor-bg, transparent); color: currentColor; font-family: inherit; font-size: 10px; line-height: 1.4; letter-spacing: 0.5px; outline: none; box-sizing: border-box; min-height: 24px; min-width: 18px; opacity: 1; scrollbar-width: thin; scrollbar-color: currentColor transparent; }
   #pcTextBar #mainText::-webkit-scrollbar { width: 8px; height: 8px; }
   #pcTextBar #mainText::-webkit-scrollbar-thumb { background: currentColor; opacity: 0.16; }
   #pcTextBar #mainText::placeholder { color: inherit; opacity: 0.45; }
@@ -1385,7 +1386,8 @@ function applyRandomText() {
   const ta = document.getElementById('mainText');
   if (ta) {
     ta.value = TEXT;
-    // 프로그램적 변경이라 input 이벤트가 발생하지 않음 → 자동 높이 직접 재조정
+    // 프로그램적 변경이라 input 이벤트가 발생하지 않음 → 자동 높이·폭 직접 재조정
+    if (typeof _adjustMainTextWidth === 'function') _adjustMainTextWidth(ta);
     ta.style.height = 'auto';
     ta.style.height = ta.scrollHeight + 'px';
     // [v1.10b] 입력바 컨테이너 높이 변동을 --pc-textbar-h 에 동기화 → HUD top 이 따라 내려감.
@@ -2766,7 +2768,10 @@ function subdivideJamoOriented(jamo, kH, kV) {
   if (E === 0) return deepClone(jamo);
   const counts = new Array(E).fill(0);
   for (let k = 0; k < E; k++) {
-    const a = jamo.nodes[jamo.edges[k][0]], b = jamo.nodes[jamo.edges[k][1]];
+    const e = jamo.edges[k];
+    // [v1.12b] 투명획 분절 금지 — 슬라이더(가로/세로)·모임꼴 박스 칸수 모두 inv 엣지는 노드 추가 안 함.
+    if (e.length > 2 && e[2] === 'inv') continue;
+    const a = jamo.nodes[e[0]], b = jamo.nodes[e[1]];
     const dx = Math.abs(b.x - a.x), dy = Math.abs(b.y - a.y);
     if (dx + dy < 0.001) continue;  // 0 길이 엣지 제외
     const r = Math.atan2(dy, dx) / (Math.PI / 2);  // 0=가로, 1=세로
@@ -2841,18 +2846,22 @@ function addRandomNodesOnEdges(jamo, count) {
   }), edges: [], strokes: jamo.strokes.map(s => s.slice()) };
   const edgesMut = jamo.edges.map(e => e.slice());
   for (let i = 0; i < count; i++) {
-    let ei = 0, bestLen = -1;
+    let ei = -1, bestLen = -1;
     for (let k = 0; k < edgesMut.length; k++) {
-      const aN = out.nodes[edgesMut[k][0]], bN = out.nodes[edgesMut[k][1]];
+      const _e = edgesMut[k];
+      // [v1.12b] 투명획 노드추가 금지 — inv 엣지는 후보에서 제외.
+      if (_e.length > 2 && _e[2] === 'inv') continue;
+      const aN = out.nodes[_e[0]], bN = out.nodes[_e[1]];
       const len = Math.hypot(bN.x - aN.x, bN.y - aN.y);
       if (len > bestLen) { bestLen = len; ei = k; }
     }
+    if (ei < 0) break;  // 가용 일반 엣지가 없음 (모두 투명) → 더 추가 못 함
     const [a, b] = edgesMut[ei];
     const t = 0.5;
     const na = out.nodes[a], nb = out.nodes[b];
     const newIdx = out.nodes.length;
     const _origEdge = edgesMut[ei];
-    const _isInv = _origEdge.length > 2 && _origEdge[2] === 'inv';
+    const _isInv = _origEdge.length > 2 && _origEdge[2] === 'inv';  // 위 필터로 항상 false 지만 안전 보존
     const _newN = { x: na.x + (nb.x - na.x) * t, y: na.y + (nb.y - na.y) * t };
     if (_isInv) _newN.inv = true;
     if (na.jSrc) _newN.jSrc = na.jSrc;
@@ -3651,8 +3660,9 @@ function _computeMagnetPairs(nodes, nodeJamos, ch) {
 function buildWorld(str) {
   // 통일된 점 간격을 글자 렌더링 SCALE 기준으로 사용
   const SCALE = Math.max(PARAMS.pointDist, 4);
-  // 자간/행간 — 슬라이더 값 그대로 사용. 자동 보정은 randomizeAll에서만 적용.
-  const letterSpacing = PARAMS.letterSpacing;
+  // 자간 — 슬라이더 값 × 0.5 (v1.12b A/B 테스트 결과 — 사용자 결정).
+  //   자동 보정은 randomizeAll에서만 적용.
+  const letterSpacing = PARAMS.letterSpacing * 0.5;
   const lineHeight = Math.max(40, PARAMS.lineHeight);
   const spaceWidth = SCALE * 1; // 공백 — 글자폭의 절반 (이전 *2의 절반)
   // 6개 자모별 길이 슬라이더는 buildToken 내부에서 PARAMS 직접 참조
@@ -3737,6 +3747,15 @@ function buildWorld(str) {
     //   (요청 "성공 시 모든 자간/행간 동일 계산"의 전역 확대는 후속 단계 — F7 은 비한글 우선)
     return { type: 'glyph', token: t, width: Math.max(w, SCALE * 0.5) };
   });
+
+  // [v1.12b] 자간 슬롯 폭 일정 모드 (A/B 테스트 결과 — 사용자 결정).
+  //   모든 글자가 동일 advance 폭 사용 → 글자 BBox 폭 차이로 인한 자간 불균질 인식 해소.
+  //   각 글리프는 슬롯 중앙에 정렬.
+  {
+    let _maxGW = 0;
+    items.forEach(it => { if (it.type === 'glyph' && it.width > _maxGW) _maxGW = it.width; });
+    if (_maxGW > 0) items.forEach(it => { if (it.type === 'glyph') it.width = _maxGW; });
+  }
 
   // 단어 단위로 묶기: 공백/줄바꿈이 분리자
   const units = []; // { type: 'word'|'space'|'newline', items?, width? }
@@ -4215,6 +4234,61 @@ function drawNodeShape(n, r) {
   ctx.fill();
 }
 
+// [v1.11b 테스트] iPad/Safari (17.x 이하 + iOS Safari 모두) 의 ctx.filter='blur(...)' 미지원
+//   대응용 JS 박스블러 (분리형 슬라이딩 윈도 × 3패스 ≈ Gaussian). 알파 채널만 처리.
+//   픽셀당 O(1) 슬라이딩 윈도 → 반경 무관 일정 시간. 화면 픽셀 수에만 비례.
+function _jsBoxBlurAlpha(imgData, radiusPx) {
+  const W = imgData.width, H = imgData.height;
+  if (W <= 0 || H <= 0) return;
+  const r = Math.max(1, Math.round(radiusPx));
+  const d = imgData.data;
+  const N = W * H;
+  let src = new Float32Array(N);
+  let dst = new Float32Array(N);
+  for (let i = 0, j = 3; i < N; i++, j += 4) src[i] = d[j];
+  const div = 2 * r + 1;
+  const ITER = 3;
+  for (let k = 0; k < ITER; k++) {
+    // 가로 패스
+    for (let y = 0; y < H; y++) {
+      const row = y * W;
+      let sum = 0;
+      for (let x = -r; x <= r; x++) {
+        const sx = x < 0 ? 0 : (x >= W ? W - 1 : x);
+        sum += src[row + sx];
+      }
+      for (let x = 0; x < W; x++) {
+        dst[row + x] = sum / div;
+        const lx = x - r;
+        const rx = x + r + 1;
+        sum -= src[row + (lx < 0 ? 0 : lx)];
+        sum += src[row + (rx >= W ? W - 1 : rx)];
+      }
+    }
+    { const t = src; src = dst; dst = t; }
+    // 세로 패스
+    for (let x = 0; x < W; x++) {
+      let sum = 0;
+      for (let y = -r; y <= r; y++) {
+        const sy = y < 0 ? 0 : (y >= H ? H - 1 : y);
+        sum += src[sy * W + x];
+      }
+      for (let y = 0; y < H; y++) {
+        dst[y * W + x] = sum / div;
+        const ly = y - r;
+        const ry = y + r + 1;
+        sum -= src[(ly < 0 ? 0 : ly) * W + x];
+        sum += src[(ry >= H ? H - 1 : ry) * W + x];
+      }
+    }
+    { const t = src; src = dst; dst = t; }
+  }
+  for (let i = 0, j = 3; i < N; i++, j += 4) {
+    const v = src[i];
+    d[j] = v < 0 ? 0 : (v > 255 ? 255 : v);
+  }
+}
+
 // ── 부드럽게 (픽셀 마스크 + blur + threshold) — 변수 슬라이더 노출 ──
 function smoothedTotalWidth() { return Math.max(0, PARAMS.lineW || 0); }
 
@@ -4296,13 +4370,13 @@ function drawSmoothedBodies(targetCtx, bodies, fg, bg) {
     });
   });
 
-  // 모퉁이 둥글리기 — blur + threshold
+  // 모퉁이 둥글리기 — JS 박스블러 + 알파 임계값
+  //   ctx.filter='blur' 네이티브 경로는 Safari 17.x 이하 미지원 → A/B 테스트 결과 JS 경로로 통합 (v1.12b).
   if (cornerR > 0) {
     mctx.setTransform(1, 0, 0, 1, 0, 0);  // scale 해제
-    mctx.filter = 'blur(' + (cornerR * BLUR_F * SCALE) + 'px)';
-    mctx.drawImage(mask, 0, 0);
-    mctx.filter = 'none';
+    const _blurPx = cornerR * BLUR_F * SCALE;
     const imgData = mctx.getImageData(0, 0, W * SCALE, H * SCALE);
+    _jsBoxBlurAlpha(imgData, _blurPx);
     const d = imgData.data;
     for (let i = 0; i < d.length; i += 4) {
       d[i + 3] = d[i + 3] > A_THR ? 255 : 0;
@@ -4435,10 +4509,10 @@ function drawBorders(targetCtx, bodies, fg) {
   if (cornerR > 0) {
     const BLUR_F = Math.max(0, PARAMS.blurFactor || 0.5);
     const A_THR = Math.max(0, Math.min(255, Math.round(PARAMS.alphaThreshold ?? 128)));
-    rctx.filter = 'blur(' + (cornerR * BLUR_F * S) + 'px)';
-    rctx.drawImage(_bdRing, 0, 0);
-    rctx.filter = 'none';
+    const _blurPx = cornerR * BLUR_F * S;
+    // JS 박스블러로 통합 (v1.12b) — 윤곽 밴드도 동일 처리.
     const im = rctx.getImageData(0, 0, MW, MH);
+    _jsBoxBlurAlpha(im, _blurPx);
     const dd = im.data;
     for (let k = 0; k < dd.length; k += 4) dd[k + 3] = dd[k + 3] > A_THR ? 255 : 0;
     rctx.putImageData(im, 0, 0);
@@ -5986,6 +6060,44 @@ const DICE_FACES = ['⚀','⚁','⚂','⚃','⚄','⚅'];
 const DEFAULT_DIE = '⚂';
 function randomDieFace() { return DICE_FACES[Math.floor(Math.random() * DICE_FACES.length)]; }
 
+// [v1.11b] #mainText 폭을 입력 텍스트(또는 placeholder) 폭에 딱 맞게 조절.
+//   숨김 미러 div 로 가장 긴 줄을 측정 → ta.style.width 인라인 부여. max 200px(또는 viewport-32).
+//   max 도달 시 자동 행갈이(높이는 _adjustTaHeight 가 별도로 처리).
+let _mainTextMirror = null;
+function _adjustMainTextWidth(ta) {
+  if (!ta) ta = document.getElementById('mainText');
+  if (!ta) return;
+  if (!_mainTextMirror) {
+    _mainTextMirror = document.createElement('div');
+    _mainTextMirror.setAttribute('aria-hidden', 'true');
+    _mainTextMirror.style.cssText = 'position:absolute;left:-9999px;top:-9999px;visibility:hidden;white-space:pre;pointer-events:none;';
+    document.body.appendChild(_mainTextMirror);
+  }
+  const m = _mainTextMirror;
+  const cs = getComputedStyle(ta);
+  m.style.fontFamily = cs.fontFamily;
+  m.style.fontSize = cs.fontSize;
+  m.style.fontWeight = cs.fontWeight;
+  m.style.fontStyle = cs.fontStyle;
+  m.style.letterSpacing = cs.letterSpacing;
+  m.style.lineHeight = cs.lineHeight;
+  m.style.padding = cs.padding;
+  m.style.border = cs.border;
+  m.style.boxSizing = cs.boxSizing;
+  const txt = ta.value || ta.placeholder || '';
+  const lines = txt.split('\n');
+  let maxW = 0;
+  for (const line of lines) {
+    m.textContent = line.length ? line : ' ';
+    if (m.offsetWidth > maxW) maxW = m.offsetWidth;
+  }
+  // CSS max-width 와 동일한 상한 — JS 에서도 명시(인라인 width 가 max-width 보다 우선되므로 직접 clamp).
+  const maxW_ = Math.min(200, window.innerWidth - 32);
+  // +1 픽셀 안전 마진(반올림/서브픽셀 회피)
+  const w = Math.min(maxW_, Math.max(18, maxW + 1));
+  ta.style.width = w + 'px';
+}
+
 // [7번] PC 전용 외부 텍스트 입력바 — 출력화면 하단 중앙(#pcTextBar). 페이지 init 시 한 번 호출.
 //   panel.open 여부와 무관하게 항상 표시 (모바일에선 CSS 로 hidden).
 function setupPcTextBar() {
@@ -6029,6 +6141,7 @@ function setupPcTextBar() {
     document.documentElement.style.setProperty('--pc-textbar-h', h + 'px');
   };
   const _adjustTaHeight = () => {
+    if (typeof _adjustMainTextWidth === 'function') _adjustMainTextWidth(ta);
     ta.style.height = 'auto';
     ta.style.height = ta.scrollHeight + 'px';
     _syncTextBarHeight();
@@ -6055,7 +6168,8 @@ function setupPcTextBar() {
   // [v1.10b] Enter = 행갈이(브라우저 기본 동작). 입력 종료는 blur(다른 곳 클릭) 로 처리.
   host.appendChild(ta);
   requestAnimationFrame(_adjustTaHeight);
-  window.addEventListener('resize', _syncTextBarHeight);
+  // [v1.11b] 화면 폭 변경 시 max-width(min(200px, vw-32))가 달라질 수 있으므로 폭도 함께 재조정
+  window.addEventListener('resize', _adjustTaHeight);
 }
 
 function buildPanel() {
@@ -8087,12 +8201,34 @@ function saveSVG() {
   const bg = currentBgColor();
   const lineW = PARAMS.lineW;
   const nodeR = PARAMS.nodeR / 2;
+  // [v1.12b] SVG 부드럽게 — 캔버스의 JS 박스블러 + 알파 임계값 파이프라인을
+  //   SVG feGaussianBlur + feComponentTransfer(linear, steep slope) + feFlood + feComposite 로 근사.
+  //   캔버스 픽셀 라이드의 SCALE 슈퍼샘플은 SVG 벡터에서는 불필요 → 표시 픽셀 단위 그대로.
+  const _smR = Math.max(0, PARAMS.cornerR || 0);
+  const _BLUR_F = Math.max(0, PARAMS.blurFactor || 0.5);
+  const _A_THR = Math.max(0, Math.min(255, Math.round(PARAMS.alphaThreshold ?? 128)));
+  const _useSmooth = _smR > 0;
   const parts = [];
   parts.push('<?xml version="1.0" encoding="UTF-8"?>');
   parts.push('<svg xmlns="http://www.w3.org/2000/svg" viewBox="' + X + ' 0 ' + W + ' ' + H + '" width="' + W + '" height="' + H + '">');
   parts.push('<rect x="' + X + '" y="0" width="' + W + '" height="' + H + '" fill="' + bg + '"/>');
-  parts.push('<g fill="' + fg + '" stroke="' + fg + '" stroke-linecap="round">');
-  // SVG: 일반 획·노드 (부드럽게는 SVG에 적용 안 됨 — 픽셀 처리 한정)
+  if (_useSmooth) {
+    const _stdDev = _smR * _BLUR_F;
+    const _T = _A_THR / 255;
+    const _slope = 50;                    // 가파른 기울기 → 임계값 근방에서 사실상 step
+    const _intercept = 0.5 - _slope * _T; // y = slope·x + intercept, x=T 에서 y=0.5
+    const _pad = Math.ceil(_stdDev * 4 + 4);  // 블러 확산 여유 (가우시안 꼬리 ≈ 3σ)
+    parts.push('<defs>');
+    parts.push('<filter id="mhSmooth" filterUnits="userSpaceOnUse" x="' + (X - _pad) + '" y="' + (-_pad) + '" width="' + (W + 2 * _pad) + '" height="' + (H + 2 * _pad) + '" color-interpolation-filters="sRGB">');
+    parts.push('<feGaussianBlur in="SourceAlpha" stdDeviation="' + _stdDev.toFixed(3) + '" result="b"/>');
+    parts.push('<feComponentTransfer in="b" result="m"><feFuncA type="linear" slope="' + _slope + '" intercept="' + _intercept.toFixed(4) + '"/></feComponentTransfer>');
+    parts.push('<feFlood flood-color="' + fg + '" result="c"/>');
+    parts.push('<feComposite in="c" in2="m" operator="in"/>');
+    parts.push('</filter>');
+    parts.push('</defs>');
+  }
+  parts.push('<g fill="' + fg + '" stroke="' + fg + '" stroke-linecap="round"' + (_useSmooth ? ' filter="url(#mhSmooth)"' : '') + '>');
+  // SVG: 일반 획·노드 (부드럽게는 _useSmooth 시 SVG <filter> 로 적용)
   world.bodies.forEach(body => {
     body.edges.forEach(e => {
       if (e.transparent) return;  // 투명 획 비표시
@@ -11957,6 +12093,17 @@ function setupCustomTooltips() {
     if (_ttTimer) { clearTimeout(_ttTimer); _ttTimer = null; }
     if (tt.classList.contains('show')) tt.classList.remove('show');
   }, true);  // capture phase — 핸들러 체인에서 가장 먼저 실행
+  // [v1.11b] 모바일 터치에서는 mouseout 이 자연 발생하지 않아 — 손을 뗀 뒤에도 호버 툴팁이 화면에 잔존.
+  //   touchstart → mouseover 합성 → 1초 후 툴팁 show. 그 사이 touchend 가 와도 mouseout 미발생.
+  //   → pointerup/touchend/touchcancel 시점에 타이머·표시 모두 강제 해제.
+  const _hideTooltipNow = () => {
+    if (_ttTimer) { clearTimeout(_ttTimer); _ttTimer = null; }
+    if (tt.classList.contains('show')) tt.classList.remove('show');
+  };
+  document.addEventListener('pointerup', _hideTooltipNow, true);
+  document.addEventListener('pointercancel', _hideTooltipNow, true);
+  document.addEventListener('touchend', _hideTooltipNow, true);
+  document.addEventListener('touchcancel', _hideTooltipNow, true);
 }
 
 requestAnimationFrame(() => {
