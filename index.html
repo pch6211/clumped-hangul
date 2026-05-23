@@ -3,7 +3,7 @@
 <html lang="ko"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-<title>뭉친 한글 Clumped Hangul v.1.10</title>
+<title>뭉친 한글 Clumped Hangul v.1.11</title>
 <meta name="description" content="">
 <!-- Google AdSense 로더 (퍼블리셔 ca-pub-7237044319292911) — 우하단 광고 박스용 -->
 <!-- [v1.09] AdSense 승인 대기 중 — 일단 mute. 승인 후 아래 라인 주석 해제. -->
@@ -21,90 +21,6 @@
   /* 모바일 전용: 햄버거 메뉴(☰) / 패널 우상단 뒤로가기(←) — 데스크탑에서는 숨김 */
   #mobileMenuBtn, #panelMobileBack, #mobileMenuDie { display: none; }  /* ID selector — .stageBtn(class) 보다 우위 → PC 에서 확실히 숨김 */
   /* 모바일 (≤ 600px) — 자동 감상모드만, UI 모두 숨김 + 하단 텍스트 입력바만 노출 */
-  @media (max-width: 600px) {
-    .panel, .editor, #hud, #cwTooltipEl, #introPanel, .ccFooter { display: none !important; }
-    /* 세로 스택: "텍스트" 라벨 → (줄 띄고) → 입력창. 가로줄 없음. 좌우 여백 = 아래 여백(36px).
-       바 자체는 투명(캔버스 비침), 입력창 안만 동적 배경색. */
-    #mobileTextBar {
-      display: flex; flex-direction: column; align-items: stretch; gap: 4px;
-      position: fixed; left: 0; right: 0; bottom: 0; z-index: 120;
-      box-sizing: border-box; padding: 9px 24px 24px;
-      background: transparent; color: var(--editor-fg, currentColor);
-      font-family: sans-serif; font-size: 10px; letter-spacing: 0.5px;
-      pointer-events: auto;
-    }
-    #mobileTextBar .mtbLabel { align-self: flex-start; display: inline-flex; align-items: center; gap: 4px; }
-    /* 모바일 입력바 라벨 옆 주사위 — .panel .groupTitle .die 와 동일 규칙(가운데 정렬, 14px) */
-    #mobileTextBar .die { display: inline-flex; align-items: center; justify-content: center; font-size: 15px; line-height: 1; height: 15px; cursor: pointer; user-select: none; padding: 0 2px; opacity: 1; vertical-align: middle; }
-    #mobileTextBar .die.rolling { pointer-events: none; }
-    #mobileTextBar textarea {
-      width: 100%; resize: none; overflow-y: auto;
-      max-height: 30vh; min-height: 22px; box-sizing: border-box; padding: 4px 6px;
-      background: var(--editor-bg, transparent); color: var(--editor-fg, currentColor);
-      border: 1px solid currentColor; border-radius: 0; outline: none;
-      font-family: inherit; font-size: 10px; line-height: 1.4; letter-spacing: 0.5px;
-    }
-    /* 모바일 햄버거 메뉴 버튼(☰) — 좌상단 고정. 속성창 열기. ✕/▩/⚀ 와 동일하게 특수문자 자체가 버튼.
-       위치: 입력바 좌·하 패딩(24px) 와 정렬 — top·left 24px 인셋. 크기·정렬 규칙은 .die(14px) 와 통일. */
-    #mobileMenuBtn {
-      display: inline-flex; align-items: center; justify-content: center;
-      position: fixed; top: 24px; left: 24px; z-index: 130;
-      height: 15px; line-height: 1;
-      font-family: sans-serif; font-size: 15px;
-      color: var(--editor-fg, currentColor); background: transparent;
-      cursor: pointer; user-select: none; pointer-events: auto;
-      vertical-align: middle;
-    }
-    /* [v1.09] 모바일 전역 주사위 (R = 전체 랜덤) — 햄버거 같은 줄 우상단 고정 */
-    #mobileMenuDie {
-      display: inline-flex; align-items: center; justify-content: center;
-      position: fixed; top: 24px; right: 24px; z-index: 220;  /* 패널(200) 위 */
-      height: 15px; line-height: 1;
-      font-family: sans-serif; font-size: 15px;
-      color: var(--editor-fg, currentColor); background: transparent;
-      cursor: pointer; user-select: none; pointer-events: auto;
-      vertical-align: middle; padding: 0 2px;
-    }
-    /* 패널 열렸을 때 햄버거·주사위·하단 입력바 숨김 */
-    /* 패널 열렸을 때 햄버거·하단 입력바 숨김. [v1.09] 주사위(#mobileMenuDie)는 자리 유지. */
-    /* 패널 = 화면 좌측 3/4 오버레이. 우측 1/4 영역은 캔버스(출력화면)가 보임.
-       우측 끝에 1px 선 = 패널 div 의 우측 경계. 좌우 여백은 모바일 입력바(24px)와 동일 톤.
-       (3/4 폭 = 하단 SVG/PNG/SAVE/LOAD 4 버튼이 한 줄에 들어가도록 — F8) */
-    .panel.open {
-      display: block !important;
-      position: fixed;
-      top: 0; left: 0; bottom: 0; right: auto;
-      width: calc(100vw * 3 / 4); height: 100vh; max-width: none;
-      padding: 24px 24px 24px;  /* [v1.09] ✕ 닫기 버튼 삭제 → padding-top 48 → 24 (콘텐츠 위로 24px 이동) */
-      background: var(--editor-bg, #fff);
-      color: var(--editor-fg, currentColor);
-      border-right: 1px solid var(--editor-fg, currentColor);
-      z-index: 200;
-      overflow-y: auto; overflow-x: hidden;
-      box-sizing: border-box;
-      direction: ltr;  /* 모바일은 RTL 스크롤바 트릭 해제 */
-    }
-    .panel.open > * { direction: ltr; }
-    /* 패널 열렸을 때 햄버거·하단 입력바 숨김(중복 표시 방지 + 우측 1/3 캔버스 깔끔히 보임) */
-    body.panel-open #mobileMenuBtn,
-    body.panel-open #mobileTextBar { display: none !important; }
-    /* 패널 안의 텍스트 입력창·가이드는 모바일에서 숨김
-       (텍스트 입력은 외부 #mobileTextBar 로 일원화, 가이드는 PC 전용) */
-    .panel.open #panelTextTitle,
-    .panel.open #mainText,
-    .panel.open #panelGuide { display: none !important; }
-    /* 패널 우상단 닫기(✕) — 패널의 우측 경계(3/4 지점) 안쪽 24px(패널 padding-right) 에 고정.
-       다른 팝업 닫기 버튼(.stageBtn.closeX) 과 동일 font-size 10px. */
-    .panel.open #panelMobileBack {
-      display: inline-flex; align-items: center; justify-content: center;
-      position: fixed; top: 24px; right: calc((100vw / 4) + 24px); z-index: 210;
-      height: 14px; line-height: 1;
-      font-family: sans-serif; font-size: 10px;
-      color: var(--editor-fg, currentColor); background: var(--editor-bg, transparent);
-      cursor: pointer; user-select: none;
-      vertical-align: middle;
-    }
-  }
   #universe { position: fixed; inset: 0; width: 100vw; height: 100vh; display: block; background: transparent; cursor: default; }
   #universe.near-node { cursor: grab; }
   #universe.dragging { cursor: grabbing; }
@@ -156,48 +72,8 @@
   #mhAdSlot::after { content: ''; position: absolute; inset: 0; z-index: 2;
     border: 1px solid currentColor; box-sizing: border-box; pointer-events: none; }
   /* [B2/G1] 모바일 — 광고·우하단 버튼 없음 */
-  @media (max-width: 600px) {
-    #mhBottomBtns, #mhAdBox { display: none !important; }
-  }
 
   /* ── 모바일 (가로폭 600px 이하) — 여백·텍스트 크기 2/3 축소 ── */
-  @media (max-width: 600px) {
-    :root { --ui-gap: 7px; }  /* 메인 화면 마진 좌·우 각 추가 -5px (12→7) */
-    /* CC 푸터 가운데 정렬 (모바일) */
-    .ccFooter { right: auto; left: 50%; transform: translateX(-50%); }
-    body, .panel, .editor, .hud, .ccFooter,
-    .mhDialog, .mhContextMenu, .panel textarea,
-    .editor .sidebar textarea {
-      font-size: 7px;
-    }
-    .panel .pillBtn, .editor .pillBtn, .mhDialog .pillBtn,
-    .editor .jamoBtn, .editor .jamoGrid > .gridFiller {
-      font-size: 7px;
-    }
-    /* 모바일 한정 — 하단 4 버튼(SVG/PNG/SAVE/LOAD) 한 줄에 들어가도록 패딩 축소 (F8) */
-    .panel .pillBtn { padding: 5px 10px; }
-    /* 모바일 한정 — 슬라이더 행 라벨 컬럼 65 → 80px (사용자 요청: 슬라이더 바 15px 줄임) */
-    .panel .row { grid-template-columns: 1fr 80px; }
-    /* 모바일에서 PC 텍스트바 숨김 — 입력은 하단 #mobileTextBar 에 일원화 */
-    #pcTextBar { display: none !important; }
-    /* 모바일에서 HUD 박스 padding 축소 (단축키 안내는 모바일에서 짧음) */
-    .hud { padding: 6px 10px; }
-    /* 모바일 HUD 는 인라인 (PC 의 block 행갈이 오버라이드) */
-    .hud .hudItem { display: inline-block; margin-right: 10px; }
-    .hud .hudItem:last-child { margin-right: 0; }
-    .panel { width: 198px; top: 16px; }
-    .editor .sidebar { width: 188px; top: 16px; }
-    /* [v1.10b] 모바일도 right 오프셋 제거 — 사이드바 폭 기반 자동 이동 폐기. */
-    .editor .stage { right: auto; top: 16px; }
-    .hud, .ccFooter { top: auto; bottom: 14px; }
-    /* 모바일은 panel-open 시 HUD 시프트 안 함 (어차피 모바일 패널은 좌측 3/4 차지) */
-    body.panel-open .hud { transform: none; }
-    .panel .btnRow, .editor .btnRow, .editor .toolBtnBottomRow,
-    .mhDialog .mhMeta, .mhDialog .mhActions, .panel .feedbackActions,
-    .mhQRRow, .mhControls,
-    .editor .stage .meta { gap: 5px; }
-    .panel .btnRow + .btnRow { margin-top: 5px; }
-  }
   /* ── 공통 다이얼로그 (의견 보내기 / 후원 QR) — editor stage 디자인 일치 ── */
   /* 통일 규칙:
        - padding 10px 사방
@@ -772,7 +648,7 @@
    ║  • 기능 ON/OFF 플래그 :                                                     ║
    ║      - MH_CFG.params.wallOn  : 화면 가장자리 벽 반발 (기본 false).          ║
    ║      - 모바일 판정/동작     : 검색 → "function isMobile("                   ║
-   ║      - 인트로 표시          : localStorage 'mh_intro_hide' (체크박스로 토글)║
+   ║      - 인트로 표시          : localStorage 'mh_intro_hide_v1.11' (체크박스로 토글)║
    ║  • 자모/문자 사방 마진(T/B/L/R) : 자모 편집창에는 UI 없음(박스가 스폰 결정). ║
    ║      디자인 JSON 의 각 글자 "margins":{T,B,L,R} 로 저장됨. 합성 진입점       ║
    ║      getJamoMargins 에서 ÷COORD_SCALE 되어 적용. 검색 → "getJamoMargins".   ║
@@ -811,9 +687,14 @@ const MH_CFG = {
   //   (코드의 const PARAMS 는 이 객체를 그대로 가리킴 — 단일 출처.)
   params: {
     pointDist: 16,       // 점 간격 (자음·모음 통일)
-    skelWidth: 0,        // [F1] 너비 — 모든 초·중·종성 가로획에 점 N개 길이무관 랜덤 분배(가로 가중)
-    skelHeight: 0,       // [F1] 높이 — 모든 초·중·종성 세로획에 점 N개 길이무관 랜덤 분배(세로 가중)
-    randomExtra: 0,      // [F1] 임의 획 추가 — 모든 획에 가중없이 길이무관 랜덤 분배
+    // [v1.11/v1.05] 자모별 6 골격 슬라이더 — 자모 종류(cho/jung/jong) × 방향(Horiz/Vert)
+    choHoriz: 0,         // 초성 가로 분할
+    choVert: 0,          // 초성 세로 분할
+    jungHoriz: 0,        // 중성 가로 분할
+    jungVert: 0,         // 중성 세로 분할
+    jongHoriz: 0,        // 종성 가로 분할
+    jongVert: 0,         // 종성 세로 분할
+    randomExtra: 0,      // 임의 획 추가 — 모든 획에 가중없이 길이무관 랜덤 분배
     gravity: 4,          // 뭉치는 힘 (글자 중심 당기는 힘)
     letterSpacing: 10,   // 글자 간격
     lineHeight: 60,      // 행 간격
@@ -1021,7 +902,7 @@ function _scaleDefsMap(map, f) {
 _scaleDefsMap(PRIMITIVES, COORD_SCALE);
 if (typeof FACTORY_DEFAULTS !== 'undefined') _scaleDefsMap(FACTORY_DEFAULTS, COORD_SCALE);
 /* #13 Task3 - attached jamo JSON embedded as default. meta.coordScale:2 == COORD_SCALE so NO extra scaling. Overwrites FACTORY_DEFAULTS/PRIMITIVES (reset restores to this). */
-const EMBEDDED_DEFAULT_JSON = {"designs":{"0":{"nodes":[{"x":9,"y":7,"isBase":true},{"x":8,"y":9,"isBase":true},{"x":9,"y":10,"isBase":true},{"x":10,"y":9,"isBase":true},{"x":10,"y":8,"isBase":true},{"x":8,"y":8,"isBase":true}],"edges":[[1,2],[2,3],[0,4],[4,3],[5,0],[5,1],[4,1]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"1":{"nodes":[{"x":8,"y":10,"isBase":true},{"x":9,"y":10,"isBase":true},{"x":10,"y":10,"isBase":true},{"x":9,"y":7,"isBase":true},{"x":8,"y":8,"isBase":true},{"x":9,"y":8,"isBase":true},{"x":9,"y":9,"isBase":true}],"edges":[[0,1],[1,2],[3,4],[5,3],[1,6],[6,5]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"2":{"nodes":[{"x":8,"y":8,"isBase":true},{"x":9,"y":7,"isBase":true},{"x":10,"y":8,"isBase":true},{"x":8,"y":10,"isBase":true},{"x":10,"y":10,"isBase":true},{"x":9,"y":9,"isBase":true}],"edges":[[0,1],[1,2],[3,4],[2,5],[5,3]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"3":{"nodes":[{"x":8,"y":8,"isBase":true},{"x":9,"y":7,"isBase":true},{"x":9,"y":11,"isBase":true},{"x":8,"y":10,"isBase":true},{"x":9,"y":9,"isBase":true},{"x":10,"y":8,"isBase":true},{"x":10,"y":10,"isBase":true},{"x":8,"y":9,"isBase":false}],"edges":[[0,1],[2,3],[1,5],[5,4],[4,6],[6,2],[4,7]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"4":{"nodes":[{"x":7,"y":9,"isBase":true},{"x":9,"y":7,"isBase":true},{"x":10,"y":9,"isBase":true},{"x":9,"y":9,"isBase":true},{"x":9,"y":10,"isBase":true},{"x":8,"y":9,"isBase":true},{"x":9,"y":8,"isBase":true},{"x":8,"y":8,"isBase":true}],"edges":[[3,2],[3,4],[0,5],[5,3],[1,6],[6,3],[0,7],[7,1]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"5":{"nodes":[{"x":8,"y":8,"isBase":true},{"x":10,"y":8,"isBase":true},{"x":10,"y":10,"isBase":true},{"x":9,"y":11,"isBase":true},{"x":8,"y":10,"isBase":true},{"x":8,"y":9,"isBase":true},{"x":9,"y":9,"isBase":true},{"x":9,"y":8,"isBase":true}],"edges":[[3,4],[2,3],[0,5],[5,6],[6,2],[1,7],[7,0]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"6":{"nodes":[{"x":9,"y":7,"isBase":true},{"x":8,"y":8,"isBase":true},{"x":8,"y":9,"isBase":true},{"x":9,"y":10,"isBase":true},{"x":10,"y":9,"isBase":true},{"x":9,"y":8,"isBase":true},{"x":10,"y":8,"isBase":true}],"edges":[[0,1],[1,2],[2,3],[3,4],[4,5],[5,2],[0,6]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"7":{"nodes":[{"x":8,"y":7,"isBase":true},{"x":10,"y":7,"isBase":true},{"x":10,"y":8,"isBase":true},{"x":8,"y":8,"isBase":true},{"x":9,"y":7,"isBase":true},{"x":9,"y":9,"isBase":true},{"x":9,"y":10,"isBase":true}],"edges":[[2,1],[0,3],[0,4],[4,1],[2,5],[5,6]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"8":{"nodes":[{"x":9,"y":7,"isBase":true},{"x":8,"y":8,"isBase":true},{"x":9,"y":9,"isBase":true},{"x":10,"y":10,"isBase":true},{"x":9,"y":11,"isBase":true},{"x":8,"y":10,"isBase":true},{"x":10,"y":8,"isBase":true}],"edges":[[0,1],[1,2],[2,3],[3,4],[4,5],[5,2],[2,6],[6,0]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"9":{"nodes":[{"x":9,"y":9,"isBase":true},{"x":8,"y":8,"isBase":true},{"x":9,"y":7,"isBase":true},{"x":10,"y":8,"isBase":true},{"x":10,"y":9,"isBase":true},{"x":9,"y":10,"isBase":true},{"x":8,"y":9,"isBase":true}],"edges":[[0,1],[1,2],[2,3],[3,0],[3,4],[4,5],[5,6]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"ㄱ":{"nodes":[{"x":8,"y":8,"isBase":true},{"x":10,"y":8,"isBase":true},{"x":10,"y":10,"isBase":true},{"x":9,"y":8,"isBase":true},{"x":10,"y":9,"isBase":true}],"edges":[[0,3],[3,1],[1,4],[4,2]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"ㄴ":{"nodes":[{"x":8,"y":8,"isBase":true},{"x":8,"y":10,"isBase":true},{"x":10,"y":10,"isBase":true},{"x":8,"y":9,"isBase":true},{"x":9,"y":10,"isBase":true}],"edges":[[0,3],[3,1],[1,4],[4,2]],"strokes":[[0,1]],"margins":{"T":0,"B":2,"L":2,"R":0}},"ㄷ":{"nodes":[{"x":8,"y":10,"isBase":true},{"x":10,"y":10,"isBase":true},{"x":10,"y":8,"isBase":true},{"x":8,"y":8,"isBase":true},{"x":8,"y":9,"isBase":true},{"x":9,"y":8,"isBase":true},{"x":9,"y":10,"isBase":true}],"edges":[[0,4],[4,3],[3,5],[5,2],[0,6],[6,1]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"ㄹ":{"nodes":[{"x":8,"y":8,"isBase":true},{"x":8,"y":10,"isBase":true},{"x":10,"y":8,"isBase":true},{"x":10,"y":10,"isBase":true},{"x":10,"y":9,"isBase":true},{"x":8,"y":9,"isBase":true},{"x":9,"y":10,"isBase":true},{"x":9,"y":9,"isBase":true},{"x":9,"y":8,"isBase":true}],"edges":[[2,4],[1,5],[1,6],[6,3],[5,7],[7,4],[0,8],[8,2]],"strokes":[[0,2]],"margins":{"T":0,"B":0,"L":0,"R":0}},"ㅁ":{"nodes":[{"x":8,"y":10,"isBase":true},{"x":10,"y":10,"isBase":true},{"x":8,"y":8,"isBase":true},{"x":10,"y":8,"isBase":true},{"x":10,"y":9,"isBase":true},{"x":8,"y":9,"isBase":true},{"x":9,"y":8,"isBase":true},{"x":9,"y":10,"isBase":true}],"edges":[[1,4],[4,3],[2,5],[5,0],[2,6],[6,3],[0,7],[7,1]],"strokes":[[0,1,0]],"margins":{"T":0,"B":0,"L":0,"R":0}},"ㅂ":{"nodes":[{"x":8,"y":8,"isBase":true},{"x":8,"y":9,"isBase":true},{"x":8,"y":10,"isBase":true},{"x":10,"y":10,"isBase":true},{"x":10,"y":9,"isBase":true},{"x":10,"y":8,"isBase":true},{"x":9,"y":10,"isBase":true},{"x":9,"y":9,"isBase":true}],"edges":[[0,1],[1,2],[3,4],[4,5],[2,6],[6,3],[4,7],[7,1]],"strokes":[[0,1,2,3,4,5],[4,1]],"margins":{"T":0,"B":0,"L":0,"R":0}},"ㅅ":{"nodes":[{"x":10,"y":10,"isBase":true},{"x":9,"y":9,"isBase":true},{"x":8,"y":10,"isBase":true},{"x":9,"y":8,"isBase":true}],"edges":[[0,1],[1,2],[1,3]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"ㅇ":{"nodes":[{"x":9,"y":10,"isBase":true},{"x":9,"y":8,"isBase":true},{"x":10,"y":9,"isBase":true},{"x":8,"y":9,"isBase":true}],"edges":[[1,2],[0,3],[1,3],[0,2]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"ㅈ":{"nodes":[{"x":8,"y":10,"isBase":true},{"x":10,"y":10,"isBase":true},{"x":9,"y":9,"isBase":true},{"x":9,"y":8,"isBase":true},{"x":8,"y":8,"isBase":true},{"x":10,"y":8,"isBase":true}],"edges":[[0,2],[2,1],[2,3],[3,4],[3,5]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"ㅊ":{"nodes":[{"x":8,"y":10,"isBase":true},{"x":10,"y":10,"isBase":true},{"x":8,"y":8,"isBase":true},{"x":9,"y":8,"isBase":true},{"x":9,"y":7,"isBase":true},{"x":10,"y":8,"isBase":true},{"x":9,"y":9,"isBase":true}],"edges":[[3,2],[3,4],[5,3],[0,6],[6,3],[6,1]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"ㅋ":{"nodes":[{"x":8,"y":8,"isBase":true},{"x":10,"y":8,"isBase":true},{"x":10,"y":10,"isBase":true},{"x":8,"y":9,"isBase":true},{"x":10,"y":9,"isBase":true},{"x":9,"y":9,"isBase":true},{"x":9,"y":8,"isBase":true}],"edges":[[1,4],[4,2],[3,5],[5,4],[0,6],[6,1]],"strokes":[[0,1,2]],"margins":{"T":0,"B":0,"L":0,"R":0}},"ㅌ":{"nodes":[{"x":8,"y":9,"isBase":true},{"x":8,"y":10,"isBase":true},{"x":10,"y":10,"isBase":true},{"x":10,"y":9,"isBase":true},{"x":8,"y":8,"isBase":true},{"x":10,"y":8,"isBase":true},{"x":9,"y":10,"isBase":true},{"x":9,"y":9,"isBase":true},{"x":9,"y":8,"isBase":true}],"edges":[[0,1],[0,4],[1,6],[6,2],[3,7],[7,0],[4,8],[8,5]],"strokes":[[0,1,2],[3,0]],"margins":{"T":0,"B":0,"L":0,"R":0}},"ㅍ":{"nodes":[{"x":7,"y":8,"isBase":true},{"x":8,"y":8,"isBase":true},{"x":8,"y":10,"isBase":true},{"x":10,"y":10,"isBase":true},{"x":9,"y":10,"isBase":true},{"x":9,"y":8,"isBase":true},{"x":7,"y":10,"isBase":true},{"x":10,"y":8,"isBase":true},{"x":9,"y":9,"isBase":true},{"x":8,"y":9,"isBase":true}],"edges":[[0,1],[4,3],[1,5],[2,4],[2,6],[5,7],[4,8],[8,5],[2,9],[9,1]],"strokes":[[0,1],[2,3],[2,1]],"margins":{"T":0,"B":0,"L":0,"R":0}},"ㅎ":{"nodes":[{"x":8,"y":9,"isBase":true},{"x":9,"y":10,"isBase":true},{"x":10,"y":9,"isBase":true},{"x":8,"y":8,"isBase":true},{"x":9,"y":7,"isBase":true},{"x":10,"y":8,"isBase":true},{"x":9,"y":8,"isBase":true}],"edges":[[0,1],[1,2],[6,3],[6,4],[6,5],[0,6],[6,2]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"ㅏ":{"nodes":[{"x":9,"y":7,"isBase":true},{"x":9,"y":9,"isBase":true},{"x":9,"y":11,"isBase":true},{"x":10,"y":9,"tags":["s"],"tagFilters":{"s":"ㅣ"},"isBase":true},{"x":9,"y":8,"isBase":true},{"x":9,"y":10,"isBase":true}],"edges":[[1,3],[0,4],[4,1],[1,5],[5,2]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"ㅑ":{"nodes":[{"x":9,"y":7,"isBase":true},{"x":9,"y":8,"isBase":true},{"x":9,"y":10,"isBase":true},{"x":10,"y":8,"tags":["s"],"tagFilters":{"s":"ㅣ"},"isBase":true},{"x":9,"y":11,"isBase":true},{"x":10,"y":10,"tags":["s"],"tagFilters":{"s":"ㅣ"},"isBase":true},{"x":9,"y":9,"isBase":true}],"edges":[[0,1],[1,3],[2,4],[2,5],[1,6],[6,2]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"ㅓ":{"nodes":[{"x":8,"y":9,"isBase":true},{"x":9,"y":9,"isBase":true},{"x":9,"y":7,"isBase":true},{"x":9,"y":11,"isBase":true},{"x":9,"y":8,"isBase":true},{"x":9,"y":10,"isBase":true}],"edges":[[0,1],[2,4],[4,1],[1,5],[5,3]],"strokes":[[0,1],[2,1],[3,1]],"margins":{"T":0,"B":0,"L":0,"R":0}},"ㅕ":{"nodes":[{"x":9,"y":8,"isBase":true},{"x":8,"y":8,"isBase":true},{"x":9,"y":7,"isBase":true},{"x":9,"y":10,"isBase":true},{"x":9,"y":11,"isBase":true},{"x":8,"y":10,"isBase":true},{"x":9,"y":9,"isBase":true}],"edges":[[1,0],[2,0],[3,4],[3,5],[0,6],[6,3]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"ㅗ":{"nodes":[{"x":9,"y":8,"isBase":true},{"x":11,"y":9,"isBase":true},{"x":7,"y":9,"isBase":true},{"x":9,"y":9,"isBase":true},{"x":8,"y":9,"isBase":true},{"x":10,"y":9,"isBase":true}],"edges":[[3,0],[2,4],[4,3],[3,5],[5,1]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"ㅛ":{"nodes":[{"x":8,"y":9,"isBase":true},{"x":10,"y":9,"isBase":true},{"x":8,"y":8,"isBase":true},{"x":10,"y":8,"isBase":true},{"x":7,"y":9,"isBase":true},{"x":11,"y":9,"isBase":true},{"x":9,"y":9,"isBase":true}],"edges":[[0,2],[1,3],[1,5],[0,4],[0,6],[6,1]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"ㅜ":{"nodes":[{"x":9,"y":10,"isBase":true},{"x":7,"y":9,"isBase":true},{"x":11,"y":9,"isBase":true},{"x":9,"y":9,"isBase":true},{"x":10,"y":9,"isBase":true},{"x":8,"y":9,"isBase":true}],"edges":[[3,0],[3,4],[4,2],[1,5],[5,3]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"ㅠ":{"nodes":[{"x":8,"y":10,"isBase":true},{"x":10,"y":10,"isBase":true},{"x":7,"y":9,"isBase":true},{"x":11,"y":9,"isBase":true},{"x":10,"y":9,"isBase":true},{"x":8,"y":9,"isBase":true},{"x":9,"y":9,"isBase":true}],"edges":[[3,4],[5,2],[5,0],[4,1],[4,6],[6,5]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"ㅡ":{"nodes":[{"x":7,"y":9,"isBase":true},{"x":8,"y":9,"isBase":true},{"x":9,"y":9,"isBase":true},{"x":10,"y":9,"isBase":true},{"x":11,"y":9,"isBase":true}],"edges":[[0,1],[1,2],[2,3],[3,4]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"ㅣ":{"nodes":[{"x":9,"y":11,"isBase":true},{"x":9,"y":8,"tags":["n"],"tagFilters":{"n":"ㅑ"},"isBase":true},{"x":9,"y":10,"tags":["n"],"tagFilters":{"n":"ㅑ"},"isBase":true},{"x":9,"y":9,"tags":["n"],"tagFilters":{"n":"ㅏ"},"isBase":true},{"x":9,"y":7,"isBase":true}],"edges":[[2,0],[1,3],[3,2],[1,4]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"A":{"nodes":[{"x":7,"y":10,"isBase":true},{"x":8,"y":9,"isBase":true},{"x":9,"y":8,"isBase":true},{"x":10,"y":9,"isBase":true},{"x":11,"y":10,"isBase":true},{"x":9,"y":9,"isBase":true}],"edges":[[0,1],[1,2],[2,3],[3,4],[1,5],[5,3]],"strokes":[[0,1,2,3,4],[1,3]],"margins":{"T":0,"B":0,"L":0,"R":0}},"B":{"nodes":[{"x":8,"y":11,"isBase":true},{"x":10,"y":10,"isBase":true},{"x":10,"y":8,"isBase":true},{"x":8,"y":9,"isBase":true},{"x":8,"y":7,"isBase":true},{"x":9,"y":7,"isBase":true},{"x":9,"y":9,"isBase":true},{"x":9,"y":11,"isBase":true}],"edges":[[4,3],[3,0],[4,5],[5,2],[2,6],[6,3],[6,1],[0,7],[7,1]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"C":{"nodes":[{"x":9,"y":7,"isBase":true},{"x":7,"y":9,"isBase":true},{"x":9,"y":11,"isBase":true},{"x":10,"y":8,"isBase":true},{"x":10,"y":10,"isBase":true},{"x":8,"y":8,"isBase":true},{"x":8,"y":10,"isBase":true}],"edges":[[0,3],[2,4],[0,5],[5,1],[1,6],[6,2]],"strokes":[[0,1,2]],"margins":{"T":0,"B":0,"L":0,"R":0}},"D":{"nodes":[{"x":8,"y":7,"isBase":true},{"x":8,"y":11,"isBase":true},{"x":9,"y":8,"isBase":true},{"x":9,"y":10,"isBase":true},{"x":10,"y":9,"isBase":true}],"edges":[[0,1],[0,2],[3,1],[2,4],[4,3]],"strokes":[[1,0,1]],"margins":{"T":0,"B":0,"L":0,"R":0}},"E":{"nodes":[{"x":8,"y":8,"isBase":true},{"x":8,"y":9,"isBase":true},{"x":8,"y":10,"isBase":true},{"x":10,"y":8,"isBase":true},{"x":10,"y":9,"isBase":true},{"x":10,"y":10,"isBase":true},{"x":9,"y":8,"isBase":true},{"x":9,"y":9,"isBase":true},{"x":9,"y":10,"isBase":true}],"edges":[[0,1],[1,2],[0,6],[6,3],[1,7],[7,4],[2,8],[8,5]],"strokes":[[3,0,1,2,5],[1,4]],"margins":{"T":0,"B":0,"L":0,"R":0}},"F":{"nodes":[{"x":8,"y":8,"isBase":true},{"x":8,"y":9,"isBase":true},{"x":8,"y":10,"isBase":true},{"x":10,"y":8,"isBase":true},{"x":10,"y":9,"isBase":true},{"x":9,"y":9,"isBase":true},{"x":9,"y":8,"isBase":true}],"edges":[[0,1],[1,2],[1,5],[5,4],[0,6],[6,3]],"strokes":[[3,0,1,2],[1,4]],"margins":{"T":0,"B":0,"L":0,"R":0}},"G":{"nodes":[{"x":10,"y":8,"isBase":true},{"x":9,"y":7,"isBase":true},{"x":7,"y":9,"isBase":true},{"x":9,"y":11,"isBase":true},{"x":10,"y":10,"isBase":true},{"x":10,"y":9,"isBase":true},{"x":10,"y":11,"isBase":true},{"x":8,"y":8,"isBase":true},{"x":8,"y":10,"isBase":true},{"x":9,"y":9,"isBase":true}],"edges":[[0,1],[4,5],[4,6],[3,4],[1,7],[7,2],[2,8],[8,3],[5,9]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"H":{"nodes":[{"x":8,"y":8,"isBase":true},{"x":8,"y":9,"isBase":true},{"x":8,"y":10,"isBase":true},{"x":10,"y":8,"isBase":true},{"x":10,"y":9,"isBase":true},{"x":10,"y":10,"isBase":true},{"x":9,"y":9,"isBase":true}],"edges":[[0,1],[1,2],[3,4],[4,5],[1,6],[6,4]],"strokes":[[0,1,2],[3,4,5],[1,4]],"margins":{"T":0,"B":0,"L":0,"R":0}},"I":{"nodes":[{"x":9,"y":8,"isBase":true},{"x":9,"y":10,"isBase":true},{"x":9,"y":11,"isBase":true},{"x":8,"y":8,"isBase":true},{"x":10,"y":8,"isBase":true},{"x":10,"y":11,"isBase":true},{"x":8,"y":11,"isBase":true},{"x":9,"y":9,"isBase":true}],"edges":[[1,2],[3,0],[0,4],[5,2],[2,6],[0,7],[7,1]],"strokes":[[0,1]],"margins":{"T":0,"B":0,"L":0,"R":0}},"J":{"nodes":[{"x":9,"y":8,"isBase":true},{"x":10,"y":8,"isBase":true},{"x":11,"y":8,"isBase":true},{"x":10,"y":10,"isBase":true},{"x":9,"y":11,"isBase":true},{"x":8,"y":10,"isBase":true},{"x":10,"y":9,"isBase":true}],"edges":[[0,1],[1,2],[3,4],[4,5],[3,6],[6,1]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"K":{"nodes":[{"x":9,"y":9,"isBase":true},{"x":10,"y":8,"isBase":true},{"x":10,"y":10,"isBase":true},{"x":9,"y":8,"isBase":true},{"x":9,"y":10,"isBase":true},{"x":9,"y":7,"isBase":true},{"x":11,"y":7,"isBase":true},{"x":11,"y":11,"isBase":true},{"x":9,"y":11,"isBase":true}],"edges":[[0,1],[3,0],[4,0],[0,2],[3,5],[1,6],[2,7],[4,8]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"L":{"nodes":[{"x":8,"y":8,"isBase":true},{"x":8,"y":10,"isBase":true},{"x":10,"y":10,"isBase":true},{"x":8,"y":9,"isBase":true},{"x":9,"y":10,"isBase":true}],"edges":[[0,3],[3,1],[1,4],[4,2]],"strokes":[[0,1,2]],"margins":{"T":0,"B":0,"L":0,"R":0}},"M":{"nodes":[{"x":7,"y":10,"isBase":true},{"x":7,"y":8,"isBase":true},{"x":9,"y":10,"isBase":true},{"x":11,"y":8,"isBase":true},{"x":11,"y":10,"isBase":true},{"x":7,"y":9,"isBase":true},{"x":11,"y":9,"isBase":true},{"x":8,"y":9,"isBase":true},{"x":10,"y":9,"isBase":true}],"edges":[[0,5],[5,1],[3,6],[6,4],[1,7],[7,2],[2,8],[8,3]],"strokes":[[0,1,2,3,4]],"margins":{"T":0,"B":0,"L":0,"R":0}},"N":{"nodes":[{"x":8,"y":10,"isBase":true},{"x":8,"y":8,"isBase":true},{"x":10,"y":10,"isBase":true},{"x":10,"y":8,"isBase":true},{"x":8,"y":9,"isBase":true},{"x":10,"y":9,"isBase":true},{"x":9,"y":9,"isBase":true}],"edges":[[0,4],[4,1],[2,5],[5,3],[1,6],[6,2]],"strokes":[[0,1,2,3]],"margins":{"T":0,"B":0,"L":0,"R":0}},"O":{"nodes":[{"x":9,"y":11,"isBase":true},{"x":10,"y":10,"isBase":true},{"x":8,"y":10,"isBase":true},{"x":8,"y":8,"isBase":true},{"x":9,"y":7,"isBase":true},{"x":10,"y":8,"isBase":true},{"x":11,"y":9,"isBase":true},{"x":7,"y":9,"isBase":true}],"edges":[[0,1],[0,2],[3,4],[4,5],[5,6],[6,1],[2,7],[7,3]],"strokes":[[0,1]],"margins":{"T":0,"B":0,"L":0,"R":0}},"P":{"nodes":[{"x":9,"y":7,"isBase":true},{"x":9,"y":10,"isBase":true},{"x":9,"y":8,"isBase":true},{"x":11,"y":8,"isBase":true},{"x":9,"y":9,"isBase":true},{"x":9,"y":11,"isBase":true},{"x":10,"y":9,"isBase":true},{"x":10,"y":7,"isBase":true}],"edges":[[2,0],[4,2],[1,4],[1,5],[3,6],[6,4],[0,7],[7,3]],"strokes":[[1,0]],"margins":{"T":0,"B":0,"L":0,"R":0}},"Q":{"nodes":[{"x":9,"y":7,"isBase":true},{"x":8,"y":8,"isBase":true},{"x":10,"y":8,"isBase":true},{"x":8,"y":10,"isBase":true},{"x":9,"y":11,"isBase":true},{"x":10,"y":10,"isBase":true},{"x":11,"y":11,"isBase":true},{"x":9,"y":9,"isBase":true},{"x":7,"y":9,"isBase":true},{"x":11,"y":9,"isBase":true}],"edges":[[0,1],[2,0],[3,4],[4,5],[5,6],[5,7],[1,8],[8,3],[5,9],[9,2]],"strokes":[[0,1,2,0]],"margins":{"T":0,"B":0,"L":0,"R":0}},"R":{"nodes":[{"x":9,"y":8,"isBase":true},{"x":10,"y":7,"isBase":true},{"x":11,"y":8,"isBase":true},{"x":9,"y":10,"isBase":true},{"x":9,"y":11,"isBase":true},{"x":11,"y":10,"isBase":true},{"x":9,"y":7,"isBase":true},{"x":10,"y":9,"isBase":true},{"x":9,"y":9,"isBase":true},{"x":12,"y":11,"isBase":true}],"edges":[[1,2],[3,4],[7,5],[0,6],[2,7],[3,8],[8,0],[5,9],[1,6],[7,8]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"S":{"nodes":[{"x":10,"y":8,"isBase":true},{"x":9,"y":8,"isBase":true},{"x":8,"y":8,"isBase":true},{"x":9,"y":9,"isBase":true},{"x":10,"y":9,"isBase":true},{"x":10,"y":10,"isBase":true},{"x":8,"y":9,"isBase":true},{"x":9,"y":10,"isBase":true},{"x":8,"y":10,"isBase":true}],"edges":[[0,1],[1,2],[3,4],[4,5],[3,6],[6,2],[5,7],[7,8]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"T":{"nodes":[{"x":9,"y":8,"isBase":true},{"x":9,"y":9,"isBase":true},{"x":9,"y":10,"isBase":true},{"x":10,"y":8,"isBase":true},{"x":8,"y":8,"isBase":true},{"x":9,"y":11,"isBase":true}],"edges":[[1,0],[2,1],[0,3],[4,0],[2,5]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"U":{"nodes":[{"x":8,"y":9,"isBase":true},{"x":8,"y":10,"isBase":true},{"x":10,"y":10,"isBase":true},{"x":8,"y":8,"isBase":true},{"x":10,"y":8,"isBase":true},{"x":10,"y":9,"isBase":true},{"x":9,"y":10,"isBase":true}],"edges":[[0,1],[3,0],[4,5],[5,2],[1,6],[6,2]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"V":{"nodes":[{"x":7,"y":8,"isBase":true},{"x":9,"y":10,"isBase":true},{"x":11,"y":8,"isBase":true},{"x":10,"y":9,"isBase":true},{"x":8,"y":9,"isBase":true}],"edges":[[1,3],[3,2],[0,4],[4,1]],"strokes":[[0,1,2]],"margins":{"T":0,"B":0,"L":0,"R":0}},"W":{"nodes":[{"x":7,"y":10,"isBase":true},{"x":9,"y":8,"isBase":true},{"x":11,"y":10,"isBase":true},{"x":11,"y":8,"isBase":true},{"x":7,"y":8,"isBase":true},{"x":7,"y":9,"isBase":true},{"x":8,"y":9,"isBase":true},{"x":10,"y":9,"isBase":true},{"x":11,"y":9,"isBase":true}],"edges":[[4,5],[5,0],[0,6],[6,1],[1,7],[7,2],[2,8],[8,3]],"strokes":[[0,1,2]],"margins":{"T":0,"B":0,"L":0,"R":0}},"X":{"nodes":[{"x":8,"y":8,"isBase":true},{"x":10,"y":8,"isBase":true},{"x":9,"y":9,"isBase":true},{"x":8,"y":10,"isBase":true},{"x":10,"y":10,"isBase":true},{"x":11,"y":7,"isBase":true},{"x":11,"y":11,"isBase":true},{"x":7,"y":7,"isBase":true},{"x":7,"y":11,"isBase":true}],"edges":[[0,2],[2,4],[1,2],[2,3],[1,5],[4,6],[0,7],[3,8]],"strokes":[[0,2,4],[1,2,3]],"margins":{"T":0,"B":0,"L":0,"R":0}},"Y":{"nodes":[{"x":8,"y":8,"isBase":true},{"x":10,"y":8,"isBase":true},{"x":9,"y":9,"isBase":true},{"x":9,"y":10,"isBase":true},{"x":9,"y":11,"isBase":true}],"edges":[[0,2],[1,2],[2,3],[3,4]],"strokes":[[0,2,3],[1,2]],"margins":{"T":0,"B":0,"L":0,"R":0}},"Z":{"nodes":[{"x":8,"y":8,"isBase":true},{"x":10,"y":8,"isBase":true},{"x":8,"y":10,"isBase":true},{"x":10,"y":10,"isBase":true},{"x":9,"y":9,"isBase":true}],"edges":[[0,1],[2,3],[1,4],[4,2]],"strokes":[[0,1,2,3]],"margins":{"T":0,"B":0,"L":0,"R":0}},"a":{"nodes":[{"x":10,"y":8,"isBase":true},{"x":10,"y":9,"isBase":true},{"x":9,"y":8,"isBase":true},{"x":8,"y":9,"isBase":true},{"x":9,"y":10,"isBase":true},{"x":10,"y":10,"isBase":true}],"edges":[[0,1],[1,2],[2,3],[3,4],[4,1],[1,5]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"b":{"nodes":[{"x":9,"y":9,"isBase":true},{"x":9,"y":8,"isBase":true},{"x":10,"y":9,"isBase":true},{"x":9,"y":10,"isBase":true},{"x":9,"y":7,"isBase":true},{"x":9,"y":6,"isBase":true}],"edges":[[0,1],[1,2],[0,3],[3,2],[1,4],[4,5]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"c":{"nodes":[{"x":10,"y":8,"isBase":true},{"x":9,"y":9,"isBase":true},{"x":10,"y":10,"isBase":true},{"x":11,"y":8,"isBase":true},{"x":11,"y":10,"isBase":true}],"edges":[[1,2],[0,1],[0,3],[2,4]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"d":{"nodes":[{"x":10,"y":6,"isBase":true},{"x":10,"y":10,"isBase":true},{"x":10,"y":9,"isBase":true},{"x":9,"y":9,"isBase":true},{"x":10,"y":8,"isBase":true},{"x":10,"y":7,"isBase":true}],"edges":[[2,1],[1,3],[3,4],[4,2],[0,5],[5,4]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"e":{"nodes":[{"x":9,"y":8,"isBase":true},{"x":9,"y":10,"isBase":true},{"x":8,"y":9,"isBase":true},{"x":10,"y":10,"isBase":true},{"x":10,"y":9,"isBase":true}],"edges":[[0,2],[2,1],[1,3],[4,2],[0,4]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"f":{"nodes":[{"x":9,"y":7,"isBase":true},{"x":9,"y":8,"isBase":true},{"x":9,"y":10,"isBase":true},{"x":8,"y":8,"isBase":true},{"x":10,"y":8,"isBase":true},{"x":10,"y":7,"isBase":true},{"x":9,"y":9,"isBase":true}],"edges":[[3,1],[1,4],[0,1],[0,5],[1,6],[6,2]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"g":{"nodes":[{"x":10,"y":8,"isBase":true},{"x":9,"y":8,"isBase":true},{"x":10,"y":9,"isBase":true},{"x":9,"y":10,"isBase":true},{"x":8,"y":9,"isBase":true},{"x":10,"y":7,"isBase":true}],"edges":[[0,5],[5,1],[1,2],[2,0],[2,3],[3,4]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"h":{"nodes":[{"x":8,"y":8,"isBase":true},{"x":8,"y":10,"isBase":true},{"x":9,"y":9,"isBase":true},{"x":10,"y":10,"isBase":true},{"x":8,"y":11,"isBase":true},{"x":8,"y":9,"isBase":true},{"x":10,"y":11,"isBase":true}],"edges":[[1,2],[2,3],[1,4],[0,5],[5,1],[3,6]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"i":{"nodes":[{"x":9,"y":7,"isBase":true},{"x":9,"y":8,"isBase":true},{"x":9,"y":10,"isBase":true},{"x":9,"y":9,"isBase":true}],"edges":[[0,1,"inv"],[1,3],[3,2]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"j":{"nodes":[{"x":10,"y":7,"isBase":true},{"x":10,"y":8,"isBase":true},{"x":10,"y":9,"isBase":true},{"x":9,"y":10,"isBase":true},{"x":8,"y":9,"isBase":true}],"edges":[[1,2],[2,3],[3,4],[0,1,"inv"]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"k":{"nodes":[{"x":9,"y":7,"isBase":true},{"x":9,"y":10,"isBase":true},{"x":9,"y":9,"isBase":true},{"x":10,"y":8,"isBase":true},{"x":10,"y":10,"isBase":true},{"x":9,"y":8,"isBase":true}],"edges":[[2,1],[2,3],[2,4],[0,5],[5,2]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"l":{"nodes":[{"x":9,"y":8,"isBase":true},{"x":9,"y":11,"isBase":true},{"x":9,"y":10,"isBase":true},{"x":9,"y":9,"isBase":true},{"x":9,"y":7,"isBase":true}],"edges":[[2,1],[0,3],[3,2],[0,4]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"m":{"nodes":[{"x":8,"y":10,"isBase":true},{"x":8,"y":9,"isBase":true},{"x":9,"y":9,"isBase":true},{"x":9,"y":10,"isBase":true},{"x":10,"y":9,"isBase":true},{"x":10,"y":10,"isBase":true}],"edges":[[1,0],[1,2],[3,2],[2,4],[4,5]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"n":{"nodes":[{"x":8,"y":9,"isBase":true},{"x":9,"y":9,"isBase":true},{"x":8,"y":10,"isBase":true},{"x":9,"y":10,"isBase":true}],"edges":[[0,2],[1,3],[0,1]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"o":{"nodes":[{"x":9,"y":8,"isBase":true},{"x":10,"y":9,"isBase":true},{"x":9,"y":10,"isBase":true},{"x":8,"y":9,"isBase":true}],"edges":[[0,1],[1,2],[2,3],[3,0]],"strokes":[[0,1,2,3,0]],"margins":{"T":0,"B":0,"L":0,"R":0}},"p":{"nodes":[{"x":8,"y":8,"isBase":true},{"x":8,"y":12,"isBase":true},{"x":8,"y":9,"isBase":true},{"x":9,"y":9,"isBase":true},{"x":8,"y":10,"isBase":true},{"x":8,"y":11,"isBase":true}],"edges":[[0,2],[0,3],[3,4],[4,2],[4,5],[5,1]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"q":{"nodes":[{"x":10,"y":8,"isBase":true},{"x":9,"y":9,"isBase":true},{"x":10,"y":10,"isBase":true},{"x":10,"y":9,"isBase":true},{"x":10,"y":11,"isBase":true},{"x":10,"y":12,"isBase":true}],"edges":[[0,1],[1,2],[2,3],[3,0],[2,4],[4,5]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"r":{"nodes":[{"x":9,"y":9,"isBase":true},{"x":9,"y":10,"isBase":true},{"x":10,"y":8,"isBase":true},{"x":11,"y":9,"isBase":true},{"x":9,"y":8,"isBase":true}],"edges":[[0,1],[0,2],[2,3],[0,4]],"strokes":[[1,0]],"margins":{"T":0,"B":0,"L":0,"R":0}},"s":{"nodes":[{"x":9,"y":9,"isBase":true},{"x":10,"y":10,"isBase":true},{"x":10,"y":9,"isBase":true},{"x":9,"y":10,"isBase":true}],"edges":[[2,0],[1,3],[0,1]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"t":{"nodes":[{"x":9,"y":8,"isBase":true},{"x":9,"y":10,"isBase":true},{"x":8,"y":8,"isBase":true},{"x":10,"y":8,"isBase":true},{"x":9,"y":7,"isBase":true},{"x":9,"y":9,"isBase":true}],"edges":[[2,0],[0,3],[0,4],[0,5],[5,1]],"strokes":[[2,0,1],[2,0,3]],"margins":{"T":0,"B":0,"L":0,"R":0}},"u":{"nodes":[{"x":9,"y":9,"isBase":true},{"x":9,"y":10,"isBase":true},{"x":10,"y":10,"isBase":true},{"x":10,"y":9,"isBase":true}],"edges":[[0,1],[2,3],[2,1]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"v":{"nodes":[{"x":9,"y":10,"isBase":true},{"x":8,"y":9,"isBase":true},{"x":10,"y":9,"isBase":true}],"edges":[[1,0],[0,2]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"w":{"nodes":[{"x":7,"y":9,"isBase":true},{"x":8,"y":10,"isBase":true},{"x":9,"y":9,"isBase":true},{"x":10,"y":10,"isBase":true},{"x":11,"y":9,"isBase":true}],"edges":[[1,0],[1,2],[2,3],[3,4]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"x":{"nodes":[{"x":8,"y":10,"isBase":true},{"x":9,"y":9,"isBase":true},{"x":10,"y":10,"isBase":true},{"x":8,"y":8,"isBase":true},{"x":10,"y":8,"isBase":true}],"edges":[[0,1],[1,2],[3,1],[4,1]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"y":{"nodes":[{"x":10,"y":9,"isBase":true},{"x":10,"y":8,"isBase":true},{"x":10,"y":10,"isBase":true},{"x":9,"y":10,"isBase":true},{"x":9,"y":8,"isBase":true}],"edges":[[0,1],[0,2],[2,3],[0,4]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"z":{"nodes":[{"x":9,"y":9,"isBase":true},{"x":10,"y":9,"isBase":true},{"x":9,"y":10,"isBase":true},{"x":10,"y":10,"isBase":true}],"edges":[[0,1],[2,1],[3,2]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},".":{"nodes":[{"x":9,"y":10,"isBase":true}],"edges":[],"strokes":[],"yShift":2,"margins":{"T":0,"B":0,"L":0,"R":0}},",":{"nodes":[{"x":9,"y":10,"isBase":true},{"x":10,"y":9,"isBase":true}],"edges":[[0,1]],"strokes":[],"yShift":2,"margins":{"T":0,"B":0,"L":0,"R":0}},"_":{"nodes":[{"x":8,"y":12,"isBase":true},{"x":9,"y":12,"isBase":true}],"edges":[[0,1]],"strokes":[],"yShift":3,"margins":{"T":0,"B":0,"L":0,"R":0}},"'":{"nodes":[{"x":9,"y":7,"isBase":true},{"x":9,"y":8,"isBase":true}],"edges":[[0,1]],"strokes":[[0,1]],"yShift":-2.4,"margins":{"T":0,"B":0,"L":0,"R":0}},"\"":{"nodes":[{"x":8,"y":9,"isBase":true},{"x":8,"y":8,"isBase":true},{"x":9,"y":8,"isBase":true},{"x":9,"y":9,"isBase":true}],"edges":[[1,0],[2,3]],"strokes":[],"yShift":-2.4,"margins":{"T":0,"B":0,"L":0,"R":0}},"`":{"nodes":[{"x":9,"y":9,"isBase":true},{"x":10,"y":10,"isBase":true}],"edges":[[0,1]],"strokes":[],"yShift":-2.4,"margins":{"T":0,"B":0,"L":0,"R":0}},"^":{"nodes":[{"x":8,"y":10,"isBase":true},{"x":9,"y":9,"isBase":true},{"x":10,"y":10,"isBase":true}],"edges":[[0,1],[1,2]],"strokes":[],"yShift":-1.4,"margins":{"T":0,"B":0,"L":0,"R":0}},":":{"nodes":[{"x":9,"y":9,"isBase":true},{"x":9,"y":10,"isBase":true}],"edges":[[0,1,"inv"]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},";":{"nodes":[{"x":10,"y":8,"isBase":true},{"x":10,"y":9,"isBase":true},{"x":9,"y":10,"isBase":true}],"edges":[[1,2],[0,1,"inv"]],"strokes":[],"yShift":0.6,"margins":{"T":0,"B":0,"L":0,"R":0}},"!":{"nodes":[{"x":9,"y":10,"isBase":true},{"x":9,"y":11,"isBase":true},{"x":9,"y":8,"isBase":true},{"x":9,"y":9,"isBase":true},{"x":9,"y":7,"isBase":true}],"edges":[[0,1,"inv"],[0,3],[3,2],[2,4]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"?":{"nodes":[{"x":9,"y":10,"isBase":true},{"x":8,"y":8,"isBase":true},{"x":9,"y":7,"isBase":true},{"x":10,"y":8,"isBase":true},{"x":9,"y":9,"isBase":true},{"x":9,"y":11,"isBase":true}],"edges":[[1,2],[2,3],[3,4],[4,0],[0,5,"inv"]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"-":{"nodes":[{"x":10,"y":9,"isBase":true},{"x":9,"y":9,"isBase":true}],"edges":[[1,0]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"+":{"nodes":[{"x":9,"y":9,"isBase":true},{"x":9,"y":8,"isBase":true},{"x":9,"y":10,"isBase":true},{"x":8,"y":9,"isBase":true},{"x":10,"y":9,"isBase":true}],"edges":[[0,1],[0,2],[3,0],[0,4]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"=":{"nodes":[{"x":8,"y":9,"isBase":true},{"x":9,"y":9,"isBase":true},{"x":8,"y":10,"isBase":true},{"x":9,"y":10,"isBase":true}],"edges":[[0,1],[2,3]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"~":{"nodes":[{"x":8,"y":10,"isBase":true},{"x":9,"y":9,"isBase":true},{"x":10,"y":10,"isBase":true},{"x":11,"y":9,"isBase":true}],"edges":[[0,1],[1,2],[2,3]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"*":{"nodes":[{"x":8,"y":8,"isBase":true},{"x":10,"y":10,"isBase":true},{"x":9,"y":9,"isBase":true},{"x":10,"y":8,"isBase":true},{"x":9,"y":8,"isBase":true},{"x":8,"y":10,"isBase":true},{"x":9,"y":10,"isBase":true}],"edges":[[0,2],[2,1],[2,3],[2,4],[2,5],[2,6]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"|":{"nodes":[{"x":9,"y":9,"isBase":true},{"x":9,"y":11,"isBase":true},{"x":9,"y":10,"isBase":true},{"x":9,"y":7,"isBase":true},{"x":9,"y":8,"isBase":true},{"x":9,"y":12,"isBase":true},{"x":9,"y":6,"isBase":true}],"edges":[[1,2],[2,0],[0,4],[4,3],[1,5],[3,6]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"/":{"nodes":[{"x":9,"y":9,"isBase":true},{"x":7,"y":11,"isBase":true},{"x":8,"y":10,"isBase":true},{"x":11,"y":7,"isBase":true},{"x":10,"y":8,"isBase":true}],"edges":[[1,2],[2,0],[0,4],[4,3]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"\\":{"nodes":[{"x":9,"y":9,"isBase":true},{"x":11,"y":11,"isBase":true},{"x":10,"y":10,"isBase":true},{"x":7,"y":7,"isBase":true},{"x":8,"y":8,"isBase":true}],"edges":[[1,2],[2,0],[0,4],[4,3]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"<":{"nodes":[{"x":8,"y":9,"isBase":true},{"x":10,"y":7,"isBase":true},{"x":10,"y":11,"isBase":true},{"x":9,"y":8,"isBase":true},{"x":9,"y":10,"isBase":true}],"edges":[[0,3],[3,1],[0,4],[4,2]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},">":{"nodes":[{"x":9,"y":8,"isBase":true},{"x":10,"y":9,"isBase":true},{"x":9,"y":10,"isBase":true},{"x":8,"y":7,"isBase":true},{"x":8,"y":11,"isBase":true}],"edges":[[0,1],[1,2],[0,3],[2,4]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"(":{"nodes":[{"x":8,"y":7,"isBase":true},{"x":8,"y":11,"isBase":true},{"x":9,"y":12,"isBase":true},{"x":9,"y":6,"isBase":true},{"x":8,"y":9,"isBase":true},{"x":8,"y":10,"isBase":true},{"x":8,"y":8,"isBase":true}],"edges":[[1,2],[0,3],[4,5],[5,1],[0,6],[6,4]],"strokes":[[0,0,1,2]],"margins":{"T":0,"B":0,"L":0,"R":0}},")":{"nodes":[{"x":9,"y":6,"isBase":true},{"x":10,"y":7,"isBase":true},{"x":10,"y":11,"isBase":true},{"x":9,"y":12,"isBase":true},{"x":10,"y":9,"isBase":true},{"x":10,"y":8,"isBase":true},{"x":10,"y":10,"isBase":true}],"edges":[[0,1],[2,3],[1,5],[5,4],[4,6],[6,2]],"strokes":[[0,1,2,3]],"margins":{"T":0,"B":0,"L":0,"R":0}},"[":{"nodes":[{"x":9,"y":7,"isBase":true},{"x":9,"y":11,"isBase":true},{"x":10,"y":11,"isBase":true},{"x":10,"y":7,"isBase":true},{"x":9,"y":9,"isBase":true},{"x":9,"y":8,"isBase":true},{"x":9,"y":10,"isBase":true}],"edges":[[1,2],[0,3],[0,5],[5,4],[4,6],[6,1]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"]":{"nodes":[{"x":9,"y":7,"isBase":true},{"x":9,"y":11,"isBase":true},{"x":8,"y":11,"isBase":true},{"x":8,"y":7,"isBase":true},{"x":9,"y":9,"isBase":true},{"x":9,"y":8,"isBase":true},{"x":9,"y":10,"isBase":true}],"edges":[[1,2],[0,3],[0,5],[5,4],[4,6],[6,1]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"{":{"nodes":[{"x":8,"y":9,"isBase":true},{"x":9,"y":9,"isBase":true},{"x":9,"y":7,"isBase":true},{"x":10,"y":7,"isBase":true},{"x":9,"y":11,"isBase":true},{"x":10,"y":11,"isBase":true},{"x":9,"y":10,"isBase":true},{"x":9,"y":8,"isBase":true}],"edges":[[0,1],[2,3],[4,5],[1,6],[6,4],[1,7],[7,2]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"}":{"nodes":[{"x":11,"y":9,"isBase":true},{"x":10,"y":9,"isBase":true},{"x":10,"y":7,"isBase":true},{"x":9,"y":7,"isBase":true},{"x":10,"y":11,"isBase":true},{"x":9,"y":11,"isBase":true},{"x":10,"y":10,"isBase":true},{"x":10,"y":8,"isBase":true}],"edges":[[0,1],[2,3],[4,5],[1,6],[6,4],[1,7],[7,2]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"#":{"nodes":[{"x":9,"y":7,"isBase":true},{"x":9,"y":10,"isBase":true},{"x":10,"y":7,"isBase":true},{"x":10,"y":10,"isBase":true},{"x":8,"y":8,"isBase":true},{"x":9,"y":8,"isBase":true},{"x":10,"y":8,"isBase":true},{"x":11,"y":8,"isBase":true},{"x":8,"y":9,"isBase":true},{"x":9,"y":9,"isBase":true},{"x":10,"y":9,"isBase":true},{"x":11,"y":9,"isBase":true}],"edges":[[0,5],[4,5],[2,6],[5,6],[6,7],[5,9],[9,1],[8,9],[6,10],[10,3],[10,9],[10,11]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"$":{"nodes":[{"x":9,"y":7,"isBase":true},{"x":8,"y":7,"isBase":true},{"x":8,"y":8,"isBase":true},{"x":10,"y":8,"isBase":true},{"x":10,"y":9,"isBase":true},{"x":9,"y":9,"isBase":true},{"x":8,"y":9,"isBase":true},{"x":9,"y":10,"isBase":true},{"x":9,"y":6,"isBase":true},{"x":10,"y":7,"isBase":true},{"x":9,"y":8,"isBase":true}],"edges":[[0,1],[1,2],[3,4],[4,5],[5,6],[5,7],[0,8],[0,9],[2,10],[10,3],[10,0],[10,5]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"%":{"nodes":[{"x":10,"y":10,"isBase":true},{"x":9,"y":11,"isBase":true},{"x":8,"y":8,"isBase":true},{"x":7,"y":7,"isBase":true},{"x":8,"y":6,"isBase":true},{"x":9,"y":7,"isBase":true},{"x":11,"y":11,"isBase":true},{"x":10,"y":12,"isBase":true},{"x":9,"y":9,"isBase":true},{"x":7,"y":11,"isBase":true},{"x":8,"y":10,"isBase":true},{"x":11,"y":7,"isBase":true},{"x":10,"y":8,"isBase":true}],"edges":[[0,1],[3,2],[3,4],[4,5],[5,2],[0,6],[6,7],[7,1],[9,10],[10,8],[8,12],[12,11]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"&":{"nodes":[{"x":9,"y":9,"isBase":true},{"x":10,"y":8,"isBase":true},{"x":8,"y":10,"isBase":true},{"x":9,"y":11,"isBase":true},{"x":10,"y":10,"isBase":true},{"x":11,"y":9,"isBase":true},{"x":11,"y":11,"isBase":true},{"x":8,"y":8,"isBase":true},{"x":9,"y":7,"isBase":true}],"edges":[[1,0],[0,2],[2,3],[3,4],[4,0],[4,5],[4,6],[0,7],[7,8],[8,1]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"@":{"nodes":[{"x":9,"y":7,"isBase":true},{"x":8,"y":8,"isBase":true},{"x":9,"y":9,"isBase":true},{"x":10,"y":8,"isBase":true},{"x":11,"y":8,"isBase":true},{"x":8,"y":7,"isBase":true},{"x":10,"y":9,"isBase":true},{"x":10,"y":7,"isBase":true},{"x":8,"y":9,"isBase":true},{"x":7,"y":8,"isBase":true},{"x":9,"y":6,"isBase":true},{"x":9,"y":10,"isBase":true}],"edges":[[0,1],[1,2],[2,3],[3,0],[4,7],[3,7],[9,8],[10,5],[11,6],[5,9],[8,11],[4,6],[10,7],[3,6]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"…":{"nodes":[{"x":8,"y":9,"isBase":true},{"x":9,"y":9,"isBase":true},{"x":10,"y":9,"isBase":true}],"edges":[],"strokes":[],"yShift":2,"margins":{"T":0,"B":0,"L":0,"R":0}},"‘":{"nodes":[{"x":8,"y":7,"isBase":true},{"x":7,"y":8,"isBase":true}],"edges":[[0,1]],"strokes":[[0,1]],"yShift":-2.4,"margins":{"T":0,"B":0,"L":0,"R":0}},"’":{"nodes":[{"x":9,"y":8,"isBase":true},{"x":8,"y":9,"isBase":true}],"edges":[[0,1]],"strokes":[],"yShift":-2.4,"margins":{"T":0,"B":0,"L":0,"R":0}},"“":{"nodes":[{"x":9,"y":7,"isBase":true},{"x":8,"y":8,"isBase":true},{"x":10,"y":7,"isBase":true},{"x":9,"y":8,"isBase":true}],"edges":[[0,1],[3,2]],"strokes":[],"yShift":-2.4,"margins":{"T":0,"B":0,"L":0,"R":0}},"”":{"nodes":[{"x":8,"y":9,"isBase":true},{"x":10,"y":8,"isBase":true},{"x":9,"y":9,"isBase":true},{"x":9,"y":8,"isBase":true}],"edges":[[1,2],[0,3]],"strokes":[],"yShift":-2.4,"margins":{"T":0,"B":0,"L":0,"R":0}},"°":{"nodes":[{"x":8,"y":8,"isBase":true},{"x":8,"y":7,"isBase":true},{"x":9,"y":7,"isBase":true},{"x":9,"y":8,"isBase":true}],"edges":[[1,2],[2,3],[3,0],[0,1]],"strokes":[],"yShift":-2,"margins":{"T":0,"B":0,"L":0,"R":0}},"·":{"nodes":[{"x":8,"y":9,"isBase":true}],"edges":[],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"–":{"nodes":[{"x":8,"y":9,"isBase":true},{"x":10,"y":9,"isBase":true}],"edges":[[0,1]],"strokes":[[0,1]],"margins":{"T":0,"B":0,"L":0,"R":0}},"—":{"nodes":[{"x":7,"y":9,"isBase":true},{"x":10,"y":9,"isBase":true}],"edges":[[0,1]],"strokes":[[0,1]],"margins":{"T":0,"B":0,"L":0,"R":0}},"─":{"nodes":[{"x":5,"y":9,"isBase":true},{"x":11,"y":9,"isBase":true},{"x":7,"y":9,"isBase":true},{"x":9,"y":9,"isBase":true}],"edges":[[0,2],[2,3],[3,1]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"×":{"nodes":[{"x":7,"y":8,"isBase":true},{"x":8,"y":9,"isBase":true},{"x":9,"y":10,"isBase":true},{"x":9,"y":8,"isBase":true},{"x":7,"y":10,"isBase":true}],"edges":[[0,1],[1,2],[3,1],[1,4]],"strokes":[[0,1,2],[3,1,4]],"margins":{"T":0,"B":0,"L":0,"R":0}},"▫":{"nodes":[{"x":8,"y":9,"isBase":true},{"x":9,"y":9,"isBase":true},{"x":9,"y":10,"isBase":true},{"x":8,"y":10,"isBase":true}],"edges":[[0,1],[1,2],[2,3],[3,0]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"◯":{"nodes":[{"x":8,"y":7,"isBase":true},{"x":10,"y":9,"isBase":true},{"x":8,"y":11,"isBase":true},{"x":6,"y":9,"isBase":true}],"edges":[[1,2],[2,3],[3,0],[0,1]],"strokes":[[0,1,1,2,3,0]],"margins":{"T":0,"B":0,"L":0,"R":0}},"╳":{"nodes":[{"x":6,"y":7,"isBase":true},{"x":8,"y":9,"isBase":true},{"x":10,"y":11,"isBase":true},{"x":10,"y":7,"isBase":true},{"x":6,"y":11,"isBase":true}],"edges":[[0,1],[1,2],[3,1],[1,4]],"strokes":[[0,1,2],[3,1,4]],"margins":{"T":0,"B":0,"L":0,"R":0}},"〈":{"nodes":[{"x":8,"y":7,"isBase":true},{"x":8,"y":11,"isBase":true},{"x":9,"y":12,"isBase":true},{"x":9,"y":6,"isBase":true},{"x":6,"y":9,"isBase":true},{"x":7,"y":10,"isBase":true},{"x":7,"y":8,"isBase":true}],"edges":[[1,2],[0,3],[4,5],[5,1],[0,6],[6,4]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"〉":{"nodes":[{"x":10,"y":7,"isBase":true},{"x":10,"y":11,"isBase":true},{"x":9,"y":12,"isBase":true},{"x":9,"y":6,"isBase":true},{"x":12,"y":9,"isBase":true},{"x":11,"y":10,"isBase":true},{"x":11,"y":8,"isBase":true}],"edges":[[1,2],[0,3],[4,5],[5,1],[0,6],[6,4]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"《":{"nodes":[{"x":9,"y":7,"isBase":true},{"x":9,"y":11,"isBase":true},{"x":10,"y":12,"isBase":true},{"x":10,"y":6,"isBase":true},{"x":7,"y":9,"isBase":true},{"x":8,"y":10,"isBase":true},{"x":8,"y":8,"isBase":true},{"x":8,"y":7,"isBase":true},{"x":8,"y":11,"isBase":true},{"x":9,"y":12,"isBase":true},{"x":9,"y":6,"isBase":true},{"x":6,"y":9,"isBase":true},{"x":7,"y":10,"isBase":true},{"x":7,"y":8,"isBase":true}],"edges":[[1,2],[0,3],[4,5],[5,1],[0,6],[6,4],[8,9],[7,10],[11,12],[12,8],[7,13],[13,11]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"》":{"nodes":[{"x":9,"y":7,"isBase":true},{"x":9,"y":11,"isBase":true},{"x":8,"y":12,"isBase":true},{"x":8,"y":6,"isBase":true},{"x":11,"y":9,"isBase":true},{"x":10,"y":10,"isBase":true},{"x":10,"y":8,"isBase":true},{"x":10,"y":7,"isBase":true},{"x":10,"y":11,"isBase":true},{"x":9,"y":12,"isBase":true},{"x":9,"y":6,"isBase":true},{"x":12,"y":9,"isBase":true},{"x":11,"y":10,"isBase":true},{"x":11,"y":8,"isBase":true}],"edges":[[1,2],[0,3],[4,5],[5,1],[0,6],[6,4],[8,9],[7,10],[11,12],[12,8],[7,13],[13,11]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"「":{"nodes":[{"x":10,"y":8,"isBase":true},{"x":9,"y":8,"isBase":true},{"x":9,"y":10,"isBase":true},{"x":9,"y":9,"isBase":true}],"edges":[[0,1],[1,3],[3,2]],"strokes":[[0,1,2]],"margins":{"T":0,"B":0,"L":0,"R":0}},"」":{"nodes":[{"x":9,"y":10,"isBase":true},{"x":10,"y":10,"isBase":true},{"x":10,"y":8,"isBase":true},{"x":10,"y":9,"isBase":true}],"edges":[[0,1],[1,3],[3,2]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"『":{"nodes":[{"x":9,"y":7,"isBase":true},{"x":8,"y":7,"isBase":true},{"x":10,"y":8,"isBase":true},{"x":9,"y":8,"isBase":true},{"x":9,"y":10,"isBase":true},{"x":9,"y":9,"isBase":true},{"x":8,"y":9,"isBase":true},{"x":8,"y":8,"isBase":true}],"edges":[[0,1],[2,3],[3,5],[5,4],[1,7],[7,6]],"strokes":[[0,1]],"margins":{"T":0,"B":0,"L":0,"R":0}},"』":{"nodes":[{"x":9,"y":10,"isBase":true},{"x":10,"y":10,"isBase":true},{"x":10,"y":8,"isBase":true},{"x":8,"y":9,"isBase":true},{"x":9,"y":9,"isBase":true},{"x":9,"y":7,"isBase":true},{"x":9,"y":8,"isBase":true},{"x":10,"y":9,"isBase":true}],"edges":[[0,1],[3,4],[4,6],[6,5],[1,7],[7,2]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"ㅐ":{"nodes":[{"x":0,"y":0,"jSrc":"jung1","isBase":true},{"x":0,"y":2,"jSrc":"jung1","isBase":true},{"x":0,"y":4,"jSrc":"jung1","isBase":true},{"x":1,"y":2,"jSrc":"jung1","isBase":true},{"x":0,"y":1,"jSrc":"jung1","isBase":true},{"x":0,"y":3,"jSrc":"jung1","isBase":true},{"x":1,"y":4,"jSrc":"jung2","isBase":true},{"x":1,"y":1,"jSrc":"jung2","isBase":true},{"x":1,"y":3,"jSrc":"jung2","isBase":true},{"x":1,"y":2,"jSrc":"jung2","isBase":true},{"x":1,"y":0,"jSrc":"jung2","isBase":true}],"edges":[[1,3],[0,4],[4,1],[1,5],[5,2],[8,6],[7,9],[9,8],[7,10]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"ㅒ":{"nodes":[{"x":0,"y":0,"jSrc":"jung1","isBase":true},{"x":0,"y":1,"jSrc":"jung1","isBase":true},{"x":0,"y":3,"jSrc":"jung1","isBase":true},{"x":1,"y":1,"jSrc":"jung1","isBase":true},{"x":0,"y":4,"jSrc":"jung1","isBase":true},{"x":1,"y":3,"jSrc":"jung1","isBase":true},{"x":0,"y":2,"jSrc":"jung1","isBase":true},{"x":1,"y":4,"jSrc":"jung2","isBase":true},{"x":1,"y":1,"jSrc":"jung2","isBase":true},{"x":1,"y":3,"jSrc":"jung2","isBase":true},{"x":1,"y":2,"jSrc":"jung2","isBase":true},{"x":1,"y":0,"jSrc":"jung2","isBase":true}],"edges":[[0,1],[1,3],[2,4],[2,5],[1,6],[6,2],[9,7],[8,10],[10,9],[8,11]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"ㅔ":{"nodes":[{"x":0,"y":2,"jSrc":"jung1","isBase":true},{"x":1,"y":2,"jSrc":"jung1","isBase":true},{"x":1,"y":0,"jSrc":"jung1","isBase":true},{"x":1,"y":4,"jSrc":"jung1","isBase":true},{"x":1,"y":1,"jSrc":"jung1","isBase":true},{"x":1,"y":3,"jSrc":"jung1","isBase":true},{"x":5,"y":4,"jSrc":"jung2","isBase":true},{"x":5,"y":1,"jSrc":"jung2","isBase":true},{"x":5,"y":3,"jSrc":"jung2","isBase":true},{"x":5,"y":2,"jSrc":"jung2","isBase":true},{"x":5,"y":0,"jSrc":"jung2","isBase":true}],"edges":[[0,1],[2,4],[4,1],[1,5],[5,3],[8,6],[7,9],[9,8],[7,10]],"strokes":[[0,1],[2,1],[3,1]],"margins":{"T":0,"B":0,"L":0,"R":0}},"ㅖ":{"nodes":[{"x":1,"y":1,"jSrc":"jung1","isBase":true},{"x":0,"y":1,"jSrc":"jung1","isBase":true},{"x":1,"y":0,"jSrc":"jung1","isBase":true},{"x":1,"y":3,"jSrc":"jung1","isBase":true},{"x":1,"y":4,"jSrc":"jung1","isBase":true},{"x":0,"y":3,"jSrc":"jung1","isBase":true},{"x":1,"y":2,"jSrc":"jung1","isBase":true},{"x":5,"y":4,"jSrc":"jung2","isBase":true},{"x":5,"y":1,"jSrc":"jung2","isBase":true},{"x":5,"y":3,"jSrc":"jung2","isBase":true},{"x":5,"y":2,"jSrc":"jung2","isBase":true},{"x":5,"y":0,"jSrc":"jung2","isBase":true}],"edges":[[1,0],[2,0],[3,4],[3,5],[0,6],[6,3],[9,7],[8,10],[10,9],[8,11]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"ㄲ":{"nodes":[{"x":0,"y":0,"jSrc":"cho1","isBase":true},{"x":2,"y":0,"jSrc":"cho1","isBase":true},{"x":2,"y":2,"jSrc":"cho1","isBase":true},{"x":1,"y":0,"jSrc":"cho1","isBase":true},{"x":2,"y":1,"jSrc":"cho1","isBase":true},{"x":6,"y":0,"jSrc":"cho2","isBase":true},{"x":8,"y":0,"jSrc":"cho2","isBase":true},{"x":8,"y":2,"jSrc":"cho2","isBase":true},{"x":7,"y":0,"jSrc":"cho2","isBase":true},{"x":8,"y":1,"jSrc":"cho2","isBase":true}],"edges":[[0,3],[3,1],[1,4],[4,2],[5,8],[8,6],[6,9],[9,7]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"ㄸ":{"nodes":[{"x":0,"y":2,"jSrc":"cho1","isBase":true},{"x":2,"y":2,"jSrc":"cho1","isBase":true},{"x":2,"y":0,"jSrc":"cho1","isBase":true},{"x":0,"y":0,"jSrc":"cho1","isBase":true},{"x":0,"y":1,"jSrc":"cho1","isBase":true},{"x":1,"y":0,"jSrc":"cho1","isBase":true},{"x":1,"y":2,"jSrc":"cho1","isBase":true},{"x":6,"y":2,"jSrc":"cho2","isBase":true},{"x":8,"y":2,"jSrc":"cho2","isBase":true},{"x":8,"y":0,"jSrc":"cho2","isBase":true},{"x":6,"y":0,"jSrc":"cho2","isBase":true},{"x":6,"y":1,"jSrc":"cho2","isBase":true},{"x":7,"y":0,"jSrc":"cho2","isBase":true},{"x":7,"y":2,"jSrc":"cho2","isBase":true}],"edges":[[0,4],[4,3],[3,5],[5,2],[0,6],[6,1],[7,11],[11,10],[10,12],[12,9],[7,13],[13,8]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"ㅃ":{"nodes":[{"x":0,"y":0,"jSrc":"cho1","isBase":true},{"x":0,"y":1,"jSrc":"cho1","isBase":true},{"x":0,"y":2,"jSrc":"cho1","isBase":true},{"x":2,"y":2,"jSrc":"cho1","isBase":true},{"x":2,"y":1,"jSrc":"cho1","isBase":true},{"x":2,"y":0,"jSrc":"cho1","isBase":true},{"x":1,"y":2,"jSrc":"cho1","isBase":true},{"x":1,"y":1,"jSrc":"cho1","isBase":true},{"x":6,"y":0,"jSrc":"cho2","isBase":true},{"x":6,"y":1,"jSrc":"cho2","isBase":true},{"x":6,"y":2,"jSrc":"cho2","isBase":true},{"x":8,"y":2,"jSrc":"cho2","isBase":true},{"x":8,"y":1,"jSrc":"cho2","isBase":true},{"x":8,"y":0,"jSrc":"cho2","isBase":true},{"x":7,"y":2,"jSrc":"cho2","isBase":true},{"x":7,"y":1,"jSrc":"cho2","isBase":true}],"edges":[[0,1],[1,2],[3,4],[4,5],[2,6],[6,3],[4,7],[7,1],[8,9],[9,10],[11,12],[12,13],[10,14],[14,11],[12,15],[15,9]],"strokes":[[0,1,2,3,4,5],[4,1],[8,9,10,11,12,13],[12,9]],"margins":{"T":0,"B":0,"L":0,"R":0}},"ㅆ":{"nodes":[{"x":2,"y":2,"jSrc":"cho1","isBase":true},{"x":1,"y":1,"jSrc":"cho1","isBase":true},{"x":0,"y":2,"jSrc":"cho1","isBase":true},{"x":1,"y":0,"jSrc":"cho1","isBase":true},{"x":8,"y":2,"jSrc":"cho2","isBase":true},{"x":7,"y":1,"jSrc":"cho2","isBase":true},{"x":6,"y":2,"jSrc":"cho2","isBase":true},{"x":7,"y":0,"jSrc":"cho2","isBase":true}],"edges":[[0,1],[1,2],[1,3],[4,5],[5,6],[5,7]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"ㅉ":{"nodes":[{"x":0,"y":2,"jSrc":"cho1","isBase":true},{"x":2,"y":2,"jSrc":"cho1","isBase":true},{"x":1,"y":1,"jSrc":"cho1","isBase":true},{"x":1,"y":0,"jSrc":"cho1","isBase":true},{"x":0,"y":0,"jSrc":"cho1","isBase":true},{"x":2,"y":0,"jSrc":"cho1","isBase":true},{"x":6,"y":2,"jSrc":"cho2","isBase":true},{"x":8,"y":2,"jSrc":"cho2","isBase":true},{"x":7,"y":1,"jSrc":"cho2","isBase":true},{"x":7,"y":0,"jSrc":"cho2","isBase":true},{"x":6,"y":0,"jSrc":"cho2","isBase":true},{"x":8,"y":0,"jSrc":"cho2","isBase":true}],"edges":[[0,2],[2,1],[2,3],[3,4],[3,5],[6,8],[8,7],[8,9],[9,10],[9,11]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}}},"characters":["ㄱ","ㄴ","ㄷ","ㄹ","ㅁ","ㅂ","ㅅ","ㅇ","ㅈ","ㅊ","ㅋ","ㅌ","ㅍ","ㅎ","ㅏ","ㅑ","ㅓ","ㅕ","ㅗ","ㅛ","ㅜ","ㅠ","ㅡ","ㅣ","0","1","2","3","4","5","6","7","8","9","A","B","C","D","E","F","G","H","I","J","K","L","M","N","O","P","Q","R","S","T","U","V","W","X","Y","Z","a","b","c","d","e","f","g","h","i","j","k","l","m","n","o","p","q","r","s","t","u","v","w","x","y","z","!","\"","#","$","%","&","'","(",")","*","+",",","-",".","/",":",";","<","=",">","?","@","[","\\","]","^","_","`","{","|","}","~"],"userAdded":[],"removedDefaults":[],"moimkkol":{"v|0|none":[{"kind":"cho1","x":8,"y":6,"w":2,"h":2},{"kind":"jung1","x":8,"y":9,"w":2,"h":2}],"mix|0|none":[{"kind":"cho1","x":7,"y":7,"w":2,"h":2},{"kind":"jung1","x":7,"y":10,"w":2,"h":2},{"kind":"jung2","x":10,"y":7,"w":2,"h":2}],"h_glue|0|single":[{"kind":"cho1","x":6,"y":7,"w":2,"h":2},{"kind":"jung1","x":9,"y":7,"w":2,"h":2},{"kind":"jung2","x":11,"y":7,"w":2,"h":2},{"kind":"jong1","x":6,"y":10,"w":2,"h":2}],"mix|0|single":[{"kind":"cho1","x":7,"y":6,"w":2,"h":2},{"kind":"jung1","x":7,"y":9,"w":2,"h":2},{"kind":"jung2","x":10,"y":6,"w":2,"h":2},{"kind":"jong1","x":10,"y":9,"w":2,"h":2}],"h|1|none":[{"kind":"cho1","x":6,"y":8,"w":2,"h":2},{"kind":"cho2","x":8,"y":8,"w":2,"h":2},{"kind":"jung1","x":11,"y":8,"w":2,"h":2}],"v|1|none":[{"kind":"cho1","x":7,"y":7,"w":2,"h":2},{"kind":"cho2","x":9,"y":7,"w":2,"h":2},{"kind":"jung1","x":8,"y":10,"w":2,"h":2}],"h_glue|1|none":[{"kind":"cho1","x":5,"y":8,"w":2,"h":2},{"kind":"cho2","x":7,"y":8,"w":2,"h":2},{"kind":"jung1","x":10,"y":8,"w":2,"h":2},{"kind":"jung2","x":12,"y":8,"w":2,"h":2}],"mix|1|none":[{"kind":"cho1","x":6,"y":7,"w":2,"h":2},{"kind":"cho2","x":8,"y":7,"w":2,"h":2},{"kind":"jung1","x":7,"y":10,"w":2,"h":2},{"kind":"jung2","x":11,"y":7,"w":2,"h":2}],"mix_split|1|none":[{"kind":"cho1","x":4,"y":7,"w":2,"h":2},{"kind":"cho2","x":6,"y":7,"w":2,"h":2},{"kind":"jung1","x":5,"y":10,"w":2,"h":2},{"kind":"jung2","x":9,"y":7,"w":2,"h":2},{"kind":"jung3","x":11,"y":7,"w":2,"h":2}],"h|1|single":[{"kind":"cho1","x":6,"y":6,"w":2,"h":2},{"kind":"cho2","x":8,"y":6,"w":2,"h":2},{"kind":"jung1","x":11,"y":6,"w":2,"h":2},{"kind":"jong1","x":7,"y":9,"w":2,"h":2}],"v|1|single":[{"kind":"cho1","x":7,"y":5,"w":2,"h":2},{"kind":"cho2","x":9,"y":5,"w":2,"h":2},{"kind":"jung1","x":8,"y":8,"w":2,"h":2},{"kind":"jong1","x":8,"y":11,"w":2,"h":2}],"h_glue|1|single":[{"kind":"cho1","x":5,"y":7,"w":2,"h":2},{"kind":"cho2","x":7,"y":7,"w":2,"h":2},{"kind":"jung1","x":10,"y":7,"w":2,"h":2},{"kind":"jung2","x":12,"y":7,"w":2,"h":2},{"kind":"jong1","x":6,"y":10,"w":2,"h":2}],"mix|1|single":[{"kind":"cho1","x":6,"y":6,"w":2,"h":2},{"kind":"cho2","x":8,"y":6,"w":2,"h":2},{"kind":"jung1","x":7,"y":9,"w":2,"h":2},{"kind":"jung2","x":11,"y":6,"w":2,"h":2},{"kind":"jong1","x":10,"y":9,"w":2,"h":2}],"mix_split|1|single":[{"kind":"cho1","x":5,"y":7,"w":2,"h":2},{"kind":"cho2","x":7,"y":7,"w":2,"h":2},{"kind":"jung1","x":7,"y":10,"w":2,"h":2},{"kind":"jung2","x":10,"y":7,"w":2,"h":2},{"kind":"jung3","x":12,"y":7,"w":2,"h":2},{"kind":"jong1","x":10,"y":10,"w":2,"h":2}],"h|0|split":[{"kind":"cho1","x":7,"y":7,"w":2,"h":2},{"kind":"jung1","x":10,"y":7,"w":2,"h":2},{"kind":"jong1","x":6,"y":10,"w":2,"h":2},{"kind":"jong2","x":8,"y":10,"w":2,"h":2}],"v|0|split":[{"kind":"cho1","x":8,"y":5,"w":2,"h":2},{"kind":"jung1","x":8,"y":8,"w":2,"h":2},{"kind":"jong1","x":7,"y":11,"w":2,"h":2},{"kind":"jong2","x":9,"y":11,"w":2,"h":2}],"h_glue|0|split":[{"kind":"cho1","x":6,"y":7,"w":2,"h":2},{"kind":"jung1","x":9,"y":7,"w":2,"h":2},{"kind":"jung2","x":11,"y":7,"w":2,"h":2},{"kind":"jong1","x":5,"y":10,"w":2,"h":2},{"kind":"jong2","x":7,"y":10,"w":2,"h":2}],"mix|0|split":[{"kind":"cho1","x":6,"y":7,"w":2,"h":2},{"kind":"jung1","x":5,"y":10,"w":2,"h":2},{"kind":"jung2","x":9,"y":7,"w":2,"h":2},{"kind":"jong1","x":8,"y":10,"w":2,"h":2},{"kind":"jong2","x":10,"y":10,"w":2,"h":2}],"mix_split|0|split":[{"kind":"cho1","x":6,"y":7,"w":2,"h":2},{"kind":"jung1","x":6,"y":10,"w":2,"h":2},{"kind":"jung2","x":9,"y":7,"w":2,"h":2},{"kind":"jung3","x":11,"y":7,"w":2,"h":2},{"kind":"jong1","x":9,"y":10,"w":2,"h":2},{"kind":"jong2","x":11,"y":10,"w":2,"h":2}],"h|1|split":[{"kind":"cho1","x":6,"y":7,"w":2,"h":2},{"kind":"cho2","x":8,"y":7,"w":2,"h":2},{"kind":"jung1","x":11,"y":7,"w":2,"h":2},{"kind":"jong1","x":6,"y":10,"w":2,"h":2},{"kind":"jong2","x":8,"y":10,"w":2,"h":2}],"v|1|split":[{"kind":"cho1","x":7,"y":5,"w":2,"h":2},{"kind":"cho2","x":9,"y":5,"w":2,"h":2},{"kind":"jung1","x":8,"y":8,"w":2,"h":2},{"kind":"jong1","x":7,"y":11,"w":2,"h":2},{"kind":"jong2","x":9,"y":11,"w":2,"h":2}],"mix_split|1|split":[{"kind":"cho1","x":5,"y":7,"w":2,"h":2},{"kind":"cho2","x":7,"y":7,"w":2,"h":2},{"kind":"jung1","x":6,"y":10,"w":2,"h":2},{"kind":"jung2","x":10,"y":7,"w":2,"h":2},{"kind":"jung3","x":12,"y":7,"w":2,"h":2},{"kind":"jong1","x":9,"y":10,"w":2,"h":2},{"kind":"jong2","x":11,"y":10,"w":2,"h":2}],"h_glue|1|split":[{"kind":"cho1","x":5,"y":7,"w":2,"h":2},{"kind":"cho2","x":7,"y":7,"w":2,"h":2},{"kind":"jung1","x":10,"y":7,"w":2,"h":2},{"kind":"jung2","x":12,"y":7,"w":2,"h":2},{"kind":"jong1","x":5,"y":10,"w":2,"h":2},{"kind":"jong2","x":7,"y":10,"w":2,"h":2}],"mix|1|split":[{"kind":"cho1","x":5,"y":7,"w":2,"h":2},{"kind":"cho2","x":7,"y":7,"w":2,"h":2},{"kind":"jung1","x":5,"y":10,"w":2,"h":2},{"kind":"jung2","x":10,"y":7,"w":2,"h":2},{"kind":"jong1","x":8,"y":10,"w":2,"h":2},{"kind":"jong2","x":10,"y":10,"w":2,"h":2}],"mix_split|0|none":[{"kind":"cho1","x":6,"y":7,"w":2,"h":2},{"kind":"jung1","x":6,"y":10,"w":2,"h":2},{"kind":"jung2","x":9,"y":7,"w":2,"h":2},{"kind":"jung3","x":11,"y":7,"w":2,"h":2}],"h_glue|0|none":[{"kind":"cho1","x":6,"y":8,"w":2,"h":2},{"kind":"jung1","x":9,"y":8,"w":2,"h":2},{"kind":"jung2","x":11,"y":8,"w":2,"h":2}],"v|0|single":[{"kind":"cho1","x":8,"y":5,"w":2,"h":2},{"kind":"jung1","x":8,"y":8,"w":2,"h":2},{"kind":"jong1","x":8,"y":11,"w":2,"h":2}],"mix_split|0|single":[{"kind":"cho1","x":6,"y":6,"w":2,"h":2},{"kind":"jung1","x":6,"y":9,"w":2,"h":2},{"kind":"jung2","x":9,"y":6,"w":2,"h":2},{"kind":"jung3","x":11,"y":6,"w":2,"h":2},{"kind":"jong1","x":9,"y":9,"w":2,"h":2}],"h|0|none":[{"kind":"cho1","x":7,"y":8,"w":2,"h":2},{"kind":"jung1","x":10,"y":8,"w":2,"h":2}],"h|0|single":[{"kind":"cho1","x":7,"y":7,"w":2,"h":2},{"kind":"jung1","x":10,"y":7,"w":2,"h":2},{"kind":"jong1","x":10,"y":10,"w":2,"h":2}],"h|none":[{"kind":"cho1","x":6,"y":8,"w":2,"h":2},{"kind":"jung1","x":10,"y":8,"w":2,"h":2}],"v|none":[{"kind":"cho1","x":8,"y":6,"w":2,"h":2},{"kind":"jung1","x":8,"y":10,"w":2,"h":2}],"mix|none":[{"kind":"cho1","x":6,"y":6,"w":2,"h":2},{"kind":"jung2","x":10,"y":8,"w":2,"h":2},{"kind":"jung3","x":6,"y":10,"w":2,"h":2}],"h|jong":[{"kind":"cho1","x":6,"y":6,"w":2,"h":2},{"kind":"jung1","x":10,"y":6,"w":2,"h":2},{"kind":"jong1","x":8,"y":10,"w":2,"h":2}],"v|jong":[{"kind":"cho1","x":8,"y":4,"w":2,"h":2},{"kind":"jung1","x":8,"y":8,"w":2,"h":2},{"kind":"jong1","x":8,"y":12,"w":2,"h":2}],"mix|jong":[{"kind":"cho1","x":6,"y":5,"w":2,"h":2},{"kind":"jung2","x":10,"y":7,"w":2,"h":2},{"kind":"jung3","x":6,"y":9,"w":2,"h":2},{"kind":"jong1","x":10,"y":11,"w":2,"h":2}]},"moimkkolYShift":{},"meta":{"app":"mungchin-hangul","version":2,"coordScale":2,"savedAt":"2026-05-21T15:12:52.637Z"}};
+const EMBEDDED_DEFAULT_JSON = {"designs":{"0":{"nodes":[{"x":9,"y":6,"isBase":true},{"x":8,"y":10,"isBase":true},{"x":9,"y":12,"isBase":true},{"x":10,"y":10,"isBase":true},{"x":10,"y":8,"isBase":true},{"x":8,"y":8,"isBase":true}],"edges":[[1,2],[2,3],[0,4],[4,3],[5,0],[5,1],[4,1]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"1":{"nodes":[{"x":8,"y":11,"isBase":true},{"x":9,"y":11,"isBase":true},{"x":10,"y":11,"isBase":true},{"x":9,"y":6,"isBase":true},{"x":8,"y":7,"isBase":true}],"edges":[[0,1],[1,2],[1,3],[3,4]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"2":{"nodes":[{"x":8,"y":8,"isBase":true},{"x":9,"y":6,"isBase":true},{"x":10,"y":8,"isBase":true},{"x":8,"y":12,"isBase":true},{"x":10,"y":12,"isBase":true},{"x":10,"y":10,"isBase":true}],"edges":[[0,1],[1,2],[3,4],[2,5],[5,3]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"3":{"nodes":[{"x":8,"y":7,"isBase":true},{"x":9,"y":5,"isBase":true},{"x":9,"y":13,"isBase":true},{"x":8,"y":11,"isBase":true},{"x":9,"y":9,"isBase":true},{"x":10,"y":7,"isBase":true},{"x":10,"y":11,"isBase":true},{"x":8,"y":9,"isBase":true}],"edges":[[0,1],[2,3],[1,5],[5,4],[4,6],[6,2],[4,7]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"4":{"nodes":[{"x":7,"y":10,"isBase":true},{"x":9,"y":6,"isBase":true},{"x":10,"y":10,"isBase":true},{"x":9,"y":10,"isBase":true},{"x":9,"y":12,"isBase":true}],"edges":[[0,1],[1,3],[3,2],[0,3],[3,4]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"5":{"nodes":[{"x":8,"y":6,"isBase":true},{"x":10,"y":6,"isBase":true},{"x":10,"y":9,"isBase":true},{"x":9,"y":12,"isBase":true},{"x":8,"y":10,"isBase":true},{"x":10,"y":10,"isBase":true},{"x":8,"y":9,"isBase":true},{"x":9,"y":7,"isBase":true}],"edges":[[1,0],[3,4],[2,5],[5,3],[0,6],[6,7],[7,2]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"6":{"nodes":[{"x":9,"y":6,"isBase":true},{"x":8,"y":8,"isBase":true},{"x":8,"y":10,"isBase":true},{"x":9,"y":12,"isBase":true},{"x":10,"y":10,"isBase":true},{"x":9,"y":8,"isBase":true},{"x":10,"y":8,"isBase":true}],"edges":[[0,1],[1,2],[2,3],[3,4],[4,5],[5,2],[0,6]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"7":{"nodes":[{"x":8,"y":6,"isBase":true},{"x":10,"y":6,"isBase":true},{"x":8,"y":12,"isBase":true},{"x":8,"y":7,"isBase":true}],"edges":[[0,1],[0,3],[2,1]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"8":{"nodes":[{"x":9,"y":5,"isBase":true},{"x":8,"y":7,"isBase":true},{"x":9,"y":9,"isBase":true},{"x":10,"y":11,"isBase":true},{"x":9,"y":13,"isBase":true},{"x":8,"y":11,"isBase":true},{"x":10,"y":7,"isBase":true}],"edges":[[0,1],[1,2],[2,3],[3,4],[4,5],[5,2],[2,6],[6,0]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"9":{"nodes":[{"x":9,"y":10,"isBase":true},{"x":8,"y":8,"isBase":true},{"x":9,"y":6,"isBase":true},{"x":10,"y":8,"isBase":true},{"x":10,"y":10,"isBase":true},{"x":9,"y":12,"isBase":true},{"x":8,"y":10,"isBase":true}],"edges":[[0,1],[1,2],[2,3],[3,0],[3,4],[4,5],[5,6]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"ㄱ":{"nodes":[{"x":7,"y":7,"isBase":true},{"x":10,"y":7,"isBase":true},{"x":10,"y":10,"isBase":true}],"edges":[[0,1],[1,2]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"ㄴ":{"nodes":[{"x":8,"y":7,"isBase":true,"tags":["n"],"tagFilters":{"n":"ㅣ@jung1,ㅏ@jung1"}},{"x":8,"y":10,"isBase":true},{"x":11,"y":10,"isBase":true}],"edges":[[0,1],[1,2]],"strokes":[[0,1]],"margins":{"T":0,"B":2,"L":2,"R":0}},"ㄷ":{"nodes":[{"x":8,"y":10,"isBase":true},{"x":11,"y":10,"isBase":true},{"x":7,"y":7,"isBase":true},{"x":11,"y":7,"isBase":true},{"x":8,"y":7,"isBase":true}],"edges":[[0,1],[2,4],[4,3],[0,4]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"ㄹ":{"nodes":[{"x":8,"y":6,"isBase":true},{"x":8,"y":10,"isBase":true},{"x":11,"y":6,"isBase":true},{"x":11,"y":10,"isBase":true},{"x":11,"y":8,"isBase":true},{"x":7,"y":8,"isBase":true},{"x":8,"y":8,"isBase":true},{"x":12,"y":8,"isBase":true}],"edges":[[1,3],[0,2],[2,4],[5,6],[6,4],[1,6],[4,7]],"strokes":[[0,2]],"margins":{"T":0,"B":0,"L":0,"R":0}},"ㅁ":{"nodes":[{"x":8,"y":10,"isBase":true},{"x":11,"y":10,"isBase":true},{"x":7,"y":7,"isBase":true},{"x":8,"y":7,"isBase":true},{"x":12,"y":10,"isBase":true},{"x":11,"y":7,"isBase":true}],"edges":[[0,1],[2,3],[3,0],[1,4],[1,5],[3,5]],"strokes":[[0,1,2,0]],"margins":{"T":0,"B":0,"L":0,"R":0}},"ㅂ":{"nodes":[{"x":8,"y":6,"isBase":true},{"x":8,"y":8,"isBase":true},{"x":8,"y":11,"isBase":true},{"x":11,"y":11,"isBase":true},{"x":11,"y":8,"isBase":true},{"x":11,"y":6,"isBase":true},{"x":7,"y":8,"isBase":true}],"edges":[[0,1],[1,2],[2,3],[3,4],[4,5],[4,1],[6,1]],"strokes":[[0,1,2,3,4,5],[4,1]],"margins":{"T":0,"B":0,"L":0,"R":0}},"ㅅ":{"nodes":[{"x":11,"y":11,"isBase":true},{"x":9,"y":9,"isBase":true},{"x":7,"y":11,"isBase":true},{"x":11,"y":7,"isBase":true}],"edges":[[0,1],[1,2],[1,3]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"ㅇ":{"nodes":[{"x":9,"y":11,"isBase":true},{"x":9,"y":7,"isBase":true},{"x":11,"y":9,"isBase":true},{"x":7,"y":9,"isBase":true},{"x":10,"y":7,"isBase":true}],"edges":[[1,2],[0,3],[1,3],[0,2],[1,4]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"ㅈ":{"nodes":[{"x":7,"y":11,"isBase":true},{"x":11,"y":11,"isBase":true},{"x":9,"y":9,"isBase":true},{"x":11,"y":7,"isBase":true},{"x":8,"y":7,"isBase":true}],"edges":[[0,2],[2,1],[2,3],[3,4]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"ㅊ":{"nodes":[{"x":11,"y":7,"isBase":true},{"x":8,"y":7,"isBase":true},{"x":7,"y":11,"isBase":true},{"x":9,"y":9,"isBase":true},{"x":11,"y":11,"isBase":true},{"x":9,"y":5,"isBase":true},{"x":12,"y":7,"isBase":true}],"edges":[[0,3],[3,2],[3,4],[0,1],[0,5],[0,6]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"ㅋ":{"nodes":[{"x":8,"y":7,"isBase":true},{"x":11,"y":7,"isBase":true},{"x":11,"y":11,"isBase":true},{"x":9,"y":9,"isBase":true},{"x":11,"y":9,"isBase":true}],"edges":[[0,1],[1,4],[4,2],[3,4]],"strokes":[[0,1,2]],"margins":{"T":0,"B":0,"L":0,"R":0}},"ㅌ":{"nodes":[{"x":8,"y":9,"isBase":true},{"x":8,"y":11,"isBase":true},{"x":11,"y":11,"isBase":true},{"x":10,"y":9,"isBase":true},{"x":8,"y":7,"isBase":true},{"x":7,"y":7,"isBase":true},{"x":11,"y":7,"isBase":true}],"edges":[[0,1],[1,2],[3,0],[0,4],[4,5],[4,6]],"strokes":[[0,1,2],[3,0]],"margins":{"T":0,"B":0,"L":0,"R":0}},"ㅍ":{"nodes":[{"x":6,"y":7,"isBase":true},{"x":8,"y":7,"isBase":true},{"x":8,"y":10,"isBase":true},{"x":13,"y":10,"isBase":true},{"x":11,"y":10,"isBase":true},{"x":11,"y":7,"isBase":true},{"x":6,"y":10,"isBase":true},{"x":13,"y":7,"isBase":true}],"edges":[[0,1],[2,1],[4,3],[1,5],[4,5],[2,4],[2,6],[5,7]],"strokes":[[0,1],[2,3],[2,1]],"margins":{"T":0,"B":0,"L":0,"R":0}},"ㅎ":{"nodes":[{"x":6,"y":7,"isBase":true},{"x":7,"y":9,"isBase":true},{"x":9,"y":7,"isBase":true},{"x":9,"y":11,"isBase":true},{"x":11,"y":9,"isBase":true},{"x":7,"y":5,"isBase":true},{"x":10,"y":7,"isBase":true}],"edges":[[1,3],[3,4],[2,0],[1,2],[2,4],[2,5],[2,6]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"ㅏ":{"nodes":[{"x":9,"y":6,"isBase":true},{"x":9,"y":9,"isBase":true},{"x":9,"y":12,"isBase":true,"tags":["s"],"tagFilters":{"s":"ㄴ@jong1"}},{"x":11,"y":9,"tags":["s"],"tagFilters":{"s":"ㅣ"},"isBase":true}],"edges":[[1,2],[1,3],[0,1]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"ㅑ":{"nodes":[{"x":9,"y":6,"isBase":true},{"x":9,"y":8,"isBase":true},{"x":9,"y":10,"isBase":true},{"x":11,"y":8,"tags":["s"],"tagFilters":{"s":"ㅣ"},"isBase":true},{"x":9,"y":12,"isBase":true},{"x":11,"y":10,"tags":["s"],"tagFilters":{"s":"ㅣ"},"isBase":true}],"edges":[[0,1],[1,2],[1,3],[2,4],[2,5]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"ㅓ":{"nodes":[{"x":7,"y":9,"isBase":true},{"x":9,"y":9,"isBase":true},{"x":9,"y":6,"isBase":true},{"x":9,"y":12,"isBase":true}],"edges":[[0,1],[2,1],[1,3]],"strokes":[[0,1],[2,1],[3,1]],"margins":{"T":0,"B":0,"L":0,"R":0}},"ㅕ":{"nodes":[{"x":9,"y":8,"isBase":true},{"x":7,"y":8,"isBase":true},{"x":9,"y":6,"isBase":true},{"x":9,"y":10,"isBase":true},{"x":9,"y":12,"isBase":true},{"x":7,"y":10,"isBase":true}],"edges":[[1,0],[2,0],[0,3],[3,4],[3,5]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"ㅗ":{"nodes":[{"x":9,"y":7,"isBase":true},{"x":12,"y":9,"isBase":true},{"x":6,"y":9,"isBase":true},{"x":9,"y":9,"isBase":true}],"edges":[[2,3],[3,1],[3,0]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"ㅛ":{"nodes":[{"x":8,"y":9,"isBase":true},{"x":10,"y":9,"isBase":true},{"x":8,"y":7,"isBase":true},{"x":10,"y":7,"isBase":true},{"x":6,"y":9,"isBase":true},{"x":12,"y":9,"isBase":true}],"edges":[[0,1],[0,2],[1,3],[1,5],[0,4]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"ㅜ":{"nodes":[{"x":9,"y":11,"isBase":true},{"x":6,"y":9,"isBase":true},{"x":12,"y":9,"isBase":true},{"x":9,"y":9,"isBase":true}],"edges":[[1,3],[3,2],[3,0]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"ㅠ":{"nodes":[{"x":8,"y":11,"isBase":true},{"x":10,"y":11,"isBase":true},{"x":6,"y":9,"isBase":true},{"x":12,"y":9,"isBase":true},{"x":10,"y":9,"isBase":true},{"x":8,"y":9,"isBase":true}],"edges":[[3,4],[4,5],[5,2],[5,0],[4,1]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"ㅡ":{"nodes":[{"x":6,"y":9,"isBase":true},{"x":12,"y":9,"isBase":true}],"edges":[[1,0]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"ㅣ":{"nodes":[{"x":9,"y":8,"tags":["n"],"tagFilters":{"n":"ㅑ"},"isBase":true},{"x":9,"y":10,"tags":["n"],"tagFilters":{"n":"ㅑ"},"isBase":true},{"x":9,"y":9,"tags":["n"],"tagFilters":{"n":"ㅏ"},"isBase":true},{"x":9,"y":6,"isBase":true},{"x":9,"y":12,"isBase":true,"tags":["s"],"tagFilters":{"s":"ㄴ@jong1"}}],"edges":[[0,2],[2,1],[0,3],[1,4]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"A":{"nodes":[{"x":7,"y":11,"isBase":true},{"x":8,"y":9,"isBase":true},{"x":9,"y":7,"isBase":true},{"x":10,"y":9,"isBase":true},{"x":11,"y":11,"isBase":true}],"edges":[[0,1],[1,2],[2,3],[3,4],[1,3]],"strokes":[[0,1,2,3,4],[1,3]],"margins":{"T":0,"B":0,"L":0,"R":0}},"B":{"nodes":[{"x":9,"y":13,"isBase":true},{"x":10,"y":11,"isBase":true},{"x":10,"y":7,"isBase":true},{"x":9,"y":9,"isBase":true},{"x":8,"y":11,"isBase":true},{"x":8,"y":13,"isBase":true},{"x":9,"y":5,"isBase":true},{"x":8,"y":7,"isBase":true},{"x":8,"y":9,"isBase":true},{"x":8,"y":5,"isBase":true}],"edges":[[0,1],[2,3],[3,1],[4,0],[4,5],[6,2],[6,7],[7,8],[8,4],[3,8],[7,9]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"C":{"nodes":[{"x":9,"y":5,"isBase":true},{"x":8,"y":7,"isBase":true},{"x":8,"y":10,"isBase":true},{"x":9,"y":12,"isBase":true},{"x":10,"y":7,"isBase":true},{"x":10,"y":10,"isBase":true}],"edges":[[0,1],[1,2],[2,3],[0,4],[3,5]],"strokes":[[0,1,2,3]],"margins":{"T":0,"B":0,"L":0,"R":0}},"D":{"nodes":[{"x":9,"y":6,"isBase":true},{"x":9,"y":12,"isBase":true},{"x":11,"y":8,"isBase":true},{"x":8,"y":6,"isBase":true},{"x":8,"y":12,"isBase":true},{"x":11,"y":10,"isBase":true}],"edges":[[0,1],[0,3],[1,4],[0,2],[5,2],[5,1]],"strokes":[[1,0,1]],"margins":{"T":0,"B":0,"L":0,"R":0}},"E":{"nodes":[{"x":8,"y":6,"isBase":true},{"x":8,"y":9,"isBase":true},{"x":8,"y":12,"isBase":true},{"x":10,"y":6,"isBase":true},{"x":9,"y":9,"isBase":true},{"x":10,"y":12,"isBase":true},{"x":7,"y":6,"isBase":true},{"x":7,"y":12,"isBase":true}],"edges":[[0,1],[1,2],[0,3],[1,4],[2,5],[6,0],[2,7]],"strokes":[[3,0,1,2,5],[1,4]],"margins":{"T":0,"B":0,"L":0,"R":0}},"F":{"nodes":[{"x":8,"y":6,"isBase":true},{"x":8,"y":9,"isBase":true},{"x":8,"y":12,"isBase":true},{"x":10,"y":6,"isBase":true},{"x":10,"y":9,"isBase":true},{"x":7,"y":6,"isBase":true}],"edges":[[0,1],[1,2],[0,3],[1,4],[5,0]],"strokes":[[3,0,1,2],[1,4]],"margins":{"T":0,"B":0,"L":0,"R":0}},"G":{"nodes":[{"x":10,"y":8,"isBase":true},{"x":9,"y":6,"isBase":true},{"x":8,"y":8,"isBase":true},{"x":8,"y":10,"isBase":true},{"x":9,"y":12,"isBase":true},{"x":10,"y":9,"isBase":true},{"x":9,"y":9,"isBase":true},{"x":10,"y":12,"isBase":true},{"x":10,"y":10,"isBase":true}],"edges":[[0,1],[1,2],[2,3],[3,4],[5,6],[5,8],[8,7],[4,8]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"H":{"nodes":[{"x":8,"y":6,"isBase":true},{"x":8,"y":9,"isBase":true},{"x":8,"y":12,"isBase":true},{"x":10,"y":6,"isBase":true},{"x":10,"y":9,"isBase":true},{"x":10,"y":12,"isBase":true},{"x":7,"y":6,"isBase":true},{"x":7,"y":12,"isBase":true},{"x":11,"y":12,"isBase":true},{"x":11,"y":6,"isBase":true}],"edges":[[0,1],[1,2],[3,4],[4,5],[1,4],[6,0],[7,2],[5,8],[3,9]],"strokes":[[0,1,2],[3,4,5],[1,4]],"margins":{"T":0,"B":0,"L":0,"R":0}},"I":{"nodes":[{"x":9,"y":6,"isBase":true},{"x":9,"y":12,"isBase":true},{"x":8,"y":12,"isBase":true},{"x":10,"y":12,"isBase":true},{"x":8,"y":6,"isBase":true},{"x":10,"y":6,"isBase":true}],"edges":[[1,2],[1,3],[0,4],[0,5],[1,0]],"strokes":[[0,1]],"margins":{"T":0,"B":0,"L":0,"R":0}},"J":{"nodes":[{"x":8,"y":6,"isBase":true},{"x":9,"y":6,"isBase":true},{"x":10,"y":6,"isBase":true},{"x":9,"y":10,"isBase":true},{"x":8,"y":12,"isBase":true},{"x":7,"y":10,"isBase":true}],"edges":[[0,1],[1,2],[3,4],[4,5],[3,1]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"K":{"nodes":[{"x":8,"y":6,"isBase":true},{"x":8,"y":12,"isBase":true},{"x":8,"y":10,"isBase":true},{"x":9,"y":8,"isBase":true},{"x":10,"y":10,"isBase":true},{"x":10,"y":12,"isBase":true},{"x":10,"y":6,"isBase":true}],"edges":[[0,2],[2,1],[2,3],[3,4],[4,5],[3,6]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"L":{"nodes":[{"x":8,"y":6,"isBase":true},{"x":8,"y":12,"isBase":true},{"x":10,"y":12,"isBase":true}],"edges":[[1,2],[0,1]],"strokes":[[0,1,2]],"margins":{"T":0,"B":0,"L":0,"R":0}},"M":{"nodes":[{"x":8,"y":12,"isBase":true},{"x":8,"y":6,"isBase":true},{"x":9,"y":9,"isBase":true},{"x":10,"y":6,"isBase":true},{"x":10,"y":12,"isBase":true},{"x":7,"y":6,"isBase":true},{"x":11,"y":6,"isBase":true}],"edges":[[1,2],[2,3],[1,5],[3,6],[0,1],[3,4]],"strokes":[[0,1,2,3,4]],"margins":{"T":0,"B":0,"L":0,"R":0}},"N":{"nodes":[{"x":8,"y":12,"isBase":true},{"x":8,"y":6,"isBase":true},{"x":10,"y":12,"isBase":true},{"x":10,"y":6,"isBase":true},{"x":7,"y":6,"isBase":true},{"x":11,"y":12,"isBase":true}],"edges":[[1,2],[1,4],[2,5],[0,1],[2,3]],"strokes":[[0,1,2,3]],"margins":{"T":0,"B":0,"L":0,"R":0}},"O":{"nodes":[{"x":9,"y":12,"isBase":true},{"x":10,"y":10,"isBase":true},{"x":8,"y":10,"isBase":true},{"x":8,"y":8,"isBase":true},{"x":9,"y":6,"isBase":true},{"x":10,"y":8,"isBase":true}],"edges":[[0,1],[0,2],[2,3],[3,4],[4,5],[5,1]],"strokes":[[0,1]],"margins":{"T":0,"B":0,"L":0,"R":0}},"P":{"nodes":[{"x":8,"y":6,"isBase":true},{"x":8,"y":12,"isBase":true},{"x":8,"y":8,"isBase":true},{"x":9,"y":6,"isBase":true},{"x":10,"y":8,"isBase":true},{"x":9,"y":10,"isBase":true}],"edges":[[2,0],[2,3],[3,4],[4,5],[5,2],[1,2]],"strokes":[[1,0]],"margins":{"T":0,"B":0,"L":0,"R":0}},"Q":{"nodes":[{"x":9,"y":6,"isBase":true},{"x":8,"y":8,"isBase":true},{"x":10,"y":8,"isBase":true},{"x":8,"y":10,"isBase":true},{"x":9,"y":12,"isBase":true},{"x":10,"y":10,"isBase":true},{"x":11,"y":11,"isBase":true},{"x":9,"y":9,"isBase":true}],"edges":[[0,1],[2,0],[1,3],[3,4],[4,5],[5,2],[5,6],[5,7]],"strokes":[[0,1,2,0]],"margins":{"T":0,"B":0,"L":0,"R":0}},"R":{"nodes":[{"x":8,"y":8,"isBase":true},{"x":9,"y":6,"isBase":true},{"x":8,"y":6,"isBase":true},{"x":10,"y":8,"isBase":true},{"x":9,"y":10,"isBase":true},{"x":10,"y":12,"isBase":true},{"x":8,"y":12,"isBase":true}],"edges":[[0,1],[0,2],[1,3],[3,4],[4,0],[4,5],[0,6]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"S":{"nodes":[{"x":10,"y":8,"isBase":true},{"x":9,"y":6,"isBase":true},{"x":8,"y":8,"isBase":true},{"x":10,"y":10,"isBase":true},{"x":9,"y":12,"isBase":true},{"x":8,"y":10,"isBase":true}],"edges":[[0,1],[1,2],[3,4],[4,5],[3,2]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"T":{"nodes":[{"x":7,"y":6,"isBase":true},{"x":9,"y":6,"isBase":true},{"x":11,"y":6,"isBase":true},{"x":9,"y":12,"isBase":true},{"x":7,"y":7,"isBase":true},{"x":11,"y":7,"isBase":true},{"x":8,"y":12,"isBase":true},{"x":10,"y":12,"isBase":true}],"edges":[[0,1],[1,2],[4,0],[5,2],[3,6],[3,7],[3,1]],"strokes":[[0,1,2]],"margins":{"T":0,"B":0,"L":0,"R":0}},"U":{"nodes":[{"x":8,"y":6,"isBase":true},{"x":8,"y":10,"isBase":true},{"x":9,"y":12,"isBase":true},{"x":10,"y":10,"isBase":true},{"x":10,"y":6,"isBase":true},{"x":7,"y":6,"isBase":true},{"x":11,"y":6,"isBase":true}],"edges":[[1,2],[2,3],[0,5],[4,6],[4,3],[0,1]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"V":{"nodes":[{"x":7,"y":7,"isBase":true},{"x":9,"y":11,"isBase":true},{"x":11,"y":7,"isBase":true},{"x":12,"y":7,"isBase":true},{"x":6,"y":7,"isBase":true}],"edges":[[2,3],[0,4],[1,2],[0,1]],"strokes":[[0,1,2]],"margins":{"T":0,"B":0,"L":0,"R":0}},"W":{"nodes":[{"x":8,"y":6,"isBase":true},{"x":8,"y":12,"isBase":true},{"x":9,"y":9,"isBase":true},{"x":10,"y":12,"isBase":true},{"x":10,"y":6,"isBase":true},{"x":7,"y":6,"isBase":true},{"x":11,"y":6,"isBase":true}],"edges":[[1,2],[2,3],[5,0],[4,6],[3,4],[0,1]],"strokes":[[0,1,2,3,4]],"margins":{"T":0,"B":0,"L":0,"R":0}},"X":{"nodes":[{"x":8,"y":6,"isBase":true},{"x":10,"y":6,"isBase":true},{"x":9,"y":9,"isBase":true},{"x":8,"y":12,"isBase":true},{"x":10,"y":12,"isBase":true},{"x":7,"y":6,"isBase":true},{"x":11,"y":6,"isBase":true},{"x":11,"y":12,"isBase":true},{"x":7,"y":12,"isBase":true}],"edges":[[0,2],[2,4],[1,2],[2,3],[0,5],[1,6],[4,7],[3,8]],"strokes":[[0,2,4],[1,2,3]],"margins":{"T":0,"B":0,"L":0,"R":0}},"Y":{"nodes":[{"x":8,"y":6,"isBase":true},{"x":10,"y":6,"isBase":true},{"x":9,"y":9,"isBase":true},{"x":9,"y":12,"isBase":true},{"x":8,"y":12,"isBase":true},{"x":10,"y":12,"isBase":true},{"x":11,"y":6,"isBase":true},{"x":7,"y":6,"isBase":true}],"edges":[[0,2],[1,2],[2,3],[3,4],[3,5],[1,6],[0,7]],"strokes":[[0,2,3],[1,2]],"margins":{"T":0,"B":0,"L":0,"R":0}},"Z":{"nodes":[{"x":8,"y":6,"isBase":true},{"x":10,"y":6,"isBase":true},{"x":8,"y":12,"isBase":true},{"x":10,"y":12,"isBase":true},{"x":8,"y":9,"isBase":true},{"x":9,"y":9,"isBase":true},{"x":10,"y":9,"isBase":true}],"edges":[[0,1],[2,3],[1,5],[5,2],[4,5],[5,6]],"strokes":[[0,1,2,3]],"margins":{"T":0,"B":0,"L":0,"R":0}},"a":{"nodes":[{"x":10,"y":7,"isBase":true},{"x":10,"y":9,"isBase":true},{"x":9,"y":7,"isBase":true},{"x":8,"y":9,"isBase":true},{"x":9,"y":11,"isBase":true},{"x":10,"y":11,"isBase":true}],"edges":[[0,1],[1,2],[2,3],[3,4],[4,1],[1,5]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"b":{"nodes":[{"x":9,"y":10,"isBase":true},{"x":10,"y":8,"isBase":true},{"x":11,"y":10,"isBase":true},{"x":10,"y":12,"isBase":true},{"x":9,"y":12,"isBase":true},{"x":9,"y":5,"isBase":true}],"edges":[[0,1],[1,2],[0,3],[3,2],[4,0],[0,5]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"c":{"nodes":[{"x":9,"y":7,"isBase":true},{"x":8,"y":9,"isBase":true},{"x":9,"y":11,"isBase":true},{"x":10,"y":7,"isBase":true},{"x":10,"y":11,"isBase":true}],"edges":[[1,2],[0,1],[0,3],[2,4]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"d":{"nodes":[{"x":9,"y":5,"isBase":true},{"x":9,"y":12,"isBase":true},{"x":9,"y":10,"isBase":true},{"x":8,"y":12,"isBase":true},{"x":7,"y":10,"isBase":true},{"x":8,"y":8,"isBase":true}],"edges":[[0,2],[2,1],[2,3],[3,4],[4,5],[5,2]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"e":{"nodes":[{"x":9,"y":7,"isBase":true},{"x":9,"y":11,"isBase":true},{"x":8,"y":9,"isBase":true},{"x":10,"y":11,"isBase":true},{"x":10,"y":9,"isBase":true}],"edges":[[0,2],[2,1],[1,3],[4,2],[0,4]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"f":{"nodes":[{"x":9,"y":7,"isBase":true},{"x":9,"y":9,"isBase":true},{"x":9,"y":12,"isBase":true},{"x":8,"y":9,"isBase":true},{"x":10,"y":9,"isBase":true},{"x":8,"y":12,"isBase":true},{"x":10,"y":5,"isBase":true},{"x":11,"y":7,"isBase":true}],"edges":[[1,2],[3,1],[1,4],[0,1],[2,5],[0,6],[6,7]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"g":{"nodes":[{"x":10,"y":8,"isBase":true},{"x":9,"y":6,"isBase":true},{"x":8,"y":8,"isBase":true},{"x":9,"y":10,"isBase":true},{"x":11,"y":6,"isBase":true},{"x":10,"y":10,"isBase":true},{"x":9,"y":12,"isBase":true},{"x":8,"y":10,"isBase":true}],"edges":[[0,1],[1,2],[2,3],[3,0],[0,4],[0,5],[5,6],[6,7]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"h":{"nodes":[{"x":9,"y":6,"isBase":true},{"x":9,"y":11,"isBase":true},{"x":10,"y":9,"isBase":true},{"x":11,"y":11,"isBase":true},{"x":11,"y":12,"isBase":true},{"x":9,"y":12,"isBase":true}],"edges":[[0,1],[1,2],[2,3],[3,4],[1,5]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"i":{"nodes":[{"x":9,"y":6,"isBase":true},{"x":9,"y":8,"isBase":true},{"x":9,"y":11,"isBase":true},{"x":8,"y":11,"isBase":true},{"x":10,"y":11,"isBase":true},{"x":8,"y":8,"isBase":true}],"edges":[[1,2],[2,3],[2,4],[5,1],[0,1,"inv"]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"j":{"nodes":[{"x":10,"y":6,"isBase":true},{"x":9,"y":8,"isBase":true},{"x":10,"y":8,"isBase":true},{"x":10,"y":10,"isBase":true},{"x":9,"y":12,"isBase":true},{"x":8,"y":10,"isBase":true}],"edges":[[1,2],[2,3],[3,4],[4,5],[0,2,"inv"]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"k":{"nodes":[{"x":8,"y":6,"isBase":true},{"x":8,"y":12,"isBase":true},{"x":8,"y":10,"isBase":true},{"x":10,"y":8,"isBase":true},{"x":10,"y":12,"isBase":true}],"edges":[[2,1],[2,3],[2,4],[0,2]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"l":{"nodes":[{"x":9,"y":6,"isBase":true},{"x":9,"y":12,"isBase":true},{"x":10,"y":12,"isBase":true}],"edges":[[1,2],[1,0]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"m":{"nodes":[{"x":7,"y":8,"isBase":true},{"x":7,"y":11,"isBase":true},{"x":7,"y":10,"isBase":true},{"x":8,"y":8,"isBase":true},{"x":9,"y":10,"isBase":true},{"x":9,"y":11,"isBase":true},{"x":10,"y":8,"isBase":true},{"x":11,"y":10,"isBase":true},{"x":11,"y":11,"isBase":true}],"edges":[[0,2],[2,1],[2,3],[3,4],[5,4],[4,6],[6,7],[7,8]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"n":{"nodes":[{"x":8,"y":8,"isBase":true},{"x":8,"y":10,"isBase":true},{"x":9,"y":8,"isBase":true},{"x":10,"y":10,"isBase":true},{"x":8,"y":11,"isBase":true},{"x":10,"y":11,"isBase":true}],"edges":[[0,1],[1,2],[2,3],[1,4],[3,5]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"o":{"nodes":[{"x":9,"y":7,"isBase":true},{"x":10,"y":9,"isBase":true},{"x":9,"y":11,"isBase":true},{"x":8,"y":9,"isBase":true}],"edges":[[0,1],[1,2],[2,3],[3,0]],"strokes":[[0,1,2,3,0]],"margins":{"T":0,"B":0,"L":0,"R":0}},"p":{"nodes":[{"x":9,"y":5,"isBase":true},{"x":9,"y":12,"isBase":true},{"x":9,"y":7,"isBase":true},{"x":10,"y":5,"isBase":true},{"x":11,"y":7,"isBase":true},{"x":10,"y":9,"isBase":true}],"edges":[[0,2],[2,1],[2,3],[3,4],[4,5],[5,2]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"q":{"nodes":[{"x":9,"y":5,"isBase":true},{"x":8,"y":7,"isBase":true},{"x":9,"y":9,"isBase":true},{"x":10,"y":7,"isBase":true},{"x":10,"y":12,"isBase":true},{"x":10,"y":5,"isBase":true}],"edges":[[0,1],[1,2],[2,3],[3,0],[3,5],[3,4]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"r":{"nodes":[{"x":9,"y":9,"isBase":true},{"x":9,"y":11,"isBase":true},{"x":10,"y":7,"isBase":true},{"x":11,"y":9,"isBase":true},{"x":9,"y":8,"isBase":true}],"edges":[[0,1],[0,2],[2,3],[0,4]],"strokes":[[1,0]],"margins":{"T":0,"B":0,"L":0,"R":0}},"s":{"nodes":[{"x":10,"y":7,"isBase":true},{"x":8,"y":7,"isBase":true},{"x":10,"y":9,"isBase":true},{"x":8,"y":9,"isBase":true}],"edges":[[1,2],[0,1],[2,3]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"t":{"nodes":[{"x":9,"y":8,"isBase":true},{"x":9,"y":11,"isBase":true},{"x":8,"y":8,"isBase":true},{"x":10,"y":8,"isBase":true},{"x":9,"y":6,"isBase":true},{"x":10,"y":11,"isBase":true}],"edges":[[2,0],[0,1],[0,3],[0,4],[1,5]],"strokes":[[2,0,1],[2,0,3]],"margins":{"T":0,"B":0,"L":0,"R":0}},"u":{"nodes":[{"x":8,"y":8,"isBase":true},{"x":8,"y":9,"isBase":true},{"x":9,"y":11,"isBase":true},{"x":10,"y":9,"isBase":true},{"x":10,"y":8,"isBase":true},{"x":10,"y":11,"isBase":true}],"edges":[[0,1],[1,2],[2,3],[3,4],[3,5]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"v":{"nodes":[{"x":9,"y":11,"isBase":true},{"x":8,"y":8,"isBase":true},{"x":8,"y":9,"isBase":true},{"x":10,"y":9,"isBase":true},{"x":10,"y":8,"isBase":true}],"edges":[[1,2],[2,0],[0,3],[3,4]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"w":{"nodes":[{"x":7,"y":8,"isBase":true},{"x":7,"y":9,"isBase":true},{"x":8,"y":11,"isBase":true},{"x":9,"y":9,"isBase":true},{"x":9,"y":8,"isBase":true},{"x":10,"y":11,"isBase":true},{"x":11,"y":9,"isBase":true},{"x":11,"y":8,"isBase":true}],"edges":[[0,1],[2,1],[2,3],[4,3],[3,5],[5,6],[6,7]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"x":{"nodes":[{"x":8,"y":11,"isBase":true},{"x":9,"y":9,"isBase":true},{"x":10,"y":11,"isBase":true},{"x":8,"y":7,"isBase":true},{"x":10,"y":7,"isBase":true}],"edges":[[0,1],[1,2],[3,1],[4,1]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"y":{"nodes":[{"x":10,"y":10,"isBase":true},{"x":10,"y":7,"isBase":true},{"x":10,"y":8,"isBase":true},{"x":9,"y":10,"isBase":true},{"x":8,"y":8,"isBase":true},{"x":8,"y":7,"isBase":true},{"x":9,"y":12,"isBase":true},{"x":8,"y":10,"isBase":true}],"edges":[[0,2],[2,1],[2,3],[3,4],[4,5],[0,6],[6,7]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"z":{"nodes":[{"x":8,"y":8,"isBase":true},{"x":10,"y":8,"isBase":true},{"x":8,"y":10,"isBase":true},{"x":10,"y":10,"isBase":true}],"edges":[[0,1],[2,1],[3,2]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},".":{"nodes":[{"x":9,"y":10,"isBase":true}],"edges":[],"strokes":[],"yShift":2,"margins":{"T":0,"B":0,"L":0,"R":0}},",":{"nodes":[{"x":9,"y":10,"isBase":true},{"x":10,"y":9,"isBase":true}],"edges":[[0,1]],"strokes":[],"yShift":2,"margins":{"T":0,"B":0,"L":0,"R":0}},"_":{"nodes":[{"x":8,"y":9,"isBase":true},{"x":10,"y":9,"isBase":true}],"edges":[[0,1]],"strokes":[],"yShift":2,"margins":{"T":0,"B":0,"L":0,"R":0}},"'":{"nodes":[{"x":9,"y":7,"isBase":true},{"x":9,"y":9,"isBase":true}],"edges":[[0,1]],"strokes":[[0,1]],"yShift":-2.4,"margins":{"T":0,"B":0,"L":0,"R":0}},"\"":{"nodes":[{"x":8,"y":9,"isBase":true},{"x":8,"y":8,"isBase":true},{"x":9,"y":8,"isBase":true},{"x":9,"y":9,"isBase":true}],"edges":[[1,0],[2,3]],"strokes":[],"yShift":-2.4,"margins":{"T":0,"B":0,"L":0,"R":0}},"`":{"nodes":[{"x":9,"y":9,"isBase":true},{"x":10,"y":10,"isBase":true}],"edges":[[0,1]],"strokes":[],"yShift":-2.4,"margins":{"T":0,"B":0,"L":0,"R":0}},"^":{"nodes":[{"x":8,"y":10,"isBase":true},{"x":9,"y":8,"isBase":true},{"x":10,"y":10,"isBase":true}],"edges":[[0,1],[1,2]],"strokes":[],"yShift":-1.4,"margins":{"T":0,"B":0,"L":0,"R":0}},":":{"nodes":[{"x":9,"y":8,"isBase":true},{"x":9,"y":10,"isBase":true}],"edges":[[0,1,"inv"]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},";":{"nodes":[{"x":10,"y":7,"isBase":true},{"x":10,"y":9,"isBase":true},{"x":9,"y":11,"isBase":true}],"edges":[[1,2],[0,1,"inv"]],"strokes":[],"yShift":0,"margins":{"T":0,"B":0,"L":0,"R":0}},"!":{"nodes":[{"x":9,"y":11,"isBase":true},{"x":9,"y":6,"isBase":true},{"x":9,"y":13,"isBase":true}],"edges":[[0,1],[0,2,"inv"]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"?":{"nodes":[{"x":9,"y":11,"isBase":true},{"x":8,"y":8,"isBase":true},{"x":9,"y":6,"isBase":true},{"x":10,"y":8,"isBase":true},{"x":9,"y":10,"isBase":true},{"x":9,"y":13,"isBase":true}],"edges":[[1,2],[2,3],[3,4],[4,0],[0,5,"inv"]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"-":{"nodes":[{"x":10,"y":9,"isBase":true},{"x":8,"y":9,"isBase":true}],"edges":[[1,0]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"+":{"nodes":[{"x":9,"y":9,"isBase":true},{"x":9,"y":8,"isBase":true},{"x":9,"y":10,"isBase":true},{"x":8,"y":9,"isBase":true},{"x":10,"y":9,"isBase":true}],"edges":[[0,1],[0,2],[3,0],[0,4]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"=":{"nodes":[{"x":8,"y":9,"isBase":true},{"x":10,"y":9,"isBase":true},{"x":8,"y":10,"isBase":true},{"x":10,"y":10,"isBase":true}],"edges":[[0,1],[2,3]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"~":{"nodes":[{"x":7,"y":11,"isBase":true},{"x":8,"y":9,"isBase":true},{"x":9,"y":9,"isBase":true},{"x":10,"y":11,"isBase":true},{"x":11,"y":11,"isBase":true},{"x":12,"y":9,"isBase":true}],"edges":[[0,1],[1,2],[2,3],[3,4],[4,5]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"*":{"nodes":[{"x":7,"y":9,"isBase":true},{"x":11,"y":9,"isBase":true},{"x":9,"y":9,"isBase":true},{"x":10,"y":7,"isBase":true},{"x":8,"y":7,"isBase":true},{"x":8,"y":11,"isBase":true},{"x":10,"y":11,"isBase":true}],"edges":[[0,2],[2,1],[2,3],[2,4],[2,5],[2,6]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"|":{"nodes":[{"x":9,"y":4,"isBase":true},{"x":9,"y":15,"isBase":true}],"edges":[[0,1]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"/":{"nodes":[{"x":6,"y":16,"isBase":true},{"x":11,"y":5,"isBase":true}],"edges":[[0,1]],"strokes":[[0,1]],"margins":{"T":0,"B":0,"L":0,"R":0}},"\\":{"nodes":[{"x":7,"y":5,"isBase":true},{"x":10,"y":12,"isBase":true}],"edges":[[0,1]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"<":{"nodes":[{"x":8,"y":9,"isBase":true},{"x":10,"y":8,"isBase":true},{"x":10,"y":10,"isBase":true}],"edges":[[0,1],[0,2]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},">":{"nodes":[{"x":8,"y":8,"isBase":true},{"x":10,"y":9,"isBase":true},{"x":8,"y":10,"isBase":true}],"edges":[[0,1],[1,2]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"(":{"nodes":[{"x":8,"y":7,"isBase":true},{"x":8,"y":12,"isBase":true},{"x":9,"y":14,"isBase":true},{"x":9,"y":5,"isBase":true}],"edges":[[0,1],[1,2],[0,3]],"strokes":[[0,0,1,2]],"margins":{"T":0,"B":0,"L":0,"R":0}},")":{"nodes":[{"x":8,"y":5,"isBase":true},{"x":9,"y":7,"isBase":true},{"x":9,"y":12,"isBase":true},{"x":8,"y":14,"isBase":true}],"edges":[[0,1],[1,2],[2,3]],"strokes":[[0,1,2,3]],"margins":{"T":0,"B":0,"L":0,"R":0}},"[":{"nodes":[{"x":9,"y":5,"isBase":true},{"x":9,"y":13,"isBase":true},{"x":10,"y":13,"isBase":true},{"x":10,"y":5,"isBase":true}],"edges":[[0,1],[1,2],[0,3]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"]":{"nodes":[{"x":8,"y":5,"isBase":true},{"x":9,"y":5,"isBase":true},{"x":9,"y":13,"isBase":true},{"x":8,"y":13,"isBase":true}],"edges":[[0,1],[1,2],[2,3]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"{":{"nodes":[{"x":8,"y":9,"isBase":true},{"x":9,"y":9,"isBase":true},{"x":9,"y":5,"isBase":true},{"x":10,"y":5,"isBase":true},{"x":9,"y":13,"isBase":true},{"x":10,"y":13,"isBase":true}],"edges":[[0,1],[1,2],[1,4],[2,3],[4,5]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"}":{"nodes":[{"x":10,"y":9,"isBase":true},{"x":9,"y":9,"isBase":true},{"x":9,"y":5,"isBase":true},{"x":8,"y":5,"isBase":true},{"x":9,"y":13,"isBase":true},{"x":8,"y":13,"isBase":true}],"edges":[[0,1],[1,2],[2,3],[1,4],[4,5]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"#":{"nodes":[{"x":9,"y":8,"isBase":true},{"x":9,"y":11,"isBase":true},{"x":10,"y":8,"isBase":true},{"x":10,"y":11,"isBase":true},{"x":8,"y":9,"isBase":true},{"x":9,"y":9,"isBase":true},{"x":10,"y":9,"isBase":true},{"x":11,"y":9,"isBase":true},{"x":8,"y":10,"isBase":true},{"x":9,"y":10,"isBase":true},{"x":10,"y":10,"isBase":true},{"x":11,"y":10,"isBase":true}],"edges":[[0,5],[4,5],[2,6],[5,6],[6,7],[5,9],[9,1],[8,9],[6,10],[10,3],[10,9],[10,11]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"$":{"nodes":[{"x":9,"y":6,"isBase":true},{"x":8,"y":8,"isBase":true},{"x":8,"y":9,"isBase":true},{"x":10,"y":9,"isBase":true},{"x":10,"y":10,"isBase":true},{"x":9,"y":12,"isBase":true},{"x":8,"y":10,"isBase":true},{"x":9,"y":13,"isBase":true},{"x":9,"y":5,"isBase":true},{"x":10,"y":8,"isBase":true},{"x":9,"y":9,"isBase":true}],"edges":[[0,1],[1,2],[3,4],[4,5],[5,6],[5,7],[0,8],[0,9],[2,10],[10,3],[10,0],[10,5]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"%":{"nodes":[{"x":7,"y":13,"isBase":true},{"x":10,"y":6,"isBase":true},{"x":10,"y":9,"isBase":true},{"x":9,"y":11,"isBase":true},{"x":7,"y":10,"isBase":true},{"x":6,"y":8,"isBase":true},{"x":7,"y":6,"isBase":true},{"x":8,"y":8,"isBase":true},{"x":11,"y":11,"isBase":true},{"x":10,"y":13,"isBase":true}],"edges":[[0,1],[2,3],[5,4],[5,6],[6,7],[7,4],[2,8],[8,9],[9,3]],"strokes":[[0,1]],"margins":{"T":0,"B":0,"L":0,"R":0}},"&":{"nodes":[{"x":9,"y":9,"isBase":true},{"x":10,"y":7,"isBase":true},{"x":8,"y":11,"isBase":true},{"x":9,"y":13,"isBase":true},{"x":10,"y":11,"isBase":true},{"x":11,"y":9,"isBase":true},{"x":11,"y":13,"isBase":true},{"x":8,"y":7,"isBase":true},{"x":9,"y":5,"isBase":true}],"edges":[[1,0],[0,2],[2,3],[3,4],[4,0],[4,5],[4,6],[0,7],[7,8],[8,1]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"@":{"nodes":[{"x":9,"y":7,"isBase":true},{"x":8,"y":9,"isBase":true},{"x":9,"y":11,"isBase":true},{"x":10,"y":9,"isBase":true},{"x":11,"y":11,"isBase":true},{"x":12,"y":9,"isBase":true},{"x":10,"y":5,"isBase":true},{"x":8,"y":5,"isBase":true},{"x":6,"y":9,"isBase":true},{"x":8,"y":13,"isBase":true},{"x":10,"y":13,"isBase":true},{"x":11,"y":7,"isBase":true}],"edges":[[0,1],[1,2],[2,3],[3,0],[3,4],[4,5],[6,7],[7,8],[8,9],[9,10],[10,4],[5,11],[11,6],[3,11]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"…":{"nodes":[{"x":8,"y":9,"isBase":true},{"x":9,"y":9,"isBase":true},{"x":10,"y":9,"isBase":true}],"edges":[],"strokes":[],"yShift":2,"margins":{"T":0,"B":0,"L":0,"R":0}},"‘":{"nodes":[{"x":8,"y":7,"isBase":true},{"x":7,"y":8,"isBase":true}],"edges":[[0,1]],"strokes":[[0,1]],"yShift":-2.4,"margins":{"T":0,"B":0,"L":0,"R":0}},"’":{"nodes":[{"x":9,"y":8,"isBase":true},{"x":8,"y":9,"isBase":true}],"edges":[[0,1]],"strokes":[],"yShift":-2.4,"margins":{"T":0,"B":0,"L":0,"R":0}},"“":{"nodes":[{"x":9,"y":7,"isBase":true},{"x":8,"y":8,"isBase":true},{"x":10,"y":7,"isBase":true},{"x":9,"y":8,"isBase":true}],"edges":[[0,1],[3,2]],"strokes":[],"yShift":-2.4,"margins":{"T":0,"B":0,"L":0,"R":0}},"”":{"nodes":[{"x":8,"y":9,"isBase":true},{"x":10,"y":8,"isBase":true},{"x":9,"y":9,"isBase":true},{"x":9,"y":8,"isBase":true}],"edges":[[1,2],[0,3]],"strokes":[],"yShift":-2.4,"margins":{"T":0,"B":0,"L":0,"R":0}},"°":{"nodes":[{"x":8,"y":8,"isBase":true},{"x":8,"y":7,"isBase":true},{"x":9,"y":7,"isBase":true},{"x":9,"y":8,"isBase":true}],"edges":[[1,2],[2,3],[3,0],[0,1]],"strokes":[],"yShift":-2,"margins":{"T":0,"B":0,"L":0,"R":0}},"·":{"nodes":[{"x":8,"y":9,"isBase":true}],"edges":[],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"–":{"nodes":[{"x":8,"y":9,"isBase":true},{"x":10,"y":9,"isBase":true}],"edges":[[0,1]],"strokes":[[0,1]],"margins":{"T":0,"B":0,"L":0,"R":0}},"—":{"nodes":[{"x":7,"y":9,"isBase":true},{"x":10,"y":9,"isBase":true}],"edges":[[0,1]],"strokes":[[0,1]],"margins":{"T":0,"B":0,"L":0,"R":0}},"─":{"nodes":[{"x":5,"y":9,"isBase":true},{"x":11,"y":9,"isBase":true},{"x":7,"y":9,"isBase":true},{"x":9,"y":9,"isBase":true}],"edges":[[0,2],[2,3],[3,1]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"×":{"nodes":[{"x":7,"y":8,"isBase":true},{"x":8,"y":9,"isBase":true},{"x":9,"y":10,"isBase":true},{"x":9,"y":8,"isBase":true},{"x":7,"y":10,"isBase":true}],"edges":[[0,1],[1,2],[3,1],[1,4]],"strokes":[[0,1,2],[3,1,4]],"margins":{"T":0,"B":0,"L":0,"R":0}},"▫":{"nodes":[{"x":8,"y":9,"isBase":true},{"x":9,"y":9,"isBase":true},{"x":9,"y":10,"isBase":true},{"x":8,"y":10,"isBase":true}],"edges":[[0,1],[1,2],[2,3],[3,0]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"◯":{"nodes":[{"x":8,"y":7,"isBase":true},{"x":10,"y":9,"isBase":true},{"x":8,"y":11,"isBase":true},{"x":6,"y":9,"isBase":true}],"edges":[[1,2],[2,3],[3,0],[0,1]],"strokes":[[0,1,1,2,3,0]],"margins":{"T":0,"B":0,"L":0,"R":0}},"╳":{"nodes":[{"x":6,"y":7,"isBase":true},{"x":8,"y":9,"isBase":true},{"x":10,"y":11,"isBase":true},{"x":10,"y":7,"isBase":true},{"x":6,"y":11,"isBase":true}],"edges":[[0,1],[1,2],[3,1],[1,4]],"strokes":[[0,1,2],[3,1,4]],"margins":{"T":0,"B":0,"L":0,"R":0}},"〈":{"nodes":[{"x":9,"y":4,"isBase":true},{"x":7,"y":9,"isBase":true},{"x":9,"y":14,"isBase":true}],"edges":[[0,1],[1,2]],"strokes":[[0,1,2]],"margins":{"T":0,"B":0,"L":0,"R":0}},"〉":{"nodes":[{"x":7,"y":4,"isBase":true},{"x":9,"y":9,"isBase":true},{"x":7,"y":14,"isBase":true}],"edges":[[0,1],[1,2]],"strokes":[[0,1,2]],"margins":{"T":0,"B":0,"L":0,"R":0}},"《":{"nodes":[{"x":9,"y":4,"isBase":true},{"x":7,"y":9,"isBase":true},{"x":9,"y":14,"isBase":true},{"x":10,"y":4,"isBase":true},{"x":8,"y":9,"isBase":true},{"x":10,"y":14,"isBase":true}],"edges":[[0,1],[1,2],[3,4],[4,5]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"》":{"nodes":[{"x":8,"y":4,"isBase":true},{"x":10,"y":9,"isBase":true},{"x":8,"y":14,"isBase":true},{"x":9,"y":4,"isBase":true},{"x":11,"y":9,"isBase":true},{"x":9,"y":14,"isBase":true}],"edges":[[0,1],[1,2],[3,4],[4,5]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"「":{"nodes":[{"x":9,"y":7,"isBase":true},{"x":7,"y":7,"isBase":true},{"x":7,"y":10,"isBase":true}],"edges":[[0,1],[1,2]],"strokes":[[0,1,2]],"margins":{"T":0,"B":0,"L":0,"R":0}},"」":{"nodes":[{"x":8,"y":10,"isBase":true},{"x":10,"y":10,"isBase":true},{"x":10,"y":7,"isBase":true}],"edges":[[0,1],[1,2]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"『":{"nodes":[{"x":10,"y":7,"isBase":true},{"x":8,"y":7,"isBase":true},{"x":8,"y":10,"isBase":true},{"x":10,"y":8,"isBase":true},{"x":9,"y":8,"isBase":true},{"x":9,"y":10,"isBase":true}],"edges":[[0,1],[1,2],[3,4],[4,5]],"strokes":[[0,1,2]],"margins":{"T":0,"B":0,"L":0,"R":0}},"』":{"nodes":[{"x":9,"y":10,"isBase":true},{"x":11,"y":10,"isBase":true},{"x":11,"y":7,"isBase":true},{"x":9,"y":9,"isBase":true},{"x":10,"y":9,"isBase":true},{"x":10,"y":7,"isBase":true}],"edges":[[0,1],[1,2],[3,4],[4,5]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"ㅐ":{"nodes":[{"x":0,"y":0,"jSrc":"jung1","isBase":true},{"x":0,"y":3,"jSrc":"jung1","isBase":true},{"x":0,"y":6,"jSrc":"jung1","isBase":true},{"x":2,"y":3,"jSrc":"jung1","isBase":true},{"x":6,"y":2,"jSrc":"jung2","isBase":true},{"x":6,"y":4,"jSrc":"jung2","isBase":true},{"x":6,"y":3,"jSrc":"jung2","isBase":true},{"x":6,"y":0,"jSrc":"jung2","isBase":true},{"x":6,"y":6,"jSrc":"jung2","isBase":true}],"edges":[[1,2],[1,3],[0,1],[4,6],[6,5],[4,7],[5,8]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"ㅒ":{"nodes":[{"x":0,"y":0,"jSrc":"jung1","isBase":true},{"x":0,"y":2,"jSrc":"jung1","isBase":true},{"x":0,"y":4,"jSrc":"jung1","isBase":true},{"x":2,"y":2,"jSrc":"jung1","isBase":true},{"x":0,"y":6,"jSrc":"jung1","isBase":true},{"x":2,"y":4,"jSrc":"jung1","isBase":true},{"x":6,"y":2,"jSrc":"jung2","isBase":true},{"x":6,"y":4,"jSrc":"jung2","isBase":true},{"x":6,"y":3,"jSrc":"jung2","isBase":true},{"x":6,"y":0,"jSrc":"jung2","isBase":true},{"x":6,"y":6,"jSrc":"jung2","isBase":true}],"edges":[[0,1],[1,2],[1,3],[2,4],[2,5],[6,8],[8,7],[6,9],[7,10]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"ㅔ":{"nodes":[{"x":0,"y":3,"jSrc":"jung1","isBase":true},{"x":2,"y":3,"jSrc":"jung1","isBase":true},{"x":2,"y":0,"jSrc":"jung1","isBase":true},{"x":2,"y":6,"jSrc":"jung1","isBase":true},{"x":6,"y":2,"jSrc":"jung2","isBase":true},{"x":6,"y":4,"jSrc":"jung2","isBase":true},{"x":6,"y":3,"jSrc":"jung2","isBase":true},{"x":6,"y":0,"jSrc":"jung2","isBase":true},{"x":6,"y":6,"jSrc":"jung2","isBase":true}],"edges":[[0,1],[2,1],[1,3],[4,6],[6,5],[4,7],[5,8]],"strokes":[[0,1],[2,1],[3,1]],"margins":{"T":0,"B":0,"L":0,"R":0}},"ㅖ":{"nodes":[{"x":2,"y":2,"jSrc":"jung1","isBase":true},{"x":0,"y":2,"jSrc":"jung1","isBase":true},{"x":2,"y":0,"jSrc":"jung1","isBase":true},{"x":2,"y":4,"jSrc":"jung1","isBase":true},{"x":2,"y":6,"jSrc":"jung1","isBase":true},{"x":0,"y":4,"jSrc":"jung1","isBase":true},{"x":6,"y":2,"jSrc":"jung2","isBase":true},{"x":6,"y":4,"jSrc":"jung2","isBase":true},{"x":6,"y":3,"jSrc":"jung2","isBase":true},{"x":6,"y":0,"jSrc":"jung2","isBase":true},{"x":6,"y":6,"jSrc":"jung2","isBase":true}],"edges":[[1,0],[2,0],[0,3],[3,4],[3,5],[6,8],[8,7],[6,9],[7,10]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"ㄲ":{"nodes":[{"x":0,"y":0,"jSrc":"cho2","isBase":true},{"x":3,"y":0,"jSrc":"cho2","isBase":true},{"x":3,"y":3,"jSrc":"cho2","isBase":true},{"x":7,"y":0,"jSrc":"cho1","isBase":true},{"x":10,"y":0,"jSrc":"cho1","isBase":true},{"x":10,"y":3,"jSrc":"cho1","isBase":true}],"edges":[[0,1],[1,2],[3,4],[4,5]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"ㄸ":{"nodes":[{"x":1,"y":3,"jSrc":"cho2","isBase":true},{"x":4,"y":3,"jSrc":"cho2","isBase":true},{"x":0,"y":0,"jSrc":"cho2","isBase":true},{"x":4,"y":0,"jSrc":"cho2","isBase":true},{"x":1,"y":0,"jSrc":"cho2","isBase":true},{"x":9,"y":3,"jSrc":"cho1","isBase":true},{"x":12,"y":3,"jSrc":"cho1","isBase":true},{"x":8,"y":0,"jSrc":"cho1","isBase":true},{"x":12,"y":0,"jSrc":"cho1","isBase":true},{"x":9,"y":0,"jSrc":"cho1","isBase":true}],"edges":[[0,1],[2,4],[4,3],[0,4],[5,6],[7,9],[9,8],[5,9]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"ㅃ":{"nodes":[{"x":1,"y":0,"jSrc":"cho2","isBase":true},{"x":1,"y":2,"jSrc":"cho2","isBase":true},{"x":1,"y":5,"jSrc":"cho2","isBase":true},{"x":4,"y":5,"jSrc":"cho2","isBase":true},{"x":4,"y":2,"jSrc":"cho2","isBase":true},{"x":4,"y":0,"jSrc":"cho2","isBase":true},{"x":0,"y":2,"jSrc":"cho2","isBase":true},{"x":9,"y":0,"jSrc":"cho1","isBase":true},{"x":9,"y":2,"jSrc":"cho1","isBase":true},{"x":9,"y":5,"jSrc":"cho1","isBase":true},{"x":12,"y":5,"jSrc":"cho1","isBase":true},{"x":12,"y":2,"jSrc":"cho1","isBase":true},{"x":12,"y":0,"jSrc":"cho1","isBase":true},{"x":8,"y":2,"jSrc":"cho1","isBase":true}],"edges":[[0,1],[1,2],[2,3],[3,4],[4,5],[4,1],[6,1],[7,8],[8,9],[9,10],[10,11],[11,12],[11,8],[13,8]],"strokes":[[0,1,2,3,4,5],[4,1],[7,8,9,10,11,12],[11,8]],"margins":{"T":0,"B":0,"L":0,"R":0}},"ㅆ":{"nodes":[{"x":4,"y":4,"jSrc":"cho2","isBase":true},{"x":2,"y":2,"jSrc":"cho2","isBase":true},{"x":0,"y":4,"jSrc":"cho2","isBase":true},{"x":4,"y":0,"jSrc":"cho2","isBase":true},{"x":12,"y":4,"jSrc":"cho1","isBase":true},{"x":10,"y":2,"jSrc":"cho1","isBase":true},{"x":8,"y":4,"jSrc":"cho1","isBase":true},{"x":12,"y":0,"jSrc":"cho1","isBase":true}],"edges":[[0,1],[1,2],[1,3],[4,5],[5,6],[5,7]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}},"ㅉ":{"nodes":[{"x":0,"y":4,"jSrc":"cho2","isBase":true},{"x":4,"y":4,"jSrc":"cho2","isBase":true},{"x":2,"y":2,"jSrc":"cho2","isBase":true},{"x":4,"y":0,"jSrc":"cho2","isBase":true},{"x":1,"y":0,"jSrc":"cho2","isBase":true},{"x":8,"y":4,"jSrc":"cho1","isBase":true},{"x":12,"y":4,"jSrc":"cho1","isBase":true},{"x":10,"y":2,"jSrc":"cho1","isBase":true},{"x":12,"y":0,"jSrc":"cho1","isBase":true},{"x":9,"y":0,"jSrc":"cho1","isBase":true}],"edges":[[0,2],[2,1],[2,3],[3,4],[5,7],[7,6],[7,8],[8,9]],"strokes":[],"margins":{"T":0,"B":0,"L":0,"R":0}}},"characters":["ㄱ","ㄴ","ㄷ","ㄹ","ㅁ","ㅂ","ㅅ","ㅇ","ㅈ","ㅊ","ㅋ","ㅌ","ㅍ","ㅎ","ㅏ","ㅑ","ㅓ","ㅕ","ㅗ","ㅛ","ㅜ","ㅠ","ㅡ","ㅣ","0","1","2","3","4","5","6","7","8","9","A","B","C","D","E","F","G","H","I","J","K","L","M","N","O","P","Q","R","S","T","U","V","W","X","Y","Z","a","b","c","d","e","f","g","h","i","j","k","l","m","n","o","p","q","r","s","t","u","v","w","x","y","z","!","\"","#","$","%","&","'","(",")","*","+",",","-",".","/",":",";","<","=",">","?","@","[","\\","]","^","_","`","{","|","}","~"],"userAdded":[],"removedDefaults":[],"moimkkol":{"h|none":[{"kind":"cho2","x":6,"y":8,"w":2,"h":2},{"kind":"jung1","x":10,"y":8,"w":2,"h":2}],"v|none":[{"kind":"cho2","x":8,"y":6,"w":2,"h":2},{"kind":"jung1","x":8,"y":10,"w":2,"h":2}],"mix|none":[{"kind":"cho2","x":6,"y":6,"w":2,"h":2},{"kind":"jung2","x":10,"y":8,"w":2,"h":2},{"kind":"jung3","x":6,"y":10,"w":2,"h":2}],"h|jong":[{"kind":"cho2","x":6,"y":6,"w":2,"h":2},{"kind":"jung1","x":10,"y":6,"w":2,"h":2},{"kind":"jong2","x":8,"y":10,"w":2,"h":2}],"v|jong":[{"kind":"cho2","x":8,"y":4,"w":2,"h":2},{"kind":"jung1","x":8,"y":8,"w":2,"h":2},{"kind":"jong2","x":8,"y":12,"w":2,"h":2}],"mix|jong":[{"kind":"cho2","x":6,"y":5,"w":2,"h":2},{"kind":"jung2","x":10,"y":5,"w":2,"h":2},{"kind":"jung3","x":6,"y":9,"w":2,"h":2},{"kind":"jong2","x":10,"y":9,"w":2,"h":2}]},"moimkkolYShift":{},"meta":{"app":"mungchin-hangul","version":2,"coordScale":2,"savedAt":"2026-05-23T13:09:59.636Z","v":"v1.11_release_220959"}};
 // [v1.09] 임베드 디자인을 PRIMITIVES/FACTORY_DEFAULTS 에 로드.
 //   합성 경로(COMPOUND_GLUE/COMPOUND_2D/DOUBLES/CLUSTERS) 로 처리되는 자모는 자체 디자인이
 //   PRIMITIVES 에 있으면 resolveJamo 가 자체 디자인을 우선시해 합성을 우회함 → 합성 자모는
@@ -1068,30 +949,22 @@ const _RANDOM_SENTENCES = [
   "동틀 녘 햇빛 포개짐",
   "자동차 바퀴 틈새가 파랗니",
   "해태 옆 치킨집 닭맛",
-  "코털 팽 대감네 첩 좋소",
   "닭 잡아서 치킨파티 함",
   "초코볼은 티피가 맛 좋다",
   "파티에 참석한 키다리 부자",
   "펄코트 못 받은 척하자",
   "추운 겨울밤 따뜻한 커피우유와 티를 마셔야지요",
-  "그는 미쳐서 칼부림하는 인성파탄자일 뿐이다",
   "동녘 구름 틈새로 퍼지는 햇빛",
   "해질녘 파도 속의 첨탑",
-  "중공, 천안문, 탱크, 사람하나, 피바다",
-  "체르노빌 같던 후쿠시마 원전 폭발",
   "큰 집채 훑듯 깊음",
   "부엌 파김치전 핥듯",
   "방금도 체리주스 큰 통 하나 팖",
   "시컨트 표들 보며 측정해",
-  "그 늙다리만 본선에 진출케 투표해",
-  "가나 독립 명분상 이제 총칼 타파함",
   "그는 독립문 보수에 지쳐 칼퇴 표함",
   "그날 드라마 부서와 재차 콘티 평함",
   "그 남다른 마법사의 절친, 커트 폐하",
-  "가느다란 몸 부수어 쥔 총칼, 터, 평화",
   "그녀 달리 못 본 사이 지친 카톡 표현",
   "하얀 저 견본용 우유크림",
-  "한편 터키 참전 용사, 비밀리 돈 남겨",
   "한편 터키 축제 의상비 마련도 난감",
   "저 밖에 파는 초코 티라미수 빵 두 쪽이 따뜻했다",
   "토끼와 피카츄 또 바지락짬뽕 원하셨대",
@@ -1149,7 +1022,6 @@ const _RANDOM_WORDS = [
   "눈",
   "해",
   "달",
-  "년",
   "별",
   "벌",
   "손",
@@ -1280,7 +1152,6 @@ const _RANDOM_WORDS_NEW = [
   "양반댁",
   "여유",
   "예절",
-  "원전",
   "우유",
   "우유크림",
   "위",
@@ -1302,7 +1173,6 @@ const _RANDOM_WORDS_NEW = [
   "참판",
   "천안문",
   "첨탑",
-  "체르노빌",
   "체리주스",
   "치킨집",
   "치킨파티",
@@ -1323,7 +1193,6 @@ const _RANDOM_WORDS_NEW = [
   "키스",
   "키위",
   "타입킷",
-  "탱크",
   "터",
   "터키",
   "토양",
@@ -1355,7 +1224,6 @@ const _RANDOM_WORDS_NEW = [
   "형",
   "혼례",
   "활용",
-  "후쿠시마",
   "휴일",
   "가느다랗다",
   "같다",
@@ -1485,13 +1353,29 @@ const _RANDOM_WORDS_NEW = [
   "quite",
   "toxic"
 ];
-// 가중치 분포 — 단글자 30%, 단어 40%, 문장 30%.
+// [v1.12] 가중치 분포 — 단글자 30%, 단어 40%, 문장 30%.
+//   각 카테고리마다 셔플 큐 보유 — 한 사이클(=배열 길이) 안에서는 중복 없음.
+//   큐 소진 시 자동 재셔플하여 다음 사이클 시작. 시작 직후 동일 항목 연속을 피하려 fisher-yates 사용.
+const _shuffleQueues = new WeakMap();
+function _pickFromShuffleQueue(arr) {
+  if (!arr || !arr.length) return '';
+  let q = _shuffleQueues.get(arr);
+  if (!q || !q.length) {
+    q = arr.slice();
+    // Fisher-Yates 셔플
+    for (let i = q.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [q[i], q[j]] = [q[j], q[i]];
+    }
+    _shuffleQueues.set(arr, q);
+  }
+  return q.pop();
+}
 function pickRandomText() {
   const r = Math.random();
-  const _pick = (arr) => (arr && arr.length) ? arr[Math.floor(Math.random() * arr.length)] : '';
-  if (r < 0.3) return _pick(_RANDOM_WORDS);              // 30% — 단글자
-  if (r < 0.7) return _pick(_RANDOM_WORDS_NEW);          // 40% — 단어 풀
-  return _pick(_RANDOM_SENTENCES);                        // 30% — 다단어 문장
+  if (r < 0.3) return _pickFromShuffleQueue(_RANDOM_WORDS);          // 30% — 단글자
+  if (r < 0.7) return _pickFromShuffleQueue(_RANDOM_WORDS_NEW);      // 40% — 단어 풀
+  return _pickFromShuffleQueue(_RANDOM_SENTENCES);                    // 30% — 다단어 문장
 }
 function applyRandomText() {
   const t = pickRandomText();
@@ -1662,7 +1546,7 @@ function getMoimkkolBaseline() {
 }
 loadMoimkkolBaselineLocal();
 
-// 자모 파트 라벨 — 음절 분해 d와 파트 키(cho1/cho2/jung1/jung2/jung3/jong1/jong2)로
+// 자모 파트 라벨 — 음절 분해 d와 파트 키(cho2/cho1/jung1/jung2/jung3/jong2/jong1)로
 // 박스 안에 표시할 실제 자모 글자를 반환 (쌍/겹/혼합/glue 분해 적용)
 function _getMoimkkolPartLabel(d, part) {
   if (!d) return null;
@@ -1670,8 +1554,8 @@ function _getMoimkkolPartLabel(d, part) {
   const hasC = (typeof CLUSTERS !== 'undefined');
   const hasC2 = (typeof COMPOUND_2D !== 'undefined');
   const hasCG = (typeof COMPOUND_GLUE !== 'undefined');
-  if (part === 'cho1') return (hasD && DOUBLES[d.cho]) ? DOUBLES[d.cho][0] : d.cho;
-  if (part === 'cho2') return (hasD && DOUBLES[d.cho]) ? DOUBLES[d.cho][1] : null;
+  if (part === 'cho2') return (hasD && DOUBLES[d.cho]) ? DOUBLES[d.cho][0] : d.cho;
+  if (part === 'cho1') return (hasD && DOUBLES[d.cho]) ? DOUBLES[d.cho][1] : null;
   // [v1.10b] 새 규약 (assembleSyllable 태깅과 정합):
   //   horizJ (수평획 ㅗ/ㅜ/ㅡ) = jung3
   //   vertJ  (2D 비-글루 수직 ex. ㅘ의 ㅏ, ㅢ의 ㅣ) = jung2
@@ -1705,13 +1589,13 @@ function _getMoimkkolPartLabel(d, part) {
     if (hasC2 && COMPOUND_2D[d.jung]) return COMPOUND_2D[d.jung][0];
     return null;
   }
-  if (part === 'jong1') {
+  if (part === 'jong2') {
     if (!d.jong) return null;
     if (hasD && DOUBLES[d.jong]) return DOUBLES[d.jong][0];
     if (hasC && CLUSTERS[d.jong]) return CLUSTERS[d.jong][0];
     return d.jong;
   }
-  if (part === 'jong2') {
+  if (part === 'jong1') {
     if (!d.jong) return null;
     if (hasD && DOUBLES[d.jong]) return DOUBLES[d.jong][1];
     if (hasC && CLUSTERS[d.jong]) return CLUSTERS[d.jong][1];
@@ -1739,7 +1623,7 @@ function _moimkkolPatternKey(syllable) {
 }
 
 // 음절 구성 박스 계산 — assembleSyllable의 실제 자동 배치 결과를 기반으로
-// jSrc 태그(cho1/cho2/jung1/jung2/jung3/jong1/jong2)별 그룹화 → 그룹 중심을 박스 위치로
+// jSrc 태그(cho2/cho1/jung1/jung2/jung3/jong2/jong1)별 그룹화 → 그룹 중심을 박스 위치로
 // 박스 = 1x1 고정 (위치 마커 전용 — 인접해도 결합 안 함). default 위치는 자모 스폰 중심을
 //   그리드(GRID_STEP)에 스냅해 "초기 스폰 위치"를 정확히 표현. 글리프 전체를 EDITOR_GRID(9)에 fit
 // msg6 — EDITOR_GRID↔합성공간 고정 변환계수. 스폰 간격 = 박스거리 / scale (역수, _applyMoimkkolOverride fromE).
@@ -1766,15 +1650,15 @@ function computeMoimkkolBoxes(syllable) {
   const eCx = EDITOR_GRID / 2;
   const eCy = EDITOR_GRID / 2;
   const toE = (gx, gy) => ({ x: eCx + (gx - gCx) * scale, y: eCy + (gy - gCy) * scale });
-  // jSrc 태그별 그룹화 — 누락 시 cho1 fallback
+  // jSrc 태그별 그룹화 — 누락 시 cho2 fallback
   const groups = {};
   a.glyph.nodes.forEach(n => {
-    const k = n.jSrc || 'cho1';
+    const k = n.jSrc || 'cho2';
     if (!groups[k]) groups[k] = [];
     groups[k].push(n);
   });
-  // 자모 파트 순서 — cho1/cho2 → jung1/jung2/jung3 → jong1/jong2
-  const _parts = ['cho1','cho2','jung1','jung2','jung3','jong1','jong2'];
+  // 자모 파트 순서 — cho2/cho1 → jung1/jung2/jung3 → jong2/jong1
+  const _parts = ['cho2','cho1','jung1','jung2','jung3','jong2','jong1'];
   const boxes = [];
   _parts.forEach(part => {
     const ns = groups[part];
@@ -1804,8 +1688,22 @@ function computeMoimkkolBoxes(syllable) {
     });
   });
   // 저장된 위치·크기로 덮어쓰기 — 패턴 키 기반 (x,y + w,h 복원; w/h 누락 시 6×6)
-  const saved = _moimkkolPositions[_moimkkolPatternKey(syllable)];
+  // [v1.10e] saved 데이터에 cho2↔cho1 / jung1↔jung2 / jong2↔jong1 중 한 쪽만 정의된 경우
+  //   반대쪽도 같은 위치·크기로 자동 미러. 예: mix|none 패턴의 saved 가 jung2(ㅣ) 만 정의해 두면
+  //   jung1(ㅏ/ㅓ) 도 같은 위치 → ㅙ/ㅞ 안 ㅐ/ㅔ 가 '미' 의 ㅣ 박스 위치와 정확히 일치하도록.
+  //   _moimkkolPositions 원본을 mutate 하지 않도록 slice 로 복사 후 처리.
+  let saved = _moimkkolPositions[_moimkkolPatternKey(syllable)];
   if (saved) {
+    saved = saved.slice();
+    const _mirrorSaved = (k1, k2) => {
+      const s1 = saved.find(s => s.kind === k1);
+      const s2 = saved.find(s => s.kind === k2);
+      if (s1 && !s2) saved.push(Object.assign({}, s1, { kind: k2 }));
+      else if (s2 && !s1) saved.push(Object.assign({}, s2, { kind: k1 }));
+    };
+    _mirrorSaved('cho2',  'cho1');
+    _mirrorSaved('jung1', 'jung2');
+    _mirrorSaved('jong2', 'jong1');
     saved.forEach(s => {
       const b = boxes.find(bb => bb.kind === s.kind);
       if (b && typeof s.x === 'number' && typeof s.y === 'number') {
@@ -1816,16 +1714,21 @@ function computeMoimkkolBoxes(syllable) {
       }
     });
   }
-  // [v1.09] 쌍초성 cho1↔cho2 / 쌍종성 jong1↔jong2 — 1개 박스가 대표.
-  //   computeMoimkkolBoxes 결과에 cho2/jong2 박스가 있어도 cho1/jong1 와 동일 위치·크기로 강제.
-  //   미러링(_moimkkolMirrorDelta)이 변경 시점에 둘 다 따라가므로 사용자는 한 박스만 다루면 됨.
+  // [v1.09] 쌍초성 cho2↔cho1 / 쌍종성 jong2↔jong1 / [v1.10e] 합성중성 jung1↔jung2
+  //   ─ 1개 박스가 대표. computeMoimkkolBoxes 결과에 cho1/jung2/jong1 박스가 있어도
+  //   cho2/jung1/jong2 와 동일 위치·크기로 강제. 미러링(_moimkkolMirrorDelta)이 변경 시점에
+  //   둘 다 따라가므로 사용자는 한 박스만 다루면 됨.
+  //   [v1.10e] jung1↔jung2 동기화 — ㅐ=ㅏ+ㅣ, ㅔ=ㅓ+ㅣ 등 합성중성을 쌍자음과 동일하게 처리.
+  //     _applyMoimkkolOverride 의 _splitFromRef 가 박스 안에서 두 자모를 가로 절반/절반 배치.
+  //     ㅙ(ㅗ+ㅐ)/ㅞ(ㅜ+ㅔ) 의 jung1↔jung2 도 같이 sync — jung3(ㅗ/ㅜ) 는 별도 박스 유지.
   const _syncPair = (k1, k2) => {
     const b1 = boxes.find(b => b.kind === k1);
     const b2 = boxes.find(b => b.kind === k2);
     if (b1 && b2) { b2.x = b1.x; b2.y = b1.y; b2.w = b1.w; b2.h = b1.h; }
   };
-  _syncPair('cho1', 'cho2');
-  _syncPair('jong1', 'jong2');
+  _syncPair('cho2',  'cho1');
+  _syncPair('jung1', 'jung2');
+  _syncPair('jong2', 'jong1');
   return boxes;
 }
 
@@ -1995,12 +1898,14 @@ function _moimkkolResolveMove(idx, nx, ny) {
   return { x: b.x, y: b.y };  // 이동 불가 — 현재 위치 유지
 }
 // [v1.09] 같은 part 그룹 박스에 변화량 동기화 — *같은 자모* 페어만 적용.
-//   cho1↔cho2 = 쌍자음 분해(예 ㅆ→ㅅ+ㅅ): 같은 자모, 같은 위치에서 시작 → 미러링 필요.
-//   jung1/2/3 = 섞임모음(ㅐ→ㅏ+ㅣ, ㅔ→ㅓ+ㅣ 등): *다른 자모*. 동기화 X (사용자 5: 믜의 ㅡ/ㅣ가 같이 움직이는 부작용).
-//   jong1↔jong2 = 섞임 받침(ㄵ→ㄴ+ㅈ 등): *다른 자모*. 동기화 X.
-// [v1.09] cho1↔cho2 (쌍자음) / jong1↔jong2 (쌍받침·섞임 받침) 대표 박스 정책.
-//   jung1/2/3 은 ㅔ=ㅓ+ㅣ 같은 *다른 자모* 라 동기화 안 함.
-const _MOIMKKOL_PART_GROUPS = [['cho1','cho2'], ['jong1','jong2']];
+//   cho2↔cho1 = 쌍자음 분해(예 ㅆ→ㅅ+ㅅ): 같은 자모, 같은 위치에서 시작 → 미러링 필요.
+//   [v1.10e] jung1↔jung2 = 합성중성(ㅐ→ㅏ+ㅣ, ㅔ→ㅓ+ㅣ, ㅙ=ㅗ+ㅏ+ㅣ, ㅞ=ㅜ+ㅓ+ㅣ 등):
+//     서로 *다른* 자모지만 쌍자음과 동일한 "1박스 대표 + 안에서 절반 분할" 정책으로 처리.
+//     _applyMoimkkolOverride 의 _splitFromRef 가 박스를 가로로 나눠 두 자모 좌/우 배치.
+//     jung3(ㅘ/ㅙ/ㅞ 의 ㅗ/ㅜ)는 별도 박스. ㅢ(ㅡ+ㅣ)는 jung3+jung2 로 sync 발동 안 함(jung1 없음).
+//   jong2↔jong1 = 쌍받침(ㄲ→ㄱ+ㄱ) + 섞임 받침(ㄵ→ㄴ+ㅈ 등): 둘 다 1박스 대표 정책.
+// [v1.10e] cho2↔cho1 (쌍자음) / jung1↔jung2 (합성중성) / jong2↔jong1 (쌍·섞임받침) 대표 박스.
+const _MOIMKKOL_PART_GROUPS = [['cho2','cho1'], ['jung1','jung2'], ['jong2','jong1']];
 function _moimkkolMirrorDelta(primaryIdx, dx, dy) {
   if ((dx === 0 && dy === 0) || primaryIdx < 0) return;
   const primary = _moimkkolBoxes[primaryIdx];
@@ -2122,15 +2027,16 @@ function _moimkkolSaveBoxes() {
   if (!_moimkkolChar) return;
   const key = _moimkkolPatternKey(_moimkkolChar);
   if (!key) return;
-  // [v1.09] 저장 직전 cho1↔cho2 / jong1↔jong2 강제 동기화 — 대표 박스(1개) 정책.
+  // [v1.10e] 저장 직전 cho2↔cho1 / jung1↔jung2 / jong2↔jong1 강제 동기화 — 대표 박스 정책.
   //   드래그/리사이즈 매 프레임마다 _moimkkolSaveBoxes 호출 시 적용되어, 시각·저장 모두 일관.
   const _syncPair = (k1, k2) => {
     const b1 = _moimkkolBoxes.find(b => b.kind === k1);
     const b2 = _moimkkolBoxes.find(b => b.kind === k2);
     if (b1 && b2) { b2.x = b1.x; b2.y = b1.y; b2.w = b1.w; b2.h = b1.h; }
   };
-  _syncPair('cho1','cho2');
-  _syncPair('jong1','jong2');
+  _syncPair('cho2','cho1');
+  _syncPair('jung1','jung2');
+  _syncPair('jong2','jong1');
   _moimkkolPositions[key] = _moimkkolBoxes.map(b => ({
     kind: b.kind, x: b.x, y: b.y, w: b.w, h: b.h,
   }));
@@ -2222,9 +2128,14 @@ const PANEL_GROUPS = [
     ['gravity', '뭉치는 힘', 0, 20, 1]
   ]},
   { id: 'form', title: '골격', items: [
-    ['skelWidth',   '너비',     0, 10, 1],   // [v1.10b] max 15 → 10 (사용자 요청 — 축소)
-    ['skelHeight',  '높이',     0, 10, 1],   // [v1.10b] max 15 → 10
-    ['randomExtra', '랜덤 점 추가', 0, 10, 1]   // [v1.09] '랜덤 노드' → '랜덤 점 추가' 개명
+    // [v1.11/v1.05] 자모별 6슬라이더 — 자모 종류 × 가로/세로 방향
+    ['choHoriz',    '초성 너비',  0, 5, 1],
+    ['choVert',     '초성 높이',  0, 5, 1],
+    ['jungHoriz',   '중성 너비',  0, 5, 1],
+    ['jungVert',    '중성 높이',  0, 5, 1],
+    ['jongHoriz',   '종성 너비',  0, 5, 1],
+    ['jongVert',    '종성 높이',  0, 5, 1],
+    ['randomExtra', '임의 획 추가', 0, 10, 1]
   ]},
   { id: 'spacing', title: '간격', items: [
     ['pointDist',    '점 간격',   4,  60, 1],
@@ -2505,10 +2416,12 @@ function combine2D(tl, tr, bl, br, gap) {
 //     사용자가 박스를 인접시키면 자모도 인접 정렬됨 (_applyMoimkkolOverride 안)
 //   COMPOUND_2D: 가로모음(아래) + 세로모음(우측 — 단독 표시용 4분할)
 const COMPOUND_GLUE = {
-  'ㅐ': ['ㅏ','ㅣ', 0],  // 딱 붙음 (한 몸)
-  'ㅒ': ['ㅑ','ㅣ', 0],  // 딱 붙음 (한 몸)
-  'ㅔ': ['ㅓ','ㅣ', 1],  // 한 칸 띄움
-  'ㅖ': ['ㅕ','ㅣ', 1]   // 한 칸 띄움
+  // [v1.10e] 합성중성 ㅐㅒㅔㅖ 모두 한 칸 띄움 — 쌍자음/쌍받침(gap=1)과 등장 간격 통일.
+  //   사용자가 박스 안 두 자모(ㅏ+ㅣ 등)를 본드로 직접 합치도록 일관된 출발점 제공.
+  'ㅐ': ['ㅏ','ㅣ', 1],
+  'ㅒ': ['ㅑ','ㅣ', 1],
+  'ㅔ': ['ㅓ','ㅣ', 1],
+  'ㅖ': ['ㅕ','ㅣ', 1]
 };
 const COMPOUND_2D = {
   'ㅘ': ['ㅗ','ㅏ'],
@@ -2578,11 +2491,12 @@ function resolveJamo(name) {
     return normalize(_d);
   }
   if (COMPOUND_GLUE[name]) {
-    // ㅐ/ㅒ/ㅔ/ㅖ: ㅏ+ㅣ 분해는 유지하되 자동 융합 제거(doMerge=false).
-    //   사용자가 기본 디자인의 ㅏ·ㅣ에 앞붙임/뒤붙임을 직접 달면 applyHorizontalMagnet으로 결합.
+    // [v1.10e] ㅐ/ㅒ/ㅔ/ㅖ 등장 규칙을 쌍자음(DOUBLES)과 통일 — gap+자석 결합 동일.
+    //   doMerge 인자 미전달(=기본 true) → 쌍자음과 같은 자동 인접 노드 병합 동작.
+    //   현재 gap=1 (COMPOUND_GLUE 모두) 이라 doMerge 는 실질 영향 없으나 분기 일관성 유지.
     const [a, b, g] = COMPOUND_GLUE[name];
     const mA = getJamoMargins(a), mB = getJamoMargins(b);
-    return combineH(resolveJamo(a), resolveJamo(b), g + (mA.R||0) + (mB.L||0), a, b, false);
+    return combineH(resolveJamo(a), resolveJamo(b), g + (mA.R||0) + (mB.L||0), a, b);
   }
   if (COMPOUND_2D[name]) {
     const [horizN, vertN] = COMPOUND_2D[name];
@@ -2601,8 +2515,8 @@ function resolveJamo(name) {
   return null;
 }
 // [v1.10b] 단독 합성 자모 (ㅃ/ㅉ/ㅐ/ㅒ/ㅘ/ㅙ/ㄳ/ㄵ 등) 의 part-specific jSrc 태깅된 합성 글리프 생성.
-//   resolveJamo 와 동일한 결합 흐름이지만 각 sub-part 의 노드를 cho1/cho2 또는 jung1/jung2/jung3
-//   또는 jong1/jong2 로 태깅 → buildToken 에서 body.jamos 자동 구성 + bond 참여 가능.
+//   resolveJamo 와 동일한 결합 흐름이지만 각 sub-part 의 노드를 cho2/cho1 또는 jung1/jung2/jung3
+//   또는 jong2/jong1 로 태깅 → buildToken 에서 body.jamos 자동 구성 + bond 참여 가능.
 //   자체 디자인이 PRIMITIVES 에 있으면(사용자 커스텀) 분해 안 함 (null 반환).
 function _assembleCompositeJamoStandalone(ch) {
   if (typeof ch !== 'string' || !ch) return null;
@@ -2612,17 +2526,18 @@ function _assembleCompositeJamoStandalone(ch) {
   //   매번 resolveJamo('ㄱ') 호출 → 현재 PRIMITIVES['ㄱ'] (태그 포함) 가 들어와 단독 ㄲ 에 동적 전파.
   //   ※ 사용자의 단독 ㅒ/ㅃ unitary 커스텀 디자인은 무시됨 — 음절 내부에서는 assembleSyllable 가 어차피
   //     재분해하므로 의미상 일관 ([v1.10c] 베이커리는 이제 PRIMITIVES 의 *백업* 으로만 작동.
-  // DOUBLES: 쌍자음 ㅃ/ㅉ/ㄲ/ㄸ/ㅆ → cho1 + cho2
+  // DOUBLES: 쌍자음 ㅃ/ㅉ/ㄲ/ㄸ/ㅆ → cho2 + cho1
   if (typeof DOUBLES !== 'undefined' && DOUBLES[ch]) {
     const [a, b] = DOUBLES[ch];
     const aJ = resolveJamo(a), bJ = resolveJamo(b);
     if (!aJ || !bJ) return null;
-    aJ.nodes.forEach(n => { n.jSrc = 'cho1'; });
-    bJ.nodes.forEach(n => { n.jSrc = 'cho2'; });
+    aJ.nodes.forEach(n => { n.jSrc = 'cho2'; });
+    bJ.nodes.forEach(n => { n.jSrc = 'cho1'; });
     const mA = getJamoMargins(a), mB = getJamoMargins(b);
     return combineH(aJ, bJ, 1 + (mA.R||0) + (mB.L||0), a, b);
   }
   // COMPOUND_GLUE: ㅐ/ㅒ/ㅔ/ㅖ → jung1 + jung2
+  // [v1.10e] 쌍자음과 등장 규칙 통일 — doMerge 미전달(=true), gap=1 (COMPOUND_GLUE 정의).
   if (typeof COMPOUND_GLUE !== 'undefined' && COMPOUND_GLUE[ch]) {
     const [a, b, g] = COMPOUND_GLUE[ch];
     const aJ = resolveJamo(a), bJ = resolveJamo(b);
@@ -2630,7 +2545,7 @@ function _assembleCompositeJamoStandalone(ch) {
     aJ.nodes.forEach(n => { n.jSrc = 'jung1'; });
     bJ.nodes.forEach(n => { n.jSrc = 'jung2'; });
     const mA = getJamoMargins(a), mB = getJamoMargins(b);
-    return combineH(aJ, bJ, g + (mA.R||0) + (mB.L||0), a, b, false);
+    return combineH(aJ, bJ, g + (mA.R||0) + (mB.L||0), a, b);
   }
   // COMPOUND_2D: ㅘ/ㅙ/ㅚ/ㅝ/ㅞ/ㅟ/ㅢ → jung3 (horiz) + jung1/jung2 (vert)
   if (typeof COMPOUND_2D !== 'undefined' && COMPOUND_2D[ch]) {
@@ -2647,7 +2562,7 @@ function _assembleCompositeJamoStandalone(ch) {
       vaJ.nodes.forEach(n => { n.jSrc = 'jung1'; });
       vbJ.nodes.forEach(n => { n.jSrc = 'jung2'; });
       const mVA = getJamoMargins(vaN), mVB = getJamoMargins(vbN);
-      vertJ = combineH(vaJ, vbJ, 1 + (mVA.R||0) + (mVB.L||0), vaN, vbN, false);
+      vertJ = combineH(vaJ, vbJ, 1 + (mVA.R||0) + (mVB.L||0), vaN, vbN);  // [v1.10e] 쌍자음과 doMerge 통일 (기본 true)
     } else {
       // ㅘ/ㅢ 등: vert = 단순 → vertJ=jung2
       vertJ = resolveJamo(vN);
@@ -2656,13 +2571,13 @@ function _assembleCompositeJamoStandalone(ch) {
     }
     return combine2D(null, vertJ, horizJ, null, 1);
   }
-  // CLUSTERS: 겹받침 ㄳ/ㄵ/ㄶ/ㄺ 등 → jong1 + jong2
+  // CLUSTERS: 겹받침 ㄳ/ㄵ/ㄶ/ㄺ 등 → jong2 + jong1
   if (typeof CLUSTERS !== 'undefined' && CLUSTERS[ch]) {
     const [a, b] = CLUSTERS[ch];
     const aJ = resolveJamo(a), bJ = resolveJamo(b);
     if (!aJ || !bJ) return null;
-    aJ.nodes.forEach(n => { n.jSrc = 'jong1'; });
-    bJ.nodes.forEach(n => { n.jSrc = 'jong2'; });
+    aJ.nodes.forEach(n => { n.jSrc = 'jong2'; });
+    bJ.nodes.forEach(n => { n.jSrc = 'jong1'; });
     const mA = getJamoMargins(a), mB = getJamoMargins(b);
     return combineH(aJ, bJ, 1 + (mA.R||0) + (mB.L||0), a, b);
   }
@@ -2702,7 +2617,7 @@ function _fallbackBoxGlyph() {
 // [v1.10c] jSrc 태그 보존 — 단독 자모 bond 참여를 위해 _assembleCompositeJamoStandalone 결과 사용.
 //   · 옛 베이커리는 resolveJamo(ch) 결과를 ×COORD_SCALE 로 굽고 jSrc/tags 를 제거 → 단독 ㅒ/ㅃ 등이
 //     body.jamos 없는 isPunct 처리 → bond 차단. 반면 CLUSTERS(ㄺ 등) 는 베이커리 대상이 아니라
-//     _assembleCompositeJamoStandalone 가 호출되어 jong1/jong2 태깅 → bond 정상.
+//     _assembleCompositeJamoStandalone 가 호출되어 jong2/jong1 태깅 → bond 정상.
 //   · 새 베이커리는 _assembleCompositeJamoStandalone(ch) (PRIMITIVES[ch] 아직 비어 있어 fall through)
 //     로 jSrc 태깅된 합성 결과를 받아 ×COORD_SCALE 저장. _assembleCompositeJamoStandalone 도
 //     PRIMITIVES[ch] 가 태그 완비 시 그대로 반환 → 향후 buildToken 도 _compStandalone truthy → bond 참여.
@@ -2813,7 +2728,7 @@ function _subdivideByCounts(jamo, counts) {
       const t = i / (k + 1);
       const idx = newNodes.length;
       const newN = { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
-      if (isInv) newN.inv = true;
+      // [v1.12] 노드 inv 부여 제거 — 노드는 항상 불투명
       if (a.jSrc) newN.jSrc = a.jSrc;
       // [감상모드 통합] 서브디비전으로 추가된 노드는 base 가 아님 — 호버 하이라이트·자석 대상 제외.
       newN.isBase = false;
@@ -2884,7 +2799,7 @@ function subdivideJamo(jamo, k) {
       const idx = newNodes.length;
       const newN = { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
       // 투명 획 위에 삽입되는 노드는 투명 (감상모드에서 점만 보이는 버그 방지)
-      if (isInv) newN.inv = true;
+      // [v1.12] 노드 inv 부여 제거 — 노드는 항상 불투명
       // 새 노드는 시작 노드의 자모 출처(part-specific jSrc)를 상속
       if (a.jSrc) newN.jSrc = a.jSrc;
       newNodes.push(newN);
@@ -2909,21 +2824,62 @@ function subdivideJamo(jamo, k) {
   });
   return { nodes: newNodes, edges: newEdges, strokes: newStrokes };
 }
-// [F1] 임의 획 추가 — 최장 엣지 우선 폐기. 모든 엣지에 가중 없이 길이 무관 균등 랜덤 분배.
-//   (같은 엣지 다중 선택 시 _subdivideByCounts 가 균등 간격으로 삽입)
+// [v1.11/v1.05] 임의 획 추가 — 매번 가장 긴 엣지를 골라 정중앙 분할 (자연스러운 분포).
+//   v1.10 의 균등 무작위 분배가 v1.05 의 "긴 엣지 우선" 분배로 회귀.
+//   isBase 누락 시 _annotateIsBaseFromFactory 가 좌표 매칭 실패로 false 부여 → 본드 후보 제외 유지.
 function addRandomNodesOnEdges(jamo, count) {
-  count = Math.max(0, Math.round(count || 0));
   if (count <= 0) return deepClone(jamo);
-  const E = jamo.edges.length;
-  if (E === 0) return deepClone(jamo);
-  const counts = new Array(E).fill(0);
-  for (let i = 0; i < count; i++) counts[Math.floor(Math.random() * E)]++;
-  return _subdivideByCounts(jamo, counts);
+  if (jamo.edges.length === 0) return deepClone(jamo);
+  const out = { nodes: jamo.nodes.map(n => {
+    const o = { x: n.x, y: n.y };
+    if (n.tags && n.tags.length) o.tags = n.tags.slice();
+    if (n.tagFilters) o.tagFilters = Object.assign({}, n.tagFilters);
+    if (n.jSrc) o.jSrc = n.jSrc;
+    if (n.inv) o.inv = true;
+    if (n.isBase !== undefined) o.isBase = n.isBase;
+    return o;
+  }), edges: [], strokes: jamo.strokes.map(s => s.slice()) };
+  const edgesMut = jamo.edges.map(e => e.slice());
+  for (let i = 0; i < count; i++) {
+    let ei = 0, bestLen = -1;
+    for (let k = 0; k < edgesMut.length; k++) {
+      const aN = out.nodes[edgesMut[k][0]], bN = out.nodes[edgesMut[k][1]];
+      const len = Math.hypot(bN.x - aN.x, bN.y - aN.y);
+      if (len > bestLen) { bestLen = len; ei = k; }
+    }
+    const [a, b] = edgesMut[ei];
+    const t = 0.5;
+    const na = out.nodes[a], nb = out.nodes[b];
+    const newIdx = out.nodes.length;
+    const _origEdge = edgesMut[ei];
+    const _isInv = _origEdge.length > 2 && _origEdge[2] === 'inv';
+    const _newN = { x: na.x + (nb.x - na.x) * t, y: na.y + (nb.y - na.y) * t };
+    if (_isInv) _newN.inv = true;
+    if (na.jSrc) _newN.jSrc = na.jSrc;
+    _newN.isBase = false;  // 자동 분할로 생긴 중간 노드 = 본드/호버 후보 제외
+    out.nodes.push(_newN);
+    edgesMut.splice(ei, 1,
+      _isInv ? [a, newIdx, 'inv'] : [a, newIdx],
+      _isInv ? [newIdx, b, 'inv'] : [newIdx, b]);
+    out.strokes = out.strokes.map(s => {
+      const res = [];
+      for (let j = 0; j < s.length; j++) {
+        res.push(s[j]);
+        if (j < s.length - 1) {
+          const u = s[j], v = s[j+1];
+          if ((u === a && v === b) || (u === b && v === a)) res.push(newIdx);
+        }
+      }
+      return res;
+    });
+  }
+  out.edges = edgesMut;
+  return out;
 }
 
-// 자모(cho/jung/jong)별 노드 분류 — 원본 노드는 jSrc (part-specific: cho1/cho2/jung1/jung2/jung3/jong1/jong2)
-//   서브디비전 새 노드는 jSrc 상속, 그래도 누락된 경우 BFS 보강 후 fallback 'cho1'
-const _VALID_JSRC_SET = new Set(['cho','jung','jong','cho1','cho2','jung1','jung2','jung3','jong1','jong2']);
+// 자모(cho/jung/jong)별 노드 분류 — 원본 노드는 jSrc (part-specific: cho2/cho1/jung1/jung2/jung3/jong2/jong1)
+//   서브디비전 새 노드는 jSrc 상속, 그래도 누락된 경우 BFS 보강 후 fallback 'cho2'
+const _VALID_JSRC_SET = new Set(['cho','jung','jong','cho2','cho1','jung1','jung2','jung3','jong2','jong1']);
 function computeNodeJamos(glyph, choCount, jungCount, jongCount) {
   // 노드 전부에 part-specific jSrc가 있으면 그대로 사용 (이상적 경로)
   if (glyph.nodes.length > 0 && glyph.nodes.every(n => _VALID_JSRC_SET.has(n.jSrc))) {
@@ -2937,9 +2893,9 @@ function computeNodeJamos(glyph, choCount, jungCount, jongCount) {
     if (_VALID_JSRC_SET.has(j)) result[i] = j;
   }
   // jSrc 없는 노드는 count 경계로 시드 (구버전 호환)
-  for (let i = 0; i < choCount; i++) if (!result[i]) result[i] = 'cho1';
+  for (let i = 0; i < choCount; i++) if (!result[i]) result[i] = 'cho2';
   for (let i = choCount; i < choCount + jungCount; i++) if (!result[i]) result[i] = 'jung1';
-  for (let i = choCount + jungCount; i < choCount + jungCount + jongCount; i++) if (!result[i]) result[i] = 'jong1';
+  for (let i = choCount + jungCount; i < choCount + jungCount + jongCount; i++) if (!result[i]) result[i] = 'jong2';
   // BFS — 연결된 이웃에서 자모 출처 상속
   const adj = Array.from({length: total}, () => []);
   glyph.edges.forEach(e => { adj[e[0]].push(e[1]); adj[e[1]].push(e[0]); });
@@ -2952,7 +2908,7 @@ function computeNodeJamos(glyph, choCount, jungCount, jongCount) {
       if (!result[u]) { result[u] = result[v]; queue.push(u); }
     }
   }
-  for (let i = 0; i < total; i++) if (!result[i]) result[i] = 'cho1';
+  for (let i = 0; i < total; i++) if (!result[i]) result[i] = 'cho2';
   return result;
 }
 
@@ -2968,7 +2924,7 @@ function _applyMoimkkolOverride(glyph, savedBoxes) {
   // jSrc 그룹화
   const groups = {};
   glyph.nodes.forEach((n, i) => {
-    const k = n.jSrc || 'cho1';
+    const k = n.jSrc || 'cho2';
     if (!groups[k]) groups[k] = [];
     groups[k].push(i);
   });
@@ -3003,24 +2959,35 @@ function _applyMoimkkolOverride(glyph, savedBoxes) {
   //   [Block1 재조정] 크기 스케일 제거 — 박스를 키워도 자모 크기는 원본 유지(sx=sy=1).
   //   박스가 클수록 "획만" 더 나뉨(분할은 assembleSyllable _subdiv: k = S + (박스칸−2)).
   const _DEFBOX = MH_CFG.moimkkolDefBox;   // ← 설정 대시보드 MH_CFG.moimkkolDefBox (스폰 중심 기준)
-  // [v1.10b] 쌍초성/쌍중성/쌍종성 분리 — 모임꼴 에디터는 cho1/jung1/jong1 1개(대표)만 저장.
+  // [v1.10b] 쌍초성/쌍중성/쌍종성 분리 — 모임꼴 에디터는 cho2/jung1/jong2 1개(대표)만 저장.
   //   렌더링 시 그룹1 은 박스 가로 길이의 절반(w/2) 만큼 좌측, 그룹2 는 우측으로 분리 → 두 박스가 한 변을 공유.
-  const _hasDoubleCho  = !!(groups.cho1  && groups.cho2);
+  const _hasDoubleCho  = !!(groups.cho2  && groups.cho1);
   const _hasDoubleJung = !!(groups.jung1 && groups.jung2);
-  const _hasDoubleJong = !!(groups.jong1 && groups.jong2);
-  const _splitFromRef = (refBox, isFirst) => {
+  const _hasDoubleJong = !!(groups.jong2 && groups.jong1);
+  // [v1.10e] 분할 정책 — 자모 종류별로 다름:
+  //   cho/jong: 박스 내부 절반 분할 (쌍자음 ㄲ 두 ㄱ 이 박스 안 좌/우, isJung=false)
+  //   jung:     박스 위치 = jung2(ㅣ) 위치, jung1(ㅏ/ㅓ) 은 박스 좌측 외부
+  //             → '새' 의 ㅣ 와 '미' 의 ㅣ 가 모두 박스 (10,8) 중심 위치로 일치
+  const _splitFromRef = (refBox, isFirst, isJung) => {
     const cw = (typeof refBox.w === 'number' && refBox.w > 0) ? refBox.w : _DEFBOX;
-    const dx = isFirst ? -cw / 2 : cw / 2;
+    let dx;
+    if (isJung) {
+      // jung1 = 박스 좌측 외부, jung2 = 박스 위치 (ㅣ 위치 기준 정렬)
+      dx = isFirst ? -cw : 0;
+    } else {
+      // cho/jong = 박스 내부 절반 분할
+      dx = isFirst ? -cw / 2 : cw / 2;
+    }
     return Object.assign({}, refBox, { x: refBox.x + dx });
   };
   Object.keys(groups).forEach(part => {
     let box = _mLookup[part];
-    if (_hasDoubleCho && (part === 'cho1' || part === 'cho2') && _mLookup.cho1) {
-      box = _splitFromRef(_mLookup.cho1, part === 'cho1');
+    if (_hasDoubleCho && (part === 'cho2' || part === 'cho1') && _mLookup.cho2) {
+      box = _splitFromRef(_mLookup.cho2, part === 'cho2', false);
     } else if (_hasDoubleJung && (part === 'jung1' || part === 'jung2') && _mLookup.jung1) {
-      box = _splitFromRef(_mLookup.jung1, part === 'jung1');
-    } else if (_hasDoubleJong && (part === 'jong1' || part === 'jong2') && _mLookup.jong1) {
-      box = _splitFromRef(_mLookup.jong1, part === 'jong1');
+      box = _splitFromRef(_mLookup.jung1, part === 'jung1', true);
+    } else if (_hasDoubleJong && (part === 'jong2' || part === 'jong1') && _mLookup.jong2) {
+      box = _splitFromRef(_mLookup.jong2, part === 'jong2', false);
     }
     if (!box) return;
     const idxs = groups[part];
@@ -3122,7 +3089,7 @@ function assembleSyllable(cho, jung, jong, consSub, vowSub, extras, ch, forceNoM
   }
 
   // 자모 파트별 jSrc 태깅 — 쌍초성/쌍종성/합성중성을 별개 자모로 구분
-  //   초성: 최대 2개(cho1/cho2) · 중성: 최대 3개(jung1·jung2·jung3) · 종성: 최대 2개(jong1/jong2)
+  //   초성: 최대 2개(cho2/cho1) · 중성: 최대 3개(jung1·jung2·jung3) · 종성: 최대 2개(jong2/jong1)
   //   서브디비전 함수들이 시작 노드의 jSrc를 새 노드에 상속하므로 여기서 한 번만 태깅
   const _tagAll = (jamo, name) => {
     if (jamo && jamo.nodes) jamo.nodes.forEach(n => { n.jSrc = name; });
@@ -3135,24 +3102,27 @@ function assembleSyllable(cho, jung, jong, consSub, vowSub, extras, ch, forceNoM
   //   vertAJ + vertBJ (2D 합성모음의 vert 가 COMPOUND_GLUE 인 경우, ex. ㅙ의 ㅏ+ㅣ):
   //     vertAJ → jung1, vertBJ → jung2 — COMPOUND_GLUE 단독 케이스와 정합.
   //   효과: ㅏ 가 어디서나 jung1, ㅣ 가 어디서나 jung2 → 디자인 창의 ㅏ↔ㅣ 결합이 ㅐ/ㅙ 등 모든 음절에 전파됨.
-  _tagAll(choAJ,  'cho1');
-  _tagAll(choBJ,  'cho2');
+  _tagAll(choAJ,  'cho2');
+  _tagAll(choBJ,  'cho1');
   _tagAll(horizJ, isMixed ? 'jung3' : 'jung1');
   _tagAll(vertJ,  'jung2');
   _tagAll(vertAJ, 'jung1');
   _tagAll(vertBJ, 'jung2');
-  _tagAll(jongAJ, 'jong1');
-  _tagAll(jongBJ, 'jong2');
-  _tagAll(jongJ,  'jong1');
+  _tagAll(jongAJ, 'jong2');
+  _tagAll(jongBJ, 'jong1');
+  _tagAll(jongJ,  'jong2');
   // choJ가 쌍초성(DOUBLES)이면 resolveJamo가 이미 combineH로 합쳐버려 단일 그룹.
   // 태깅된 choAJ/choBJ로 choJ를 재구성하여 part-specific 태그 보존
   if (isDoubleCho && choAJ && choBJ) {
     const [caN, cbN] = DOUBLES[cho];
     choJ = combineH(choAJ, choBJ, 1 + (mChoA.R||0) + (mChoB.L||0), caN, cbN, !_noMerge);
   } else {
-    _tagAll(choJ, 'cho1');
+    _tagAll(choJ, 'cho2');
   }
   // jungJ가 합성모음(COMPOUND_GLUE: ㅐㅒㅔㅖ)이면 두 파트로 재구성하여 분리
+  // [v1.10e] 쌍자음 choJ 와 등장 규칙 통일 — doMerge=!_noMerge.
+  //   모임꼴 모드(_noMerge=true) 에서는 박스 자유 분리 위해 false, 그 외 음절 안에서는
+  //   쌍자음과 동일하게 인접 노드 자동 병합 가능.
   if (jungJ && !isMixed && COMPOUND_GLUE[jung]) {
     const [jvaN, jvbN, jvGap] = COMPOUND_GLUE[jung];
     const jvaJ = resolveJamo(jvaN), jvbJ = resolveJamo(jvbN);
@@ -3160,8 +3130,7 @@ function assembleSyllable(cho, jung, jong, consSub, vowSub, extras, ch, forceNoM
       jvaJ.nodes.forEach(n => n.jSrc = 'jung1');
       jvbJ.nodes.forEach(n => n.jSrc = 'jung2');
       const mA = getJamoMargins(jvaN), mB = getJamoMargins(jvbN);
-      // 자동 융합 제거 — ㅏ·ㅣ 분리 유지, 결합은 사용자 앞붙임/뒤붙임 태그로만 (doMerge=false)
-      jungJ = combineH(jvaJ, jvbJ, jvGap + (mA.R||0) + (mB.L||0), jvaN, jvbN, false);
+      jungJ = combineH(jvaJ, jvbJ, jvGap + (mA.R||0) + (mB.L||0), jvaN, jvbN, !_noMerge);
     } else {
       _tagAll(jungJ, 'jung1');
     }
@@ -3169,9 +3138,10 @@ function assembleSyllable(cho, jung, jong, consSub, vowSub, extras, ch, forceNoM
     _tagAll(jungJ, 'jung1');
   }
 
-  // [F1] 골격 = 너비/높이 전역 1쌍을 모든 초·중·종성에 동일 적용(공평 분배).
-  const _sW = PARAMS.skelWidth  || 0;
-  const _sH = PARAMS.skelHeight || 0;
+  // [v1.11/v1.05] 자모별 6 골격 슬라이더 — 자모 종류(cho/jung/jong) 따라 H/V 별도.
+  const _choH  = PARAMS.choHoriz  || 0, _choV  = PARAMS.choVert  || 0;
+  const _jungH = PARAMS.jungHoriz || 0, _jungV = PARAMS.jungVert || 0;
+  const _jongH = PARAMS.jongHoriz || 0, _jongV = PARAMS.jongVert || 0;
   // [Block1 재조정] 모임꼴 박스 = 해당 자모(파트)의 "획 나누기 칸 수"를 직접 결정.
   //   한 축 분할량 k = S + N   (S=골격 슬라이더값, N = 박스칸 − 기본칸(_DEFBOX,2)).
   //     · 박스 2(기본) → N=0 → k=S  (기존과 완전히 동일, 역호환)
@@ -3204,17 +3174,17 @@ function assembleSyllable(cho, jung, jong, consSub, vowSub, extras, ch, forceNoM
   };
   // 가드 제거 — 슬라이더 0이어도 박스칸(N)만으로 분할이 추가될 수 있어야 함.
   //   (_subdiv 은 kH·kV 둘 다 0이면 원본 그대로 반환 → 기본 박스+슬라이더0 시 무동작=기존과 동일)
-  choJ = _subdiv(choJ, _sW, _sH);
-  if (choAJ) choAJ = _subdiv(choAJ, _sW, _sH);
-  if (choBJ) choBJ = _subdiv(choBJ, _sW, _sH);
-  if (jungJ)  jungJ  = _subdiv(jungJ,  _sW, _sH);
-  if (vertJ)  vertJ  = _subdiv(vertJ,  _sW, _sH);
-  if (vertAJ) vertAJ = _subdiv(vertAJ, _sW, _sH);
-  if (vertBJ) vertBJ = _subdiv(vertBJ, _sW, _sH);
-  if (horizJ) horizJ = _subdiv(horizJ, _sW, _sH);
-  if (jongJ)  jongJ  = _subdiv(jongJ,  _sW, _sH);
-  if (jongAJ) jongAJ = _subdiv(jongAJ, _sW, _sH);
-  if (jongBJ) jongBJ = _subdiv(jongBJ, _sW, _sH);
+  choJ = _subdiv(choJ, _choH, _choV);
+  if (choAJ) choAJ = _subdiv(choAJ, _choH, _choV);
+  if (choBJ) choBJ = _subdiv(choBJ, _choH, _choV);
+  if (jungJ)  jungJ  = _subdiv(jungJ,  _jungH, _jungV);
+  if (vertJ)  vertJ  = _subdiv(vertJ,  _jungH, _jungV);
+  if (vertAJ) vertAJ = _subdiv(vertAJ, _jungH, _jungV);
+  if (vertBJ) vertBJ = _subdiv(vertBJ, _jungH, _jungV);
+  if (horizJ) horizJ = _subdiv(horizJ, _jungH, _jungV);
+  if (jongJ)  jongJ  = _subdiv(jongJ,  _jongH, _jongV);
+  if (jongAJ) jongAJ = _subdiv(jongAJ, _jongH, _jongV);
+  if (jongBJ) jongBJ = _subdiv(jongBJ, _jongH, _jongV);
   if (extras) {
     if (extras.cho > 0) {
       if (choAJ && choBJ) {
@@ -3297,7 +3267,7 @@ function assembleSyllable(cho, jung, jong, consSub, vowSub, extras, ch, forceNoM
     if (isSplitVert) {
       const vNGlue = COMPOUND_GLUE[COMPOUND_2D[jung][1]];
       const [vaN, vbN, vGap] = vNGlue;
-      vertCell = combineH(vertAJ, vertBJ, vGap + (mVertA.R||0) + (mVertB.L||0), vaN, vbN, false);  // ㅙ/ㅞ 글루 자동 융합 제거 — 태그 수동 결합
+      vertCell = combineH(vertAJ, vertBJ, vGap + (mVertA.R||0) + (mVertB.L||0), vaN, vbN, !_noMerge);  // [v1.10e] 쌍자음과 doMerge 통일
     } else {
       vertCell = vertJ;
     }
@@ -3342,7 +3312,7 @@ function assembleSyllable(cho, jung, jong, consSub, vowSub, extras, ch, forceNoM
     if (isSplitVert) {
       const vNGlue = COMPOUND_GLUE[COMPOUND_2D[jung][1]];
       const [vaN, vbN, vGap] = vNGlue;
-      _vertGlyph = combineH(vertAJ, vertBJ, vGap + (mVertA.R||0) + (mVertB.L||0), vaN, vbN, false);  // ㅙ/ㅞ 글루 자동 융합 제거 — 태그 수동 결합
+      _vertGlyph = combineH(vertAJ, vertBJ, vGap + (mVertA.R||0) + (mVertB.L||0), vaN, vbN, !_noMerge);  // [v1.10e] 쌍자음과 doMerge 통일
     } else {
       _vertGlyph = vertJ;
     }
@@ -3416,9 +3386,9 @@ function assembleSyllable(cho, jung, jong, consSub, vowSub, extras, ch, forceNoM
   }
 
   // 자모 출처 마킹 — 누락된 노드만 fallback (part-specific 태그는 보존)
-  if (placedCho)  placedCho.nodes.forEach(n => { if (!n.jSrc) n.jSrc = 'cho1'; });
+  if (placedCho)  placedCho.nodes.forEach(n => { if (!n.jSrc) n.jSrc = 'cho2'; });
   if (placedJung) placedJung.nodes.forEach(n => { if (!n.jSrc) n.jSrc = 'jung1'; });
-  if (placedJong) placedJong.nodes.forEach(n => { if (!n.jSrc) n.jSrc = 'jong1'; });
+  if (placedJong) placedJong.nodes.forEach(n => { if (!n.jSrc) n.jSrc = 'jong2'; });
 
   const parts = [placedCho, placedJung];
   if (placedJong) parts.push(placedJong);
@@ -3434,7 +3404,7 @@ function assembleSyllable(cho, jung, jong, consSub, vowSub, extras, ch, forceNoM
   // 자석 병합 — cho.뒤↔jung.앞, jung.뒤↔jong.앞 페어 (필터 매칭 시)
   glyph = applyMagnetMerge(glyph, cho, jung, jong);
 
-  // jSrc 기반 카운트 — part-specific 태그(cho1/cho2/jung1/jung2/jung3/jong1/jong2) 모두 합산
+  // jSrc 기반 카운트 — part-specific 태그(cho2/cho1/jung1/jung2/jung3/jong2/jong1) 모두 합산
   let _cn = 0, _jn = 0, _gn = 0;
   glyph.nodes.forEach(n => {
     if (!n.jSrc) return;
@@ -3492,9 +3462,16 @@ function buildToken(ch, consSub, vowSub, extras) {
     if (!proto) return null;
   }
   let g = normalize(deepClone(proto));
-  // [F1] 비한글도 전역 너비/높이 동일 적용(자음/모음 구분 없이 공평).
-  const _kH = PARAMS.skelWidth  || 0;
-  const _kV = PARAMS.skelHeight || 0;
+  // [v1.11/v1.05] 비한글 — classifyChar 로 자음/모음 구분 (e_consonant→cho, e_vowel→jung).
+  const _cls = (typeof classifyChar === 'function') ? classifyChar(ch) : null;
+  let _kH = 0, _kV = 0;
+  if (_cls === 'e_consonant') {
+    _kH = PARAMS.choHoriz || 0;
+    _kV = PARAMS.choVert  || 0;
+  } else if (_cls === 'e_vowel') {
+    _kH = PARAMS.jungHoriz || 0;
+    _kV = PARAMS.jungVert  || 0;
+  }
   if (_kH > 0 || _kV > 0) g = subdivideJamoOriented(g, _kH, _kV);
   if (extras && extras.body > 0) g = addRandomNodesOnEdges(g, extras.body);
   // yShift는 subdivision 함수들이 보존하지 않으므로 proto에서 다시 복사
@@ -3538,10 +3515,10 @@ function _computeMagnetPairs(nodes, nodeJamos, ch) {
   // (폐기) 음절-포함 cand 필터 — 독립 붙임이 한 글자 안에서 교차 오염되던 원인
   //   ('족'에서 ㅈ.s ↔ ㄱ.n). 아래 _filtOK 가 "상대(파트너)의 실제 자모"를 필터와
   //   직접 대조하도록 정확화 → ㅉ용/ㄲ용 붙임이 서로 섞이지 않음.
-  // [7단계 통일] 앞/뒤 순서 판정을 _bondPartRank(cho1<cho2<jung1<jung2<jung3<
-  //   jong1<jong2)와 동일하게. 같은 글자 쌍자음(㈈+㈈)처럼 cho1·cho2가 모두 같은
+  // [7단계 통일] 앞/뒤 순서 판정을 _bondPartRank(cho2<cho1<jung1<jung2<jung3<
+  //   jong2<jong1)와 동일하게. 같은 글자 쌍자음(㈈+㈈)처럼 cho2·cho1가 모두 같은
   //   공유 디자인이라 s·n이 함께 박혀도, 의도 방향(앞순서 s → 뒷순서 n)만 통과하고
-  //   역방향(cho2.s ↔ cho1.n)은 'n파트 < s파트'로 차단. 기존 3단계의 정제이므로
+  //   역방향(cho1.s ↔ cho2.n)은 'n파트 < s파트'로 차단. 기존 3단계의 정제이므로
   //   정상 교차·기존 임베드 페어(ㅏ/ㅣ 등)는 영향 없음(역호환).
   const rank = nm => (typeof _bondPartRank === 'function')
     ? _bondPartRank(nm)
@@ -3559,19 +3536,72 @@ function _computeMagnetPairs(nodes, nodeJamos, ch) {
   // [v1.10d] PARAMS.bondLooseGlobal === 1 이면 @part 한정 무시 — 글자만 일치하면 통과.
   //   관리자 패널 옵션 C — 모든 본드 위치 무관 (어의 ㅇ↔ㅓ 가 워/월/얼 모든 ㅇ↔ㅓ 위치에 자동 전파).
   const _looseGlobal = (typeof PARAMS !== 'undefined' && PARAMS.bondLooseGlobal === 1);
-  const _filtOK = (node, tag, partnerChar, partnerPart) => {
+  // [v1.10e] 동일자모쌍 본드(ㅅ↔ㅅ, ㄱ↔ㄱ 등)의 처리 규칙:
+  //   · within-class(같은 클래스 안): cho2↔cho1 / jong2↔jong1 / jung1↔jung2 같은
+  //     "한 클래스(cho/jung/jong) 안의 본드" 는 token.part 를 null 로 저장 → 모든
+  //     within-class 위치에 자동 전파. cho2↔cho1 본드를 만들면 다른 글자(또는 같은 글자)의
+  //     jong2↔jong1 에도 자동 적용. _filtOK 에서 token.part==null & sameJamo 이면
+  //     selfPart 와 partnerPart 가 같은 클래스 일 때만 통과 → cho↔jong 같은 cross-class
+  //     자동 본드는 차단.
+  //   · cross-class(다른 클래스): cho2↔jong1 같이 사용자가 일부러 만든 cross 본드는
+  //     token.part 에 정확한 part(cho2/jong1)를 저장 → _filtOK 에서 정확히 일치할 때만 통과.
+  //     즉 다른 글자에 적용되더라도 cho2↔jong1 위치 페어에만 매칭.
+  //   효과: '씼' 에서 종성 ㅆ 의 jong2↔jong1 본드를 만들면 같은 글자 cho2↔cho1 에도 같이
+  //   적용되지만, cross 페어(cho2↔jong1, cho1↔jong2)는 자동 본드되지 않음.
+  //   다른 자모쌍(ㅇ↔ㅓ 등)은 기존 동작 유지 — looseGlobal 따라 위치 무관/한정.
+  const _partClass = (p) => {
+    if (!p) return null;
+    if (p.indexOf('cho')  === 0) return 'cho';
+    if (p.indexOf('jung') === 0) return 'jung';
+    if (p.indexOf('jong') === 0) return 'jong';
+    return null;
+  };
+  // [v1.11→v1.12] 단일↔쌍 본드 합산/분배 로직.
+  //   룰 1: 단일 자모는 sp 매칭 풀어줌 (cho1·cho2 양쪽 sp 토큰 모두 흡수).
+  //   룰 2: solo 본드(sp=null) 는 1:N 매칭 — 단일에서 만든 본드가 쌍자음 두 인스턴스에 분배.
+  // [v1.12] selfSolo 판정 — self.part 클래스(cho/jung/jong) 안에서만 자모 카운트.
+  //   '걱'(ㄱ+ㅓ+ㄱ) 에서 ㄱ는 cho1+jong1 로 2번 등장하지만 *각 클래스 안에선 1번씩*.
+  //   → cho 의 ㄱ 검사 시 cho 클래스 ㄱ 1번 → solo=true → 룰 1 활성.
+  //   → jong 의 ㄱ 검사 시 jong 클래스 ㄱ 1번 → solo=true → 룰 1 활성.
+  //   (이전: cho1+jong1 합쳐 2번 → solo=false → 룰 1 미발동 — 사용자 보고 원인)
+  const _countJamoInClass = (ch, klass) => {
+    if (!ch || !klass) return 0;
+    const seenParts = new Set();
+    for (let i = 0; i < nodeJamos.length; i++) {
+      const jc = (typeof _getMoimkkolPartLabel === 'function') ? _getMoimkkolPartLabel(d, nodeJamos[i]) : null;
+      if (jc === ch && _partClass(nodeJamos[i]) === klass) seenParts.add(nodeJamos[i]);
+    }
+    return seenParts.size;
+  };
+  const _filtMatch = (node, tag, selfChar, selfPart, partnerChar, partnerPart) => {
     const f = node.tagFilters && node.tagFilters[tag];
-    if (!f) return true;
-    if (!partnerChar) return false;
+    if (!f) return null;
+    if (!partnerChar) return undefined;
+    const _sameJamo = (selfChar && selfChar === partnerChar);
+    const _selfSolo = (_countJamoInClass(selfChar, _partClass(selfPart)) <= 1);
     const toks = _parseBondFilter(f);
     for (let i = 0; i < toks.length; i++) {
       const t = toks[i];
       if (t.ch !== partnerChar) continue;
-      if (_looseGlobal) return true;  // [v1.10d] 위치 무관 모드 — 글자만 확인
-      if (t.part == null || t.part === partnerPart) return true;
+      if (_sameJamo) {
+        if (t.part == null) {
+          const sc = _partClass(selfPart);
+          const pc = _partClass(partnerPart);
+          if (sc != null && sc === pc) return t.sp;
+          continue;
+        }
+        if (t.part !== partnerPart) continue;
+        if (t.sp != null && t.sp !== selfPart && !_selfSolo) continue;
+        return t.sp;
+      }
+      if (t.sp != null && t.sp !== selfPart && !_selfSolo) continue;
+      if (_looseGlobal) return t.sp;
+      if (t.part == null || t.part === partnerPart) return t.sp;
     }
-    return false;
+    return undefined;
   };
+  const _filtOK = (node, tag, selfChar, selfPart, partnerChar, partnerPart) =>
+    _filtMatch(node, tag, selfChar, selfPart, partnerChar, partnerPart) !== undefined;
   const sIdx = [], nIdx = [];
   for (let i = 0; i < nodes.length; i++) {
     const tg = nodes[i].tags;
@@ -3589,7 +3619,7 @@ function _computeMagnetPairs(nodes, nodeJamos, ch) {
     //   공유 디자인(예 쌍받침 ㅆ의 ㅅ)에 s·n이 같이 기록돼 단독 ㅅ('사'/'있')에서
     //   자기 s·n끼리 붙던 문제 차단. 앞/뒤는 본래 서로 다른 파트 사이 관계이므로,
     //   파트가 같은 페어는 항상 공유디자인 자가결합 부작용일 뿐(정상 붙임 아님).
-    //   쌍받침 jong1↔jong2·합성모음 jung1↔jung2·기존 임베드(ㅏ/ㅣ)는 파트가 달라 유지.
+    //   쌍받침 jong2↔jong1·합성모음 jung1↔jung2·기존 임베드(ㅏ/ㅣ)는 파트가 달라 유지.
     if (nodeJamos[a] === nodeJamos[b]) continue;
     if (rb < ra) continue;  // 앞(n)은 뒤(s)와 같거나 뒤쪽 part 여야 함
     const A = nodes[a], B = nodes[b];
@@ -3601,13 +3631,17 @@ function _computeMagnetPairs(nodes, nodeJamos, ch) {
   //   junction 노드 (양쪽 획 연결점, 양쪽 태그 보유) 가 두 결합을 가질 수 있게 허용 +
   //   동일 노드의 다중 끌어당김(1-to-many 병합) 은 차단. ㅒ 처럼 (s 노드 2 / n 노드 2) 케이스는
   //   정렬 결과에 따라 2 페어로 자연 분리.
+  // [v1.12] 1:1 가까운 매칭 — solo/multi 무관 한 노드 1회만 페어 참여.
+  //   페어는 거리순 정렬되어 있어 가까운 페어 먼저 처리. 나머지 후보는 미적용.
+  //   룰 1 (단일 자모 sp 흡수) 는 _filtMatch 안에서 유지.
   const usedS = new Set(), usedN = new Set();
   const out = [];
   for (const c of pc) {
     if (usedS.has(c.a) || usedN.has(c.b)) continue;
     const _Ja = _jc(c.a), _Jb = _jc(c.b);
-    if (!_filtOK(nodes[c.a], 's', _Jb, nodeJamos[c.b])) continue;
-    if (!_filtOK(nodes[c.b], 'n', _Ja, nodeJamos[c.a])) continue;
+    const sMatch = _filtMatch(nodes[c.a], 's', _Ja, nodeJamos[c.a], _Jb, nodeJamos[c.b]);
+    const nMatch = _filtMatch(nodes[c.b], 'n', _Jb, nodeJamos[c.b], _Ja, nodeJamos[c.a]);
+    if (sMatch === undefined || nMatch === undefined) continue;
     out.push([c.a, c.b]);
     usedS.add(c.a); usedN.add(c.b);
   }
@@ -3838,7 +3872,7 @@ function buildWorld(str) {
       }
       // 자모별 노드 분류 + 각 자모의 rest 중심·PCA 주축
       // 각 노드에 자모 타입('cons' | 'vow')을 표시 — 반발 거리 계산에 사용
-      //   part-specific 태그(cho1/cho2/jung1/jung2/jung3/jong1/jong2)로 쌍자음/합성중성 분리
+      //   part-specific 태그(cho2/cho1/jung1/jung2/jung3/jong2/jong1)로 쌍자음/합성중성 분리
       let jamos = null;
       let magnetPairs = null;
       if (!t.isPunct) {
@@ -3851,7 +3885,7 @@ function buildWorld(str) {
         const _mp = _computeMagnetPairs(initNodes, nodeJamos, t.ch);
         if (_mp.length) magnetPairs = _mp;
         // 등장하는 part 종류만 jamos 그룹으로 — 단일 파트는 자체로, 분리 파트는 별개 그룹
-        const _partOrder = ['cho1','cho2','jung1','jung2','jung3','jong1','jong2'];
+        const _partOrder = ['cho2','cho1','jung1','jung2','jung3','jong2','jong1'];
         jamos = _partOrder.map(name => {
           const nodeIndices = [];
           for (let i = 0; i < nodeJamos.length; i++) if (nodeJamos[i] === name) nodeIndices.push(i);
@@ -3912,7 +3946,10 @@ function step(dt) {
     * ((PARAMS.magnetMergeFactor != null) ? PARAMS.magnetMergeFactor : 1.0);  // [항목5] 감상모드 자석 반경 배수
   // 유연성 → 탄성 변환 + 폭주 방지 안전 캡 ([F1] 너비/높이/임의획 중 최대값 기준)
   const _maxSubdiv = Math.max(
-    PARAMS.skelWidth || 0, PARAMS.skelHeight || 0, PARAMS.randomExtra || 0
+    PARAMS.choHoriz || 0, PARAMS.choVert  || 0,
+    PARAMS.jungHoriz|| 0, PARAMS.jungVert || 0,
+    PARAMS.jongHoriz|| 0, PARAMS.jongVert || 0,
+    PARAMS.randomExtra || 0
   );
   const _stiffnessCap = Math.max(20, Math.round(PARAMS.pointDist * 5 / (1 + _maxSubdiv * 0.5)));
   const K_ANGLE_eff = Math.min(FLEX_MAX - K_ANGLE, _stiffnessCap);
@@ -4779,6 +4816,23 @@ window.addEventListener('keydown', e => {
     // Delete/Backspace — 선택된 노드(들) 삭제
     if ((e.key === 'Delete' || e.key === 'Backspace') && !e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey) {
       if (e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') {
+        // [v1.10e] 이어그리기 중이면 펜 노드 삭제 — 사용자 요청.
+        if (_editorPen != null && _editorSelected) {
+          e.preventDefault();
+          const _def = ensureEditorDef(_editorSelected);
+          pushHistory();
+          const _penIdx = _editorPen;
+          _editorPen = null;
+          _editorSelectedNode = null;
+          _editorSelectedNodes = new Set();
+          _editorSelectedEdge = -1;
+          _editorSelectedEdges = new Set();
+          removeNode(_def, _penIdx);
+          updateEditorSelectionUI();
+          renderEditorCanvas();
+          if (typeof commitEditorLive === 'function') commitEditorLive();
+          return;
+        }
         if ((_editorSelectedNodes && _editorSelectedNodes.size > 0) || _editorSelectedNode != null || _editorSelectedEdge >= 0) {
           e.preventDefault();
           deleteSelectedNodes();
@@ -4990,19 +5044,19 @@ function _bondPickDist() {
 const _BOND_HOLD_K = 3;
 // [앞/뒤 정의 확대] 한글자 내 파트 "순서"로 세분 — 앞순서 = 뒤(s), 뒷순서 = 앞(n).
 //   3단계(초/중/종)가 아니라 7단계로 나눠, 같은 카테고리라도 다른 파트끼리
-//   (쌍자음 cho1↔cho2, 합성모음 jung1↔jung2↔jung3, 겹받침 jong1↔jong2) 붙을 수 있게.
+//   (쌍자음 cho2↔cho1, 합성모음 jung1↔jung2↔jung3, 겹받침 jong2↔jong1) 붙을 수 있게.
 //   순서가 같은 경우(= 한 자모 자기 자신)만 제외(후보/커밋의 rank=== 가드).
 //   _computeMagnetPairs 의 3단계(cho/jung/jong, n파트≥s파트) 판정은 이 순서의
 //   상위호환(카테고리 내 동일·교차 증가)이라 그대로 통과 → 물리·기존 디자인 무수정.
 function _bondPartRank(part) {
   switch (part) {
-    case 'cho1':  return 0;
-    case 'cho2':  return 1;
+    case 'cho2':  return 0;
+    case 'cho1':  return 1;
     case 'jung1': return 2;
     case 'jung2': return 3;
     case 'jung3': return 4;
-    case 'jong1': return 5;
-    case 'jong2': return 6;
+    case 'jong2': return 5;
+    case 'jong1': return 6;
     default:      return -1;
   }
 }
@@ -5131,22 +5185,36 @@ function _bondRedoApply() {
   return true;
 }
 
-// [Option B] 붙임 필터 파서 — 토큰 = "글자" 또는 "글자@파트". 쉼표 구분.
-//   레거시(구분자 없는 순수 글자 연속, 예 'ㅣ'·'ㅣㄱ' / 임베드)는 각 글자를
-//   "그 글자, 파트 무관"으로 해석 → 기존 동작·임베드 100% 호환.
+// [v1.10e] 붙임 필터 파서 — 토큰 = "글자" 또는 "글자@파트" 또는 "글자@파트#self파트".
+//   · 글자 단독: 레거시(파트 무관, self 무관) — 임베드·v1.10 이전 데이터
+//   · 글자@파트: v1.10b~d — partner.part 만 저장, self 무관 (looseGlobal 따라)
+//   · 글자@파트#self파트: v1.10e — partner.part + self.part 둘 다 저장.
+//     쫒에서 ㅈ↔ㅗ 본드를 만들면 token.sp = cho1(쫒 ㅈ의 위치) → 좆에서 self.part=cho2
+//     이면 차단 → 단일 ㅈ 글자에 자동 적용 안 됨. 어→워 전파는 token.sp=cho2 이고
+//     워의 self도 cho2 이므로 partner 만 looseGlobal 로 풀려 정상 유지.
+//   · "글자@#self파트": partner.part 무관(within-class 같은 자모) 이지만 self.part 만 한정 — 사용 안 함(예약)
 function _parseBondFilter(f) {
   if (!f) return [];
-  if (f.indexOf(',') < 0 && f.indexOf('@') < 0) {
-    return Array.from(f).map(ch => ({ ch: ch, part: null }));   // 레거시: 글자별, 파트무관
+  if (f.indexOf(',') < 0 && f.indexOf('@') < 0 && f.indexOf('#') < 0) {
+    return Array.from(f).map(ch => ({ ch: ch, part: null, sp: null }));   // 레거시: 글자별, part/sp 무관
   }
   return f.split(',').filter(Boolean).map(tok => {
     const at = tok.indexOf('@');
-    return (at < 0) ? { ch: tok, part: null }
-                    : { ch: tok.slice(0, at), part: tok.slice(at + 1) || null };
+    if (at < 0) return { ch: tok, part: null, sp: null };
+    const ch = tok.slice(0, at);
+    const rest = tok.slice(at + 1);
+    const hash = rest.indexOf('#');
+    if (hash < 0) return { ch: ch, part: (rest || null), sp: null };
+    return { ch: ch, part: (rest.slice(0, hash) || null), sp: (rest.slice(hash + 1) || null) };
   });
 }
 function _serializeBondFilter(toks) {
-  return toks.map(t => t.ch + (t.part ? '@' + t.part : '')).join(',');
+  return toks.map(t => {
+    let s = t.ch;
+    if (t.part || t.sp) s += '@' + (t.part || '');
+    if (t.sp) s += '#' + t.sp;
+    return s;
+  }).join(',');
 }
 
 // [항목3] Task2 풀어쓴-한국어 필터 변환(_BOND_PART_LABEL/_bondFilterToReadable/
@@ -5161,16 +5229,17 @@ function _bondCommit() {
   const back  = (A.rank < B.rank) ? A : B;   // 앞선 파트 = 뒤(s)
   const front = (A.rank < B.rank) ? B : A;   // 다음 파트 = 앞(n)
   // [v1.10c] 이전 가드 `back.jamoChar===front.jamoChar && back.designIdx===front.designIdx return;`
-  //   제거 — DOUBLES (ㅃ 의 cho1·cho2 둘 다 ㅂ) 에서 같은 디자인 꼭짓점끼리 붙이는 합법 경로를 차단했음.
+  //   제거 — DOUBLES (ㅃ 의 cho2·cho1 둘 다 ㅂ) 에서 같은 디자인 꼭짓점끼리 붙이는 합법 경로를 차단했음.
   //   rank 차이 가드가 이미 같은 파트(자기 자신) 결합을 막으므로 추가 보호 불필요.
-  //   효과: ㅃ/ㄲ/ㄸ/ㅆ/ㅉ 단독·음절내 동일 글자 cho1↔cho2 (혹은 jong1↔jong2) 의 임의 꼭짓점 bond 허용.
+  //   효과: ㅃ/ㄲ/ㄸ/ㅆ/ㅉ 단독·음절내 동일 글자 cho2↔cho1 (혹은 jong2↔jong1) 의 임의 꼭짓점 bond 허용.
   // [개선] undo용 — 영향받는 자모의 변경 전 상태 스냅샷
   const _affected = (back.jamoChar === front.jamoChar)
     ? [back.jamoChar] : [back.jamoChar, front.jamoChar];
   const _before = _bondSnapshot(_affected);
-  // [Option B] 필터에 상대의 "글자@파트"를 토큰으로 누적. 기존 토큰 보존(여러 상대).
-  //   레거시 필터(파트 무관)는 _parseBondFilter 가 그대로 읽어 유지.
-  const _tag = (J, idx, tag, partnerChar, partnerPart) => {
+  // [v1.10e] 필터에 상대 "글자@partnerPart#selfPart" 토큰을 누적. 기존 토큰 보존(여러 상대).
+  //   selfPart 도 함께 저장하여 쫒 cho1.ㅈ ↔ ㅗ 본드가 좆 cho2.ㅈ 에 자동 전파되는 부작용 차단.
+  //   레거시 필터(sp/part 무관)는 _parseBondFilter 가 그대로 읽어 유지.
+  const _tag = (J, idx, tag, partnerChar, partnerPart, selfPart) => {
     const def = (typeof ensureEditorDef === 'function') ? ensureEditorDef(J) : (_editorDefs && _editorDefs[J]);
     if (!def || !Array.isArray(def.nodes) || !def.nodes[idx]) return;
     const nd = def.nodes[idx];
@@ -5181,20 +5250,56 @@ function _bondCommit() {
     if (!partnerChar) { nd.tagFilters[tag] = cur; return; }
     const toks = _parseBondFilter(cur);
     const np = partnerPart || null;
-    if (!toks.some(t => t.ch === partnerChar && t.part === np)) toks.push({ ch: partnerChar, part: np });
+    const sp = selfPart   || null;
+    if (!toks.some(t => t.ch === partnerChar && t.part === np && t.sp === sp))
+      toks.push({ ch: partnerChar, part: np, sp: sp });
     nd.tagFilters[tag] = _serializeBondFilter(toks);
   };
-  // [v1.10d] DOUBLES (back.jamoChar === front.jamoChar) — 파트 무관 필터로 저장.
-  //   이유: ㄱ↔ㄱ 같은 동일자모 결합은 본질적으로 "this 디자인의 X 노드 ↔ 같은 디자인의 Y 노드".
-  //   파트 한정(cho2/jong2 등) 으로 저장하면 cho 위치 결합이 jong 위치에 전파되지 못함
-  //   (사용자 보고: 낄에서 ㄲ 결합해도 끾의 받침 ㄲ 미결합). _bondPartRank 의 rank 가드가
-  //   여전히 같은 파트(자기 자신) 결합은 막으므로 안전.
-  //   교차자모(ㅇ↔ㅓ 등) 는 기존대로 파트 한정 저장 — 모임꼴 위치별 의도 보존.
+  // [v1.10e] 동일자모쌍 본드의 part 저장 정책 — within-class vs cross-class 분기.
+  //   · within-class(cho2↔cho1, jong2↔jong1, jung1↔jung2 등 같은 클래스 안 결합):
+  //     token.part = null → 모든 within-class 위치에 자동 전파. cho↔cho 본드 만들면
+  //     같은 자모 jong↔jong 페어도 자동 본드. ('낄'의 ㄲ ↔ '끾'의 받침 ㄲ 자동 전파 유지)
+  //   · cross-class(cho2↔jong1 등 사용자가 일부러 만든 다른 클래스 페어):
+  //     token.part = 정확한 part → 그 위치 페어에만 자동 적용. cho↔jong 의 자동 전파는
+  //     같은 cho↔jong 위치에만, cho↔cho 나 jong↔jong 페어에는 적용 안 됨.
+  //   _filtOK 의 same-jamo 분기와 짝이 되는 정책 — '씼' 의 종성 ㅆ 본드가 cross 페어
+  //   (cho↔jong)에 자동 전파되는 문제 차단하면서 within-class 자동 전파는 유지.
+  const _partClassOf = (p) => {
+    if (!p) return null;
+    if (p.indexOf('cho')  === 0) return 'cho';
+    if (p.indexOf('jung') === 0) return 'jung';
+    if (p.indexOf('jong') === 0) return 'jong';
+    return null;
+  };
   const _sameChar = (back.jamoChar === front.jamoChar);
-  const _frontPart = _sameChar ? null : front.part;
-  const _backPart  = _sameChar ? null : back.part;
-  _tag(back.jamoChar,  back.designIdx,  's', front.jamoChar, _frontPart);
-  _tag(front.jamoChar, front.designIdx, 'n', back.jamoChar,  _backPart);
+  const _bc = _partClassOf(back.part), _fc = _partClassOf(front.part);
+  const _withinClass = _sameChar && _bc != null && _bc === _fc;
+  // [v1.10e] sp(self.part) 저장 정책 — 본드 만들 때 self 의 자모가 그 글자에서 단독인지 판정:
+  //   · 단독(글자 안에 그 자모가 1번만 등장): sp=null → 자모 단위 위치 무관 전파
+  //     예: '어' ㅇ↔ㅓ 본드(둘 다 단독) → 워 cho2.ㅇ ↔ jung2.ㅓ 에 자동 전파
+  //   · 쌍/같은자모합성(2번 이상 등장): sp=정확한 part → 그 인스턴스 위치에만 한정
+  //     예: '쫒' cho1.ㅈ ↔ ㅗ 본드(ㅈ 쌍자음 일부) → 좆 cho2.ㅈ 에 자동 적용 안 됨
+  //   within-class same-jamo: part/sp 모두 null (cho↔cho 본드가 jong↔jong 에 자동 전파)
+  const _body = _bond.body;
+  const _dSyl = (_body && _body.ch && typeof decomposeSyllable === 'function')
+                ? decomposeSyllable(_body.ch) : null;
+  const _countJamoChar = (ch) => {
+    if (!ch || !_body || !_dSyl || !Array.isArray(_body.jamos)) return 0;
+    let cnt = 0;
+    for (const j of _body.jamos) {
+      const jc = (typeof _getMoimkkolPartLabel === 'function') ? _getMoimkkolPartLabel(_dSyl, j.name) : null;
+      if (jc === ch) cnt++;
+    }
+    return cnt;
+  };
+  const _backSolo  = (_countJamoChar(back.jamoChar)  === 1);
+  const _frontSolo = (_countJamoChar(front.jamoChar) === 1);
+  const _frontPart = _withinClass ? null : front.part;
+  const _backPart  = _withinClass ? null : back.part;
+  const _backSP   = _withinClass ? null : (_backSolo  ? null : back.part);
+  const _frontSP  = _withinClass ? null : (_frontSolo ? null : front.part);
+  _tag(back.jamoChar,  back.designIdx,  's', front.jamoChar, _frontPart, _backSP);
+  _tag(front.jamoChar, front.designIdx, 'n', back.jamoChar,  _backPart,  _frontSP);
   // 합성이 쓰는 PRIMITIVES 동기화 + localStorage 영속 (기준 baseline 은 미기록 — D-6)
   [back.jamoChar, front.jamoChar].forEach(J => {
     if (typeof _editorDefs !== 'undefined' && _editorDefs[J] && typeof PRIMITIVES !== 'undefined') {
@@ -5232,7 +5337,30 @@ function _detachAllForJamo(body, sourceIdx) {
   if (!pairs.length) return false;
   // 3) 각 페어를 디자인 꼭짓점 매핑 후 토큰 제거
   const _affectedJamos = new Set();
-  const _untag = (J, idx, tag, partnerChar, partnerPart) => {
+  // [v1.12] 본드 떼기 — 단일 자모(self의 클래스에서 1번만 등장)면 sp 매칭 풀어줌.
+  //   '걱'(단일 ㄱ)에서 본드 떼면 ㄱ 디자인의 cho1 sp + cho2 sp 토큰 모두 제거.
+  //   _bondPartRank 와 _partClass 가 존재하지 않으면 안전 폴백 (sp 정확 매칭).
+  const _partClassLocal = (p) => {
+    if (!p) return null;
+    if (p.indexOf('cho') === 0) return 'cho';
+    if (p.indexOf('jung') === 0) return 'jung';
+    if (p.indexOf('jong') === 0) return 'jong';
+    return null;
+  };
+  const _isSelfSoloInClass = (selfChar, selfPart) => {
+    if (!selfChar || !selfPart || !body || !Array.isArray(body.jamos)) return false;
+    const selfKlass = _partClassLocal(selfPart);
+    if (!selfKlass) return false;
+    let _d = body.ch && (typeof decomposeSyllable === 'function') && decomposeSyllable(body.ch);
+    if (!_d) return false;
+    const seen = new Set();
+    for (const j of body.jamos) {
+      const jc = (typeof _getMoimkkolPartLabel === 'function') ? _getMoimkkolPartLabel(_d, j.name) : null;
+      if (jc === selfChar && _partClassLocal(j.name) === selfKlass) seen.add(j.name);
+    }
+    return seen.size <= 1;
+  };
+  const _untag = (J, idx, tag, partnerChar, partnerPart, selfPart) => {
     const def = (typeof ensureEditorDef === 'function') ? ensureEditorDef(J) : (_editorDefs && _editorDefs[J]);
     if (!def || !Array.isArray(def.nodes) || !def.nodes[idx]) return;
     const nd = def.nodes[idx];
@@ -5246,8 +5374,13 @@ function _detachAllForJamo(body, sourceIdx) {
     const f = nd.tagFilters && nd.tagFilters[tag];
     if (typeof f === 'string' && f.length) {
       const np = partnerPart || null;
+      const sp = selfPart   || null;
+      // self(J) 가 단일 자모면 sp 매칭 풀어줌 → 모든 sp 토큰 제거
+      const _selfSolo = _isSelfSoloInClass(J, selfPart);
       const kept = _parseBondFilter(f).filter(t =>
-        !(t.ch === partnerChar && (t.part == null || t.part === np)));
+        !(t.ch === partnerChar
+          && (t.part == null || t.part === np)
+          && (_selfSolo || t.sp == null || t.sp === sp)));
       if (kept.length) {
         nd.tagFilters[tag] = _serializeBondFilter(kept);
       } else {
@@ -5277,8 +5410,8 @@ function _detachAllForJamo(body, sourceIdx) {
     if (!mg || !mp || mg.rank < 0 || mp.rank < 0 || mg.rank === mp.rank) return;
     const back  = (mg.rank < mp.rank) ? mg : mp;
     const front = (mg.rank < mp.rank) ? mp : mg;
-    _untag(back.jamoChar,  back.designIdx,  's', front.jamoChar, front.part);
-    _untag(front.jamoChar, front.designIdx, 'n', back.jamoChar,  back.part);
+    _untag(back.jamoChar,  back.designIdx,  's', front.jamoChar, front.part, back.part);
+    _untag(front.jamoChar, front.designIdx, 'n', back.jamoChar,  back.part,  front.part);
     _any = true;
   });
   if (!_any) return false;
@@ -5309,9 +5442,28 @@ function _detachCommit(body, gi, pi) {
   const _affected = (back.jamoChar === front.jamoChar)
     ? [back.jamoChar] : [back.jamoChar, front.jamoChar];
   const _before = _bondSnapshot(_affected);
-  // 한 디자인 노드에서 (tag) 의 "이 상대" 토큰만 제거. _filtOK 와 동일 매칭
-  //   (글자 일치 + 토큰파트 null이거나 상대파트 일치). 남는 토큰 없으면 태그까지 제거.
-  const _untag = (J, idx, tag, partnerChar, partnerPart) => {
+  // [v1.12] 단일 자모면 sp 매칭 풀어줌 — 모든 sp 토큰 일괄 제거.
+  const _partClassLocal = (p) => {
+    if (!p) return null;
+    if (p.indexOf('cho') === 0) return 'cho';
+    if (p.indexOf('jung') === 0) return 'jung';
+    if (p.indexOf('jong') === 0) return 'jong';
+    return null;
+  };
+  const _isSelfSoloInClass = (selfChar, selfPart) => {
+    if (!selfChar || !selfPart || !body || !Array.isArray(body.jamos)) return false;
+    const selfKlass = _partClassLocal(selfPart);
+    if (!selfKlass) return false;
+    let _d = body.ch && (typeof decomposeSyllable === 'function') && decomposeSyllable(body.ch);
+    if (!_d) return false;
+    const seen = new Set();
+    for (const j of body.jamos) {
+      const jc = (typeof _getMoimkkolPartLabel === 'function') ? _getMoimkkolPartLabel(_d, j.name) : null;
+      if (jc === selfChar && _partClassLocal(j.name) === selfKlass) seen.add(j.name);
+    }
+    return seen.size <= 1;
+  };
+  const _untag = (J, idx, tag, partnerChar, partnerPart, selfPart) => {
     const def = (typeof ensureEditorDef === 'function') ? ensureEditorDef(J) : (_editorDefs && _editorDefs[J]);
     if (!def || !Array.isArray(def.nodes) || !def.nodes[idx]) return;
     const nd = def.nodes[idx];
@@ -5325,22 +5477,25 @@ function _detachCommit(body, gi, pi) {
     const f = nd.tagFilters && nd.tagFilters[tag];
     if (typeof f === 'string' && f.length) {
       const np = partnerPart || null;
+      const sp = selfPart   || null;
+      const _selfSolo = _isSelfSoloInClass(J, selfPart);
       const kept = _parseBondFilter(f).filter(t =>
-        !(t.ch === partnerChar && (t.part == null || t.part === np)));
+        !(t.ch === partnerChar
+          && (t.part == null || t.part === np)
+          && (_selfSolo || t.sp == null || t.sp === sp)));
       if (kept.length) {
         nd.tagFilters[tag] = _serializeBondFilter(kept);
       } else {
         delete nd.tagFilters[tag];
         if (Object.keys(nd.tagFilters).length === 0) delete nd.tagFilters;
-        _dropTag();  // 더 이상 이 태그로 붙을 상대 없음 → 태그 제거(다시 안 붙음)
+        _dropTag();
       }
     } else {
-      // 필터 없음 = 아무 상대나 붙던 노드 → 이 태그 자체 제거해야 재결합 안 됨
       _dropTag();
     }
   };
-  _untag(back.jamoChar,  back.designIdx,  's', front.jamoChar, front.part);
-  _untag(front.jamoChar, front.designIdx, 'n', back.jamoChar,  back.part);
+  _untag(back.jamoChar,  back.designIdx,  's', front.jamoChar, front.part, back.part);
+  _untag(front.jamoChar, front.designIdx, 'n', back.jamoChar,  back.part,  front.part);
   [back.jamoChar, front.jamoChar].forEach(J => {
     if (typeof _editorDefs !== 'undefined' && _editorDefs[J] && typeof PRIMITIVES !== 'undefined') {
       PRIMITIVES[J] = JSON.parse(JSON.stringify(_editorDefs[J]));
@@ -5393,12 +5548,14 @@ canvas.addEventListener('pointerdown', e => {
     _detach = null;
     const _hitNode = (best) ? best : null;
     const _hitIsBase = !!(_hitNode && _hitNode.isBase === true);
-    // [v1.10b] junction 노드 (이미 결합된 노드 = magnetPair 의 양 끝) — BOND/DETACH 모두 skip.
-    //   단순 드래그만 허용. 결합 유지·해제 없이 그냥 끌어 옮김.
+    // [v1.10b→v1.12] junction 노드 (이미 결합된 노드 = magnetPair 의 양 끝).
+    //   v1.12: 이어 붙이기는 허용, 떼기만 제한 — BOND 분기는 통과, DETACH 분기만 skip.
+    //   결합 교점 위에서 다른 자모(예: 쏘에서 ㅅ↔ㅅ 결합 교점에 ㅗ)를 본드 가능.
     const _isJunctionPick = !!(bestBody && Array.isArray(bestBody.magnetPairs)
       && bestBody.magnetPairs.some(pr => pr[0] === bestIdx || pr[1] === bestIdx));
     // ─── BOND 분기: 기본 디자인 노드 → 결합 안 된 자모의 base 노드 후보 강조 ───
-    if (!_isJunctionPick && _hitIsBase && bestBody && !bestBody.isPunct && Array.isArray(bestBody.jamos)) {
+    //   [v1.12] _isJunctionPick 가드 제거 — junction 노드에서도 새 본드 시작 허용.
+    if (_hitIsBase && bestBody && !bestBody.isPunct && Array.isArray(bestBody.jamos)) {
       const src = _bondMapNode(bestBody, bestIdx);
       if (src) {
         // [v1.09] 양방향 붙이기 — 클릭한 노드가 속한 자모(src 자모)와 *직접* 결합된
@@ -5820,7 +5977,7 @@ canvas.addEventListener('pointerleave', endDrag);
 
 // ── 설정 패널 (미니멀) ──
 //   STRUCTURAL_KEYS: 슬라이더 변경 시 world 재구성이 필요한 키들
-const STRUCTURAL_KEYS = new Set(['pointDist','letterSpacing','lineHeight','randomExtra','skelWidth','skelHeight']);
+const STRUCTURAL_KEYS = new Set(['pointDist','letterSpacing','lineHeight','randomExtra','choHoriz','choVert','jungHoriz','jungVert','jongHoriz','jongVert']);
 const sliderUpdaters = [];
 // 그룹별 주사위 핸들러 보관 — randomizeGroup이 그룹별 적용 후 재렌더링
 const _groupRandomizers = {};
@@ -6576,8 +6733,8 @@ function idealPointDistMax() {
   const drawW = Math.max(200, cssW - panelOffsetX - (editorRightOffset || 0));
   const drawH = Math.max(200, cssH - _footerOffset());
   const charCount = visibleCharCount();
-  const hSub = (PARAMS.skelWidth  || 0) * 3 + (PARAMS.randomExtra || 0);
-  const vSub = (PARAMS.skelHeight || 0) * 3 + (PARAMS.randomExtra || 0);
+  const hSub = (PARAMS.choHoriz  || 0) + (PARAMS.jungHoriz || 0) + (PARAMS.jongHoriz || 0) + (PARAMS.randomExtra || 0);
+  const vSub = (PARAMS.choVert   || 0) + (PARAMS.jungVert  || 0) + (PARAMS.jongVert  || 0) + (PARAMS.randomExtra || 0);
   const hf = PARAMS.lsHorizFactor || 0.45;
   const vf = PARAMS.lhVertFactor || 0.3;
   // pd 단위 가로/세로 배수 — 글리프 + 기본 간격 + 노드 총합 보정
@@ -6598,7 +6755,7 @@ function visibleCharCount() {
 
 // 자동 도출되는 키 — 랜덤 시 PANEL_GROUPS 루프에서 건너뜀
 const DERIVED_KEYS = new Set([
-  'pointDist','skelWidth','skelHeight','randomExtra',
+  'pointDist','choHoriz','choVert','jungHoriz','jungVert','jongHoriz','jongVert','randomExtra',
   'letterSpacing','lineHeight','nodeR','lineW','shape','cornerR','borderWidth','repulse','shapeBoost','damping','speed','lsHorizFactor','lhVertFactor','fitsThreshold','idealAreaRatio','shrinkFactor','maxFitsIter','subdivTierLimit','tierMaxBase','tierMaxSlope','tierActiveSlope','looseBoost','smoothScale','blurFactor','alphaThreshold','wallOn',
   'nonHangulSpread','spaceShrink','magnetForce','magnetMergeFactor','bondPickFactor','detachMagnetForce','detachThreshold','springBoost',
   '_invK_ANGLE','_invK_ROT','_invK_SPRING',
@@ -6657,10 +6814,13 @@ function randomizeAll() {
   //   글자수 구간별 looseFactor → tierMax → dynMax(=tierMax×2, 최대 10) 산출 후
   //   너비 = randInt(0, dynMax) → 높이 = randInt(0, dynMax − 너비). 합 ≤ dynMax.
   //   분할 제한 OFF (subdivTierLimit=0) 면 동적 제한 없이 0~10 자유.
-  const SUBDIV_SLIDER_MAX = 10;
-  PARAMS.skelWidth = 0; PARAMS.skelHeight = 0; PARAMS.randomExtra = 0;
+  // [v1.11/v1.05] 6슬라이더에 글자수별 노드 예산 분배 — randomExtra 항상 활성.
+  //   6개 중 5개 랜덤 선택, 마지막 1개는 0 유지. 전체 예산(tierMax × tierActive)을 5개에 +1씩 분배.
+  const SUBDIV_SLIDER_MAX = 5;
+  const ALL_SUBDIV_KEYS = ['choHoriz','choVert','jungHoriz','jungVert','jongHoriz','jongVert'];
+  ALL_SUBDIV_KEYS.forEach(k => { PARAMS[k] = 0; });
+  PARAMS.randomExtra = 0;
   if (PARAMS.subdivTierLimit) {
-    // 글자수 구간별 여유 계수 (piecewise) — looseBoost 로 전체 배율 조정
     let looseFactor;
     if      (log10cc <= 0.477) looseFactor = 1.25;
     else if (log10cc <= 1.301) looseFactor = 1.25 + (log10cc - 0.477) *  0.910;
@@ -6669,23 +6829,43 @@ function randomizeAll() {
     else                       looseFactor = 1.00;
     looseFactor = Math.max(1.0, Math.min(5.0, looseFactor * (PARAMS.looseBoost || 1.0)));
     const looseShift = Math.log10(looseFactor);
-    const _tBase  = (PARAMS.tierMaxBase  || 5);
-    const _tSlope = (PARAMS.tierMaxSlope || 2.0);
-    const tierMax = Math.max(1, Math.min(_tBase, Math.ceil(_tBase - _tSlope * (log10cc - looseShift))));
-    const SCALE   = 2;                                  // v1.07 [1,5] → v1.10 [2,10] 매핑
-    const dynMax  = Math.min(SUBDIV_SLIDER_MAX, tierMax * SCALE);
-    PARAMS.randomExtra = randInt(0, Math.min(10, tierMax));
-    const _w = randInt(0, dynMax);
-    PARAMS.skelWidth  = _w;
-    PARAMS.skelHeight = randInt(0, dynMax - _w);
+    const _tBase  = (PARAMS.tierMaxBase     || 5);
+    const _tSlope = (PARAMS.tierMaxSlope    || 2.0);
+    const _aSlope = (PARAMS.tierActiveSlope || 2.5);
+    const tierMax    = Math.max(1, Math.min(_tBase, Math.ceil (_tBase - _tSlope * (log10cc - looseShift))));
+    const tierActive = Math.max(2, Math.min(3, Math.round(5 - _aSlope * (log10cc - looseShift))));
+    PARAMS.randomExtra = randInt(0, tierMax);
+    const shuffled = ALL_SUBDIV_KEYS.slice();
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    const SELECTED_COUNT = 5;
+    const selected = shuffled.slice(0, SELECTED_COUNT);
+    let totalBudget = tierMax * tierActive;
+    const values = new Array(SELECTED_COUNT).fill(0);
+    let safety = 0;
+    while (totalBudget > 0 && safety < 500) {
+      safety++;
+      const i = Math.floor(Math.random() * SELECTED_COUNT);
+      if (values[i] < SUBDIV_SLIDER_MAX) {
+        values[i]++;
+        totalBudget--;
+      } else if (values.every(v => v >= SUBDIV_SLIDER_MAX)) {
+        break;
+      }
+    }
+    selected.forEach((k, i) => { PARAMS[k] = values[i]; });
   } else {
-    // 분할 제한 OFF — 동적 제한 해제, 0~10 자유 (너비 후 (10-너비) 안에서 높이)
-    const _w = randInt(0, SUBDIV_SLIDER_MAX);
-    PARAMS.skelWidth  = _w;
-    PARAMS.skelHeight = randInt(0, SUBDIV_SLIDER_MAX - _w);
+    ALL_SUBDIV_KEYS.forEach(k => { PARAMS[k] = randInt(0, 5); });
     PARAMS.randomExtra = randInt(0, 10);
   }
-  const maxSubdiv = Math.max(PARAMS.skelWidth, PARAMS.skelHeight, PARAMS.randomExtra);
+  const maxSubdiv = Math.max(
+    PARAMS.choHoriz, PARAMS.choVert,
+    PARAMS.jungHoriz, PARAMS.jungVert,
+    PARAMS.jongHoriz, PARAMS.jongVert,
+    PARAMS.randomExtra
+  );
 
   // 5) 점 모양 — 극단 가중: 30% 원, 20% 사각, 25% 라운드, 25% 자유
   const shR = Math.random();
@@ -6698,8 +6878,8 @@ function randomizeAll() {
   let _ls = pd * 1.0;   // 자간 최적 베이스 1.0·pd
   let _lh = pd * 3.0;   // 행간 최적 베이스 3.0·pd
   // 자동 보정 — 가로/세로 노드 총합에 따른 자간/행간 보강 (튜닝값 사용)
-  const _autoH = (PARAMS.skelWidth  || 0) * 3 + (PARAMS.randomExtra || 0);
-  const _autoV = (PARAMS.skelHeight || 0) * 3 + (PARAMS.randomExtra || 0);
+  const _autoH = (PARAMS.choHoriz  || 0) + (PARAMS.jungHoriz || 0) + (PARAMS.jongHoriz || 0) + (PARAMS.randomExtra || 0);
+  const _autoV = (PARAMS.choVert   || 0) + (PARAMS.jungVert  || 0) + (PARAMS.jongVert  || 0) + (PARAMS.randomExtra || 0);
   _ls += _autoH * pd * (PARAMS.lsHorizFactor || 0.45);
   _lh += _autoV * pd * (PARAMS.lhVertFactor  || 0.3);
   // 자간은 최적값 계산 후 0.5배 — 글자가 너무 떨어지지 않게 압축
@@ -6797,13 +6977,162 @@ const QR_URL = 'https://api.qrserver.com/v1/create-qr-code/?size=260x260&data=' 
 
 // [F8] 방향 기반 — 터치 기기 + 세로 = 모바일 / 터치 기기 + 가로(타블릿 가로) = PC /
 //   비터치 데스크탑 = PC(초소형 창 <600 만 폴백). orientationchange→resize→_applyMobileMode 가 재평가.
-function isMobile() {
-  const touch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0)
-             || /Android|webOS|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
-  const portrait = window.innerHeight > window.innerWidth;
-  if (touch) return portrait;          // 타블릿: 가로=PC, 세로=모바일
-  return window.innerWidth < 600;      // 비터치 초소형 폴백
+// [v1.11] 모바일 전용 UI 폐기 — 모든 환경에서 PC 와 동일한 인터페이스 사용.
+//   isMobile() 은 항상 false 반환 → 기존 if (isMobile()) 분기들은 모두 PC 경로로 흐름.
+//   별도로 isTouchDevice() 가 터치 디바이스 감지 → 가이드 텍스트 단어 치환 및 길게 탭 핸들러에 사용.
+function isMobile() { return false; }
+function isTouchDevice() {
+  return ('ontouchstart' in window) || (navigator.maxTouchPoints > 0)
+      || /Android|webOS|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent || '');
 }
+// [v1.11] 터치 디바이스 길게 탭 → contextmenu(우클릭) 이벤트 디스패치.
+//   500ms 누르고 있으면 우클릭으로 변환. 시작점에서 8px 이상 움직이면(드래그) 취소.
+//   touchend / touchcancel 도 취소. PC 마우스 이벤트는 영향 없음.
+//   메뉴 표시 후 사용자가 다시 드래그 시작 시 모든 컨텍스트 메뉴 자동 닫기.
+(function _setupLongTap() {
+  if (!isTouchDevice()) return;
+  let _lt = null;  // { t, x, y, target }
+  let _menuOpen = false;  // 컨텍스트 메뉴 표시 상태
+  let _menuOpenAt = 0;    // 메뉴 표시 시점 ms — 즉시 닫힘 방지(grace)
+  const LT_DELAY = 500;
+  const LT_MOVE_THRESH = 8;
+  const POST_MENU_GRACE = 250;  // 메뉴 표시 직후 250ms 안의 touchmove 는 무시
+  function _clearTimer() {
+    if (_lt && _lt.t) clearTimeout(_lt.t);
+    _lt = null;
+  }
+  function _closeAllMenus() {
+    // 모든 .mhContextMenu / .editorCtxMenu 닫기
+    document.querySelectorAll('.mhContextMenu.show, .editorCtxMenu.show').forEach(function (m) {
+      m.classList.remove('show');
+      try { m.remove(); } catch (_) {}
+    });
+    if (typeof hideEditorCtxMenu === 'function') { try { hideEditorCtxMenu(); } catch (_) {} }
+    _menuOpen = false;
+  }
+  function _resetHover(menu) {
+    // 메뉴 표시 직후 모든 항목의 :hover 효과 차단 — 임시 클래스로 첫 터치 전까지 hover 무효화.
+    //   CSS :hover 는 직접 끌 수 없으나, pointer-events 일시 차단 후 setTimeout 으로 복구.
+    if (!menu) return;
+    menu.querySelectorAll('.ctxItem').forEach(function (it) {
+      it.classList.add('_lt-no-hover');
+      it.style.pointerEvents = 'none';
+    });
+    setTimeout(function () {
+      menu.querySelectorAll('.ctxItem').forEach(function (it) {
+        it.classList.remove('_lt-no-hover');
+        it.style.pointerEvents = '';
+      });
+    }, 300);
+  }
+  document.addEventListener('touchstart', function (e) {
+    if (e.touches.length !== 1) { _clearTimer(); return; }
+    const t = e.touches[0];
+    _lt = { t: null, x: t.clientX, y: t.clientY, target: e.target };
+    _lt.t = setTimeout(function () {
+      if (!_lt) return;
+      const ev = new MouseEvent('contextmenu', {
+        bubbles: true, cancelable: true,
+        clientX: _lt.x, clientY: _lt.y, button: 2
+      });
+      _lt.target.dispatchEvent(ev);
+      _menuOpen = true;
+      _menuOpenAt = Date.now();
+      // 메뉴 표시는 비동기일 수 있어 다음 프레임에 hover 초기화
+      requestAnimationFrame(function () {
+        const menus = document.querySelectorAll('.mhContextMenu.show, .editorCtxMenu.show');
+        menus.forEach(_resetHover);
+      });
+      _clearTimer();
+    }, LT_DELAY);
+  }, { passive: true });
+  document.addEventListener('touchmove', function (e) {
+    if (_menuOpen && (Date.now() - _menuOpenAt) > POST_MENU_GRACE) {
+      // 메뉴 표시 후 새 드래그 → 메뉴 닫기
+      _closeAllMenus();
+      return;
+    }
+    if (!_lt) return;
+    const t = e.touches[0]; if (!t) return;
+    if (Math.hypot(t.clientX - _lt.x, t.clientY - _lt.y) > LT_MOVE_THRESH) _clearTimer();
+  }, { passive: true });
+  document.addEventListener('touchend', function () {
+    _clearTimer();
+    // 메뉴 표시 후 손가락 떼면 메뉴 닫힘 추적 종료(메뉴 자체는 유지 — 사용자 선택 위해)
+    if (_menuOpen && (Date.now() - _menuOpenAt) > POST_MENU_GRACE) {
+      // 메뉴 외부 탭이면 메뉴 닫기 동작은 기존 핸들러가 처리.
+      // 여기선 _menuOpen 플래그만 재평가 — 다음 touchmove 가 새 드래그인지 판정용.
+    }
+  }, { passive: true });
+  document.addEventListener('touchcancel', function () { _clearTimer(); }, { passive: true });
+  // 메뉴 닫힘 감지 — DOM 변화 관찰
+  const _mo = new MutationObserver(function () {
+    if (_menuOpen && !document.querySelector('.mhContextMenu.show, .editorCtxMenu.show')) {
+      _menuOpen = false;
+    }
+  });
+  document.addEventListener('DOMContentLoaded', function () {
+    _mo.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] });
+  }, { once: true });
+})();
+
+// [v1.11] 가이드 텍스트 양방향 치환 — 터치 디바이스 ↔ PC 환경 변화에 자동 대응.
+//   페이지 로드 후 1회 + resize/orientationchange 이벤트마다 재적용.
+//   원본 텍스트를 WeakMap 에 저장해 두므로, PC 모드로 돌아갈 때 원본 복구 가능.
+(function _setupGuideLocalizer() {
+  const _origText = new WeakMap();   // text node → 원본 문자열
+  const _origTitle = new WeakMap();  // element → 원본 title 속성
+  const REPLACES = [
+    [/우\s*클릭/g, '길게 탭'],
+    [/오른\s*쪽\s*클릭/g, '길게 탭'],
+    [/우클릭/g, '길게 탭'],
+    [/클릭/g, '탭'],
+    [/마우스/g, '터치'],
+    [/드래그/g, '끌기'],
+    [/호버/g, '터치 유지']
+  ];
+  function _localize(s) {
+    let r = s;
+    REPLACES.forEach(function (p) { r = r.replace(p[0], p[1]); });
+    return r;
+  }
+  function _walk(root, applyTouch) {
+    if (!root) return;
+    // title 속성
+    if (root.hasAttribute && root.hasAttribute('title')) {
+      if (!_origTitle.has(root)) _origTitle.set(root, root.getAttribute('title') || '');
+      const orig = _origTitle.get(root);
+      if (orig) root.setAttribute('title', applyTouch ? _localize(orig) : orig);
+    }
+    // 텍스트 노드
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    let n;
+    while ((n = walker.nextNode())) {
+      if (!n.nodeValue) continue;
+      if (!_origText.has(n)) _origText.set(n, n.nodeValue);
+      const orig = _origText.get(n);
+      n.nodeValue = applyTouch ? _localize(orig) : orig;
+    }
+  }
+  function _apply() {
+    const applyTouch = isTouchDevice();
+    const SELECTORS = ['.guideList', '#panelGuide', '#editorCommonGuide', '.ctxItem', '.mhDialogTitle', '.introBody', '[title]'];
+    SELECTORS.forEach(function (sel) {
+      document.querySelectorAll(sel).forEach(function (el) { _walk(el, applyTouch); });
+    });
+  }
+  function _onReady(fn) {
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', fn, { once: true });
+    else fn();
+  }
+  _onReady(_apply);
+  // 환경 변경 (창 크기·화면 회전) 시 재적용
+  window.addEventListener('resize', _apply);
+  window.addEventListener('orientationchange', _apply);
+  // 외부 호출 가능
+  window._reapplyGuideLocalizer = _apply;
+})();
+
 
 // 인라인 확장 — HUD(좌하단) 영역에 의견폼 토글 표시
 let _inlineState = null;
@@ -6843,13 +7172,27 @@ function toggleInline(which) {
     send.className = 'pillBtn';
     send.textContent = '보내기';
     send.addEventListener('click', () => {
-      if (!ta.value.trim()) { ta.focus(); return; }
-      // Gmail web compose 새 탭으로 열기 — 서버 없이 동작 (Gmail 로그인 필요)
-      const url = 'https://mail.google.com/mail/?view=cm&fs=1'
-        + '&to=' + encodeURIComponent('pch6211@gmail.com')
-        + '&su=' + encodeURIComponent('뭉친 한글 의견')
-        + '&body=' + encodeURIComponent(ta.value);
-      window.open(url, '_blank', 'noopener');
+      const msg = (ta.value || '').trim();
+      if (!msg) { ta.focus(); return; }
+      // [v1.10e] Umami 커스텀 이벤트로 전송 — Umami 대시보드 Events 탭에서 본문 확인.
+      //   mailto 는 모바일·메일 클라이언트 미설정 환경에서 먹통이라 폴백으로만 사용.
+      try {
+        if (window.umami && typeof window.umami.track === 'function') {
+          window.umami.track('feedback', {
+            message: msg.slice(0, 5000),  // Umami 페이로드 안전 한도
+            page: (location && location.pathname) || '',
+            ua: (navigator && navigator.userAgent) ? navigator.userAgent.slice(0, 200) : ''
+          });
+        } else {
+          window.open(
+            'https://mail.google.com/mail/?view=cm&fs=1'
+              + '&to=' + encodeURIComponent('pch6211@gmail.com')
+              + '&su=' + encodeURIComponent('뭉친 한글 의견')
+              + '&body=' + encodeURIComponent(msg),
+            '_blank', 'noopener'
+          );
+        }
+      } catch (_) {}
       toggleInline('feedback');
     });
     actions.appendChild(send);
@@ -6908,10 +7251,33 @@ function openFeedbackDialog(anchor) {
     const ta = box.querySelector('.mhDialogTa');
     const msg = (ta.value || '').trim();
     if (!msg) { ta.focus(); return; }
-    // 의견을 기본 메일 클라이언트로 전송 — 제목 없음, 본문 = 입력 내용 (익명 가능)
+    // [v1.10e] Umami 커스텀 이벤트로 전송 — 익명, 서버 추가 없이 동작.
+    //   Umami 대시보드 Events 탭에서 'feedback' 이벤트의 message 속성으로 본문 확인.
+    //   mailto: 는 모바일·웹 환경에서 메일 클라이언트 미설정 시 먹통이라 광고 차단·Umami
+    //   미로드 시 폴백으로만 사용.
+    const msgEl = box.querySelector('.mhMsg');
     try {
-      window.location.href = 'mailto:pch6211@gmail.com?body=' + encodeURIComponent(msg);
-    } catch (_) {}
+      if (window.umami && typeof window.umami.track === 'function') {
+        window.umami.track('feedback', {
+          message: msg.slice(0, 5000),
+          page: (location && location.pathname) || '',
+          ua: (navigator && navigator.userAgent) ? navigator.userAgent.slice(0, 200) : ''
+        });
+        if (msgEl) msgEl.textContent = '의견이 전송되었습니다. 감사합니다!';
+        setTimeout(() => box.remove(), 1200);
+        return;
+      }
+      // Umami 미로드 (광고 차단·네트워크 오류) — Gmail 새 탭으로 폴백
+      window.open(
+        'https://mail.google.com/mail/?view=cm&fs=1'
+          + '&to=' + encodeURIComponent('pch6211@gmail.com')
+          + '&su=' + encodeURIComponent('뭉친 한글 의견')
+          + '&body=' + encodeURIComponent(msg),
+        '_blank', 'noopener'
+      );
+    } catch (_) {
+      if (msgEl) msgEl.textContent = '전송 실패. 잠시 후 다시 시도해 주세요.';
+    }
     box.remove();
   });
   // textarea 자동 확장 — 폭과 같아질 때까지 (정사각형 한도), 그 이상은 스크롤
@@ -7869,6 +8235,73 @@ const EDITOR_EDGE_HIT_PX = 10;  // 엣지 더블클릭 hit 반경
 const DRAG_THRESHOLD = 4;       // 픽셀 — 드래그 임계
 // localStorage 자동 저장 키
 const EDITOR_STORAGE_KEY = 'jeomgureum_editor_defs_v6';  // v6 — 새 첨부 JSON(20260518_183530) 임베드 적용 위해 구 저장본 무효화
+
+// [v1.12] cho1↔cho2 / jong1↔jong2 swap 마이그레이션 (1회만 실행).
+//   v1.11 이전 localStorage 의 _editorDefs / _moimkkolPositions 안에 박힌
+//   옛 라벨(cho1=왼쪽, cho2=오른쪽 등)을 새 라벨(cho2=왼쪽, cho1=오른쪽)로 변환.
+//   시각 위치는 동일하게 유지 — 데이터의 cho1↔cho2 / jong1↔jong2 라벨만 swap.
+(function _migrateChoJongSwap() {
+  const MIG_KEY = 'mh_swap_v1.12_done';
+  try {
+    if (localStorage.getItem(MIG_KEY) === '1') return;
+  } catch (_) { return; }
+  function _swap(s) {
+    if (s === 'cho1') return 'cho2';
+    if (s === 'cho2') return 'cho1';
+    if (s === 'jong1') return 'jong2';
+    if (s === 'jong2') return 'jong1';
+    return s;
+  }
+  // 1. 모임꼴 박스 데이터
+  try {
+    const raw = localStorage.getItem(MOIMKKOL_BASELINE_KEY);
+    if (raw) {
+      const data = JSON.parse(raw);
+      Object.keys(data).forEach(function (k) {
+        if (Array.isArray(data[k])) data[k].forEach(function (b) { if (b && b.kind) b.kind = _swap(b.kind); });
+      });
+      localStorage.setItem(MOIMKKOL_BASELINE_KEY, JSON.stringify(data));
+    }
+  } catch (_) {}
+  // 2. 자모 디자인 (_editorDefs) — jSrc + tagFilters 안 part/sp
+  try {
+    const raw = localStorage.getItem(EDITOR_STORAGE_KEY);
+    if (raw) {
+      const data = JSON.parse(raw);
+      Object.keys(data).forEach(function (ch) {
+        const def = data[ch];
+        if (!def || !Array.isArray(def.nodes)) return;
+        def.nodes.forEach(function (n) {
+          if (n.jSrc) n.jSrc = _swap(n.jSrc);
+          if (n.tagFilters && typeof n.tagFilters === 'object') {
+            Object.keys(n.tagFilters).forEach(function (tag) {
+              const f = n.tagFilters[tag];
+              if (typeof f !== 'string') return;
+              // 토큰 part/sp swap: 'ㅗ@cho1#cho2' → 'ㅗ@cho2#cho1'
+              n.tagFilters[tag] = f.split(',').map(function (tok) {
+                const at = tok.indexOf('@');
+                if (at < 0) return tok;
+                const ch_ = tok.slice(0, at);
+                let rest = tok.slice(at + 1);
+                const hash = rest.indexOf('#');
+                let part = '', sp = '';
+                if (hash < 0) { part = rest; }
+                else { part = rest.slice(0, hash); sp = rest.slice(hash + 1); }
+                part = _swap(part);
+                sp = _swap(sp);
+                return ch_ + '@' + part + (sp ? '#' + sp : '');
+              }).join(',');
+            });
+          }
+        });
+      });
+      localStorage.setItem(EDITOR_STORAGE_KEY, JSON.stringify(data));
+    }
+  } catch (_) {}
+  try { localStorage.setItem(MIG_KEY, '1'); } catch (_) {}
+})();
+
+
 // 마지막 입력 문구 저장
 const TEXT_STORAGE_KEY = 'jeomgureum_text_v1';
 
@@ -8774,7 +9207,7 @@ function buildEditorContent() {
             if (_moimkkolRectOverlap(hit, nx, ny, nw, nh)) return;  // 겹치면 이 프레임 무시
             const _oldX = b.x, _oldY = b.y;
             b.x = nx; b.y = ny; b.w = nw; b.h = nh;
-            // [v1.09] cho1↔cho2 등 미러링 — 위치 변화량 + 크기 동기화
+            // [v1.09] cho2↔cho1 등 미러링 — 위치 변화량 + 크기 동기화
             _moimkkolMirrorDelta(hit, b.x - _oldX, b.y - _oldY);
             _moimkkolMirrorSize(hit);
             _moimkkolSaveBoxes();
@@ -8807,7 +9240,7 @@ function buildEditorContent() {
           const _oldX = b.x, _oldY = b.y;
           const _rv = _moimkkolResolveMove(hit, _nx, _ny);
           b.x = _rv.x; b.y = _rv.y;
-          // [v1.09] 같은 part 그룹(cho1↔cho2 등) 박스 미러링
+          // [v1.09] 같은 part 그룹(cho2↔cho1 등) 박스 미러링
           _moimkkolMirrorDelta(hit, b.x - _oldX, b.y - _oldY);
           _moimkkolSaveBoxes();
           renderMoimkkolCanvas();
@@ -9194,17 +9627,26 @@ function showEditorCtxMenu(screenX, screenY, opts) {
   if (_editorClipboard) {
     items.push({ label: '붙여넣기', tip: '복사한 노드·획 붙여넣기', action: () => ctxPasteAt(screenX, screenY) });
   }
-  // 투명하게 / 불투명하게 — 엣지가 선택에 포함될 때만 표시 (노드만 선택 시 표시 X).
-  //   노드 inv 는 _autoSyncNodeInvFromEdges 가 자동 처리 → 사용자가 직접 토글할 필요 없음.
-  if (hasEdge) {
-    const anyInv = selEdges.some(ei => {
+  // [v1.12] 투명/불투명 — 노드/획 어느 한쪽 이상 선택되면 표시.
+  //   다중 선택 (노드+획) 시 둘 다 일괄 토글. 자동 동기화 없음 — 사용자 명시 설정만.
+  //   현재 선택 중 하나라도 inv 면 "불투명하게" 표시 (전체를 일반화), 아니면 "투명하게".
+  if (hasEdge || hasNode) {
+    const anyInvE = hasEdge && selEdges.some(ei => {
       const e = def.edges[ei];
       return e && e.length > 2 && e[2] === 'inv';
     });
+    const anyInvN = hasNode && selNodes.some(ni => {
+      const n = def.nodes[ni];
+      return n && n.inv === true;
+    });
+    const anyInv = anyInvE || anyInvN;
     items.push({
       label: anyInv ? '불투명하게' : '투명하게',
-      tip: anyInv ? '선택한 획을 보이게 (양 끝 노드 자동 일반화)' : '선택한 획을 안 보이게 (물리만 작동, 양 끝 노드 모두 투명 엣지에만 연결 시 자동 투명화)',
-      action: () => ctxBulkToggleEdgeInv(selEdges, !anyInv)
+      tip: anyInv ? '선택한 노드·획을 보이게' : '선택한 노드·획을 안 보이게 (물리는 그대로)',
+      action: () => {
+        if (hasEdge) ctxBulkToggleEdgeInv(selEdges, !anyInv);
+        if (hasNode) ctxBulkToggleNodeInv(selNodes, !anyInv);
+      }
     });
   }
   // [F14] 다중 선택 시 좌우 반전·상하 반전 (변형 UI 대체)
@@ -9824,26 +10266,10 @@ function enforceNormalNodeInvariant(def) {
 // 노드 inv 자동 동기화 — 어떤 노드에 연결된 모든 엣지가 inv 이면 그 노드도 inv 로 설정.
 //   normal 엣지가 하나라도 있으면 enforceNormalNodeInvariant 가 inv 를 제거하므로 충돌 없음.
 //   고립 노드는 사용자 설정 유지.
-function _autoSyncNodeInvFromEdges(def) {
-  if (!def || !Array.isArray(def.edges) || !Array.isArray(def.nodes)) return;
-  const stats = new Map();  // ni → { invCount, normCount }
-  for (let ei = 0; ei < def.edges.length; ei++) {
-    const e = def.edges[ei];
-    if (!e) continue;
-    const isInv = e.length > 2 && e[2] === 'inv';
-    [e[0], e[1]].forEach(ni => {
-      if (!stats.has(ni)) stats.set(ni, { invCount: 0, normCount: 0 });
-      const s = stats.get(ni);
-      if (isInv) s.invCount++; else s.normCount++;
-    });
-  }
-  def.nodes.forEach((n, ni) => {
-    if (!n) return;
-    const s = stats.get(ni);
-    if (!s) return;  // 고립 노드 — 기존 상태 유지
-    if (s.normCount === 0 && s.invCount > 0) n.inv = true;  // 모든 연결 엣지가 inv → 노드도 inv
-  });
-}
+// [v1.12] 노드 자동 inv 동기화 폐기 — 노드의 inv 는 사용자 우클릭 메뉴로만 설정.
+//   이전: 투명획에만 연결된 노드를 자동으로 inv 처리 → ?!;ij 등에서 노드까지 의도치 않게 투명.
+//   현재: no-op. 사용자 명시 inv 는 보존.
+function _autoSyncNodeInvFromEdges(def) { /* no-op */ }
 function loadEditorDefsLocal() {
   try {
     const s = localStorage.getItem(EDITOR_STORAGE_KEY);
@@ -9893,7 +10319,7 @@ loadEditorDefsLocal();
 //   — 단독 합성자모 bond 미작동 해결. _bondMapNode 가 body.jamos(part 그룹) 필요로 해서.
 if (typeof _recoverBakedCompatJamoTags === 'function') _recoverBakedCompatJamoTags();
 // [v1.10d] 동일자모 본드 필터 자동 loose 마이그레이션 — 이전 strict 필터의 @part 제거
-//   토큰의 글자가 그 디자인의 글자(예: ㄱ 디자인의 'ㄱ@cho2' 토큰) 면 @part 를 떼어 'ㄱ' 으로 만듦.
+//   토큰의 글자가 그 디자인의 글자(예: ㄱ 디자인의 'ㄱ@cho1' 토큰) 면 @part 를 떼어 'ㄱ' 으로 만듦.
 //   결과: 낄의 cho ㄲ 결합이 끾의 jong ㄲ·단독 ㄲ 에도 자동 전파. 교차자모(ㅇ→ㅓ 등) 토큰은 유지.
 (function _migrateLooseSameCharBondFilters() {
   try {
@@ -10195,6 +10621,35 @@ function _mergeCoincidentInDef(def) {
 }
 
 function removeNode(def, idx) {
+  // [v1.10e] 중간 노드 삭제 시 양 이웃 자동 연결 → 획 유지.
+  //   stroke 안 중간 노드면 stroke 의 이전/다음 노드를 잇는 엣지 추가.
+  //   stroke 정보 없으면 degree=2 일 때만 두 이웃 직접 연결 (분기점·끝점은 자동 연결 X).
+  const _bridges = [];
+  const _addBridge = (a, b) => {
+    if (a === idx || b === idx || a === b) return;
+    const k = Math.min(a, b) + ',' + Math.max(a, b);
+    if (_bridges.some(p => (Math.min(p[0],p[1]) + ',' + Math.max(p[0],p[1])) === k)) return;
+    _bridges.push([a, b]);
+  };
+  if (def.strokes && def.strokes.length > 0) {
+    def.strokes.forEach(s => {
+      for (let i = 1; i < s.length - 1; i++) {
+        if (s[i] === idx) _addBridge(s[i-1], s[i+1]);
+      }
+    });
+  }
+  if (_bridges.length === 0) {
+    const neighbors = new Set();
+    def.edges.forEach(e => {
+      if (e[0] === idx) neighbors.add(e[1]);
+      else if (e[1] === idx) neighbors.add(e[0]);
+    });
+    if (neighbors.size === 2) {
+      const arr = Array.from(neighbors);
+      _addBridge(arr[0], arr[1]);
+    }
+  }
+  // 본래 삭제 로직
   def.nodes.splice(idx, 1);
   def.edges = def.edges.filter(e => e[0] !== idx && e[1] !== idx)
     .map(e => {
@@ -10202,9 +10657,17 @@ function removeNode(def, idx) {
       const b = e[1] > idx ? e[1] - 1 : e[1];
       return e.length > 2 ? [a, b, e[2]] : [a, b];
     });
+  // 다리(bridge) 엣지 추가 — 노드 idx 제거 후 인덱스 보정
+  _bridges.forEach(pr => {
+    const a = pr[0] > idx ? pr[0] - 1 : pr[0];
+    const b = pr[1] > idx ? pr[1] - 1 : pr[1];
+    def.edges.push([a, b]);
+  });
   if (def.strokes) {
+    // stroke 안에서 idx 만 제외하고 인덱스 보정 (양쪽 노드는 그대로 stroke 안에 남아 다리 따라 이어짐)
     def.strokes = def.strokes.map(s => s.filter(i => i !== idx).map(i => i > idx ? i - 1 : i)).filter(s => s.length >= 2);
   }
+  if (typeof dedupeEdges === 'function') dedupeEdges(def);
 }
 
 function mergeNodes(def, fromIdx, toIdx) {
@@ -10833,7 +11296,10 @@ function handleEditorClick(canvas, evX, evY) {
       const _mid = snapSquare((def.nodes[a].x + def.nodes[b].x) / 2,
                               (def.nodes[a].y + def.nodes[b].y) / 2);
       const newIdx = def.nodes.length;
-      const newN = { x: _mid.x, y: _mid.y, isBase: false };  // 편집창 추가 노드 = base 아님 (호버/자석 제외, 떼기 가능)
+      // [v1.10e] 사용자가 편집창에서 추가한 노드 = isBase=true (호버/자석 본드 후보 포함).
+      //   서브디비전·자동 분할만 isBase=false 였던 의도였으나 편집창 분할 클릭도 false 로
+      //   분류되어 사용자가 그린 노드가 본드 대상에서 빠지던 문제.
+      const newN = { x: _mid.x, y: _mid.y, isBase: true };
       if (_invisibleStrokeMode) newN.inv = true;
       def.nodes.push(newN);
       def.edges.splice(_hitE.i, 1);
@@ -10948,7 +11414,8 @@ function handleEditorClick(canvas, evX, evY) {
     const a = origEdge[0], b = origEdge[1];
     const origFlag = (origEdge.length > 2) ? origEdge[2] : null;
     const newIdx = def.nodes.length;
-    const newN = { x: sx, y: sy, isBase: false };  // 편집창 추가 노드 = base 아님
+    // [v1.10e] 사용자 의도 노드 = isBase=true (위 주석 참조)
+    const newN = { x: sx, y: sy, isBase: true };
     if (_invisibleStrokeMode) newN.inv = true;
     def.nodes.push(newN);
     def.edges.splice(onEdge.i, 1);
@@ -10971,7 +11438,8 @@ function handleEditorClick(canvas, evX, evY) {
   // 빈 그리드 점 — 새 노드 생성, 펜 있으면 연결, 펜은 새 노드로 이동(체인)
   pushHistory();
   const newIdx = def.nodes.length;
-  const newN = { x: sx, y: sy, isBase: false };  // 편집창 추가 노드 = base 아님
+  // [v1.10e] 사용자 의도 노드 = isBase=true (위 주석 참조)
+  const newN = { x: sx, y: sy, isBase: true };
   if (_invisibleStrokeMode) newN.inv = true;
   def.nodes.push(newN);
   if (_editorPen != null) pushEdge(def, _editorPen, newIdx);
@@ -11513,7 +11981,7 @@ requestAnimationFrame(() => {
     if (!ip) return;
     // '다시 보지 않기' 가 체크돼 있으면 표시하지 않음 (display:none 유지)
     let _hide = false;
-    try { _hide = localStorage.getItem('mh_intro_hide') === '1'; } catch (_) {}
+    try { _hide = localStorage.getItem('mh_intro_hide_v1.11') === '1'; } catch (_) {}
     if (_hide) return;
     ip.style.display = '';
     // 초기 스폰 위치 = 설정창 '텍스트'(첫 그룹 제목) 과 동일.
@@ -11537,17 +12005,17 @@ requestAnimationFrame(() => {
       const chk = ds.querySelector('.introChk');
       const _sync = () => {
         let on = false;
-        try { on = localStorage.getItem('mh_intro_hide') === '1'; } catch (_) {}
+        try { on = localStorage.getItem('mh_intro_hide_v1.11') === '1'; } catch (_) {}
         if (chk) chk.textContent = on ? '☒' : '☐';
       };
       _sync();
       ds.addEventListener('click', (e) => {
         e.stopPropagation();
         let on = false;
-        try { on = localStorage.getItem('mh_intro_hide') === '1'; } catch (_) {}
+        try { on = localStorage.getItem('mh_intro_hide_v1.11') === '1'; } catch (_) {}
         try {
-          if (on) localStorage.removeItem('mh_intro_hide');
-          else localStorage.setItem('mh_intro_hide', '1');
+          if (on) localStorage.removeItem('mh_intro_hide_v1.11');
+          else localStorage.setItem('mh_intro_hide_v1.11', '1');
         } catch (_) {}
         _sync();
       });
