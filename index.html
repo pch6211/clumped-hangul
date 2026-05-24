@@ -2227,7 +2227,7 @@ const PANEL_GROUPS = [
     ['nodeR',       '점 크기',   0,  30, 1],
     ['lineW',       '획 굵기',   0,  30, 1],
     ['borderWidth', '테두리', 0, 30, 1],
-    ['flow',        '흘리기', 0, 10, 1],
+    ['flow',        '페인트', 0, 10, 1],
     ['cornerR',     '부드럽게',  0,  20, 1]
   ]},
   { id: 'bg', title: '배경 색', items: [
@@ -4474,6 +4474,67 @@ function _pickDownBranch(bi, ni, bannedEi) {
   return best;
 }
 
+// 같은 점 공유하는 다른 component 의 노드 탐색 — "옆에 연결된 획" 점프용.
+//   한 자모(jamo) 안의 stroke 들은 데이터상 끊어진 component 로 저장되지만 같은 (x, y) 점을
+//   공유하며 시각적으로 붙어있음. 그 공유점을 통해 흐름 이어감. 자모 간 점프는 자연스럽게
+//   배제됨 (서로 다른 자모는 같은 점을 공유하지 않으므로 TOL 안에서 후보 없음).
+function _findNearbyDownStart(currentBI, currentNI, x, y) {
+  const TOL = 2;                                       // float 오차 흡수용 (실제 공유점은 거의 0)
+  let best = null;
+  for (let bi = 0; bi < world.bodies.length; bi++) {
+    const bd = world.bodies[bi];
+    for (let ni = 0; ni < bd.nodes.length; ni++) {
+      if (bi === currentBI && ni === currentNI) continue;
+      const n = bd.nodes[ni];
+      if (!n || n.inv) continue;
+      const dist = Math.hypot(n.x - x, n.y - y);
+      if (dist > TOL) continue;
+      // 후보 노드가 down outgoing edge 있어야 (점프 후 계속 흐를 수 있어야)
+      let hasDown = false;
+      for (const e of bd.edges) {
+        if (e.transparent) continue;
+        let other = -1;
+        if (e.a === ni) other = e.b;
+        else if (e.b === ni) other = e.a;
+        else continue;
+        const on = bd.nodes[other];
+        if (!on || on.inv) continue;
+        if (on.y > n.y + 0.5) { hasDown = true; break; }
+      }
+      if (!hasDown) continue;
+      if (!best || dist < best.dist) best = { bi, ni, dist };
+    }
+  }
+  return best;
+}
+
+// 노드에서 chain walk(같은 component 안 down branch) 또는 점프(다른 component) 시도.
+//   성공 시 d.onEdge/head 갱신 후 true 반환. 둘 다 실패 시 false (호출자가 ray cast 또는 free fall).
+function _tryAdvanceFromNode(d, fromBI, fromNI, bannedEi, headX, headY) {
+  const branch = _pickDownBranch(fromBI, fromNI, bannedEi);
+  if (branch) {
+    d.onEdge = { bi: fromBI, ei: branch.ei,
+                 aIdx: fromNI, bIdx: branch.otherIdx, targetIdx: branch.otherIdx };
+    _setHead(d, fromBI, branch.otherIdx, headX, headY);
+    return true;
+  }
+  // 같은 component 의 down branch 없음 — 옆 connected stroke 점프
+  const jump = _findNearbyDownStart(fromBI, fromNI, headX, headY);
+  if (jump) {
+    const jBd = world.bodies[jump.bi];
+    const jN = jBd.nodes[jump.ni];
+    // 점프 연결선 push (현재 위치 → jump 노드, 떨어지는 페인트 자취)
+    _pushSeg(d, d.curAnchorBI, d.curAnchorNI, d.curAnchorChar, d.curAnchorOcc,
+             headX, headY, jN.x, jN.y);
+    const jDist = Math.hypot(jN.x - headX, jN.y - headY);
+    _setHead(d, jump.bi, jump.ni, jN.x, jN.y);
+    d.onEdge = null;                                  // 다음 iter 의 at-node chain walk 가 잡음
+    d.remaining -= jDist;                             // 점프 거리도 진행으로 카운트
+    return true;
+  }
+  return false;
+}
+
 // onEdge 가 가리키는 엣지·target node 가 현재 world 에서 유효한지 검사.
 function _isOnEdgeValid(d) {
   if (!d.onEdge) return false;
@@ -4514,17 +4575,11 @@ function _extendDrip(d, dx) {
       const dxSeg = tN.x - head.x, dySeg = tN.y - head.y;
       const segLen = Math.hypot(dxSeg, dySeg);
       if (segLen < 0.5) {
-        // 이미 endpoint 도달 — 분기 탐색 후 chain walk 시도, 없으면 ray cast 로
+        // 이미 endpoint 도달 → chain walk(같은 component) 또는 jump(옆 component) 시도
         const _curOe = d.onEdge;
         bannedEdge = { bi: _curOe.bi, ei: _curOe.ei };
-        const branch = _pickDownBranch(_curOe.bi, _curOe.targetIdx, _curOe.ei);
-        if (branch) {
-          d.onEdge = { bi: _curOe.bi, ei: branch.ei,
-                       aIdx: _curOe.targetIdx, bIdx: branch.otherIdx, targetIdx: branch.otherIdx };
-          _setHead(d, _curOe.bi, branch.otherIdx, head.x, head.y);
-          continue;
-        }
         d.onEdge = null;
+        _tryAdvanceFromNode(d, _curOe.bi, _curOe.targetIdx, _curOe.ei, head.x, head.y);
         continue;
       }
       const moveLen = Math.min(segLen, castMax);
@@ -4535,18 +4590,21 @@ function _extendDrip(d, dx) {
       _setHead(d, d.curAnchorBI, d.curAnchorNI, nx, ny);
       dx -= moveLen; d.remaining -= moveLen;
       if (moveLen < segLen - 0.001) break;          // endpoint 미도달 — 다음 프레임에 계속
-      // endpoint 도달 — 분기 탐색 후 chain walk 시도
+      // endpoint 도달 → chain walk 또는 jump
       const _curOe = d.onEdge;
       bannedEdge = { bi: _curOe.bi, ei: _curOe.ei };
-      const branch = _pickDownBranch(_curOe.bi, _curOe.targetIdx, _curOe.ei);
-      if (branch) {
-        d.onEdge = { bi: _curOe.bi, ei: branch.ei,
-                     aIdx: _curOe.targetIdx, bIdx: branch.otherIdx, targetIdx: branch.otherIdx };
-        _setHead(d, _curOe.bi, branch.otherIdx, nx, ny);
+      d.onEdge = null;
+      _tryAdvanceFromNode(d, _curOe.bi, _curOe.targetIdx, _curOe.ei, nx, ny);
+      continue;
+    }
+
+    // onEdge 없음 + head 가 노드에 정확히 있음 (초기 source 위치 또는 endpoint 후) → chain walk 시도
+    //   페인트가 벽 위 점에서 시작하면 표면 따라 흐르듯, source node 에서 같은 component
+    //   안의 down branch 따라 chain walk. 없으면 옆 component 점프, 그래도 없으면 ray cast.
+    if (Math.abs(d.curOffX) < 0.001 && Math.abs(d.curOffY) < 0.001) {
+      if (_tryAdvanceFromNode(d, d.curAnchorBI, d.curAnchorNI, -1, head.x, head.y)) {
         continue;
       }
-      d.onEdge = null;
-      continue;
     }
 
     // [B] 수직 ray cast — 가장 가까운 hit
@@ -4659,11 +4717,24 @@ function _syncDripsToWorld(w) {
   }
 }
 
+// 텍스트 변경 감지용 — 텍스트 바뀔 때마다 source 재추첨.
+let _lastFlowText = null;
+
 // world 재구성 시 — srcBody 와 drawnSegs 의 anchor 모두 (char,occ) 로 재바인딩.
 //   글자 살아있으면 drip 유지(드로잉 거리·세그먼트 모두 보존), 사라지면 드롭.
+//   다만 텍스트가 바뀌면 drip 전체 재추첨 (페인트가 새로 시작하는 느낌).
 function _resetDripsForNewWorld(w) {
   _dripsLastT = 0;
   if (!w || !w.bodies) { _drips = []; return; }
+  // 텍스트 변경 감지 → 재추첨
+  const curText = (typeof TEXT === 'string' ? TEXT : '') || '';
+  if (_lastFlowText !== null && curText !== _lastFlowText) {
+    _drips = [];
+    _lastFlowText = curText;
+    _syncDripsToWorld(w);
+    return;
+  }
+  _lastFlowText = curText;
   const occByChar = new Map();
   const bodyByCharOcc = new Map();
   w.bodies.forEach((b, bi) => {
@@ -4714,16 +4785,15 @@ function _redrawDrips() {
   if (world) _syncDripsToWorld(world);
 }
 
-// drip 의 "active start" 결정 — source body 의 chain-low 위치.
-//   활성화·anchor 분실 시점에만 호출. 차단 stroke 텔레포트는 하지 않음 (drip 이 source 부터
-//   주행하면서 hit 시점에 _extendDrip 가 hit point 에서 정지·다음 프레임에 재계산).
+// drip 의 "active start" — source node 위치 그대로 반환 (chain-low 텔레포트 X).
+//   페인트가 벽 위 어느 점에 떨어지면 거기서부터 표면을 타고 내려가듯, drip 도 source
+//   에서 출발해 _extendDrip 의 at-node chain walk 로 같은 body 의 stroke 따라 흐름.
 function _computeActiveStart(d) {
   const sb = world.bodies[d.srcBody];
   if (!sb) return null;
-  const startIdx = _findChainLow(sb, d.srcIdx);
-  const startN = sb.nodes[startIdx];
+  const startN = sb.nodes[d.srcIdx];
   if (!startN || startN.inv) return null;
-  return { bi: d.srcBody, ni: startIdx, worldX: startN.x, worldY: startN.y };
+  return { bi: d.srcBody, ni: d.srcIdx, worldX: startN.x, worldY: startN.y };
 }
 
 function _advanceFlow() {
