@@ -4511,12 +4511,20 @@ function _computeDripPath(drip, maxLen) {
     cx = best.x; cy = best.y; remain -= best.d;
     if (remain <= 0) break;
     // 3) 마주친 엣지 따라가기 — hit 점 → lower endpoint
+    //    [평행] |y 차| 가 |x 차| · 0.2 보다 작으면 평행선으로 간주 — drip 의 horizDir 로 선택.
     const bd = world.bodies[best.bi];
     const aN = bd.nodes[best.aIdx], bN = bd.nodes[best.bIdx];
     let lowIdx, lowX, lowY;
-    if (aN.y > bN.y) { lowIdx = best.aIdx; lowX = aN.x; lowY = aN.y; }
-    else             { lowIdx = best.bIdx; lowX = bN.x; lowY = bN.y; }
-    if (lowY <= cy + 0.5) break;
+    const eDy = Math.abs(aN.y - bN.y), eDx = Math.abs(aN.x - bN.x);
+    if (eDy <= Math.max(3, eDx * 0.3)) {
+      const goRight = (drip.horizDir || 1) > 0;
+      const aIsRight = aN.x > bN.x;
+      if (goRight === aIsRight) { lowIdx = best.aIdx; lowX = aN.x; lowY = aN.y; }
+      else                      { lowIdx = best.bIdx; lowX = bN.x; lowY = bN.y; }
+    } else if (aN.y > bN.y) { lowIdx = best.aIdx; lowX = aN.x; lowY = aN.y; }
+    else                    { lowIdx = best.bIdx; lowX = bN.x; lowY = bN.y; }
+    // 평행이면 위로/평평 체크를 건너뜀(평행이 아닐 때만 정지).
+    if (eDy > Math.max(3, eDx * 0.3) && lowY <= cy + 0.5) break;
     const dx = lowX - cx, dy = lowY - cy;
     const segLen = Math.hypot(dx, dy);
     if (segLen < 0.5) break;
@@ -4573,6 +4581,8 @@ function _syncDripsToWorld(w) {
       const node = w.bodies[c.b].nodes[c.n];
       const maxLen = Math.max(0, cssH + 50 - node.y);
       const targetLen = Math.max(0, Math.pow(Math.random(), FLOW_LEN_BIAS) * maxLen);
+      // [시작 지연] 글자 탄생(샘플 시각) 후 1000~5000 ms 사이 랜덤 시점에 흘리기 시작.
+      // [평행 방향] horizDir = -1(왼쪽) 또는 +1(오른쪽), drip 별 고정 (만난 평행선에서 사용).
       _drips.push({
         srcBody: c.b, srcIdx: c.n,
         srcChar: c.ch, srcOccurrence: c.occ,
@@ -4580,7 +4590,10 @@ function _syncDripsToWorld(w) {
         currentLen: 0,
         lastTermKey: '',
         residues: [],
-        _lastPath: null
+        _lastPath: null,
+        bornT: performance.now(),
+        startDelay: 1000 + Math.random() * 4000,
+        horizDir: Math.random() < 0.5 ? -1 : 1
       });
     }
   } else if (_drips.length > target) {
@@ -4659,6 +4672,11 @@ function _advanceFlow() {
   _dripsLastT = now;
   if (!world || !world.bodies) return;
   _drips.forEach(d => {
+    // [시작 지연] bornT + startDelay 전에는 애니메이션 정지 (보이지도 않음).
+    if (d.bornT != null && (now - d.bornT) < (d.startDelay || 0)) {
+      d._lastPath = null;
+      return;
+    }
     const full = _computeDripPath(d, d.targetLen);
     // [B1] 종착지 변경 debounce — 직전 변경 후 N ms 내면 무시.
     const allowChange = !_FLOW_MIT.B1
