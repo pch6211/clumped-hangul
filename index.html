@@ -4428,6 +4428,38 @@ function _pushSeg(d, anchorBI, anchorNI, anchorChar, anchorOcc, wx0, wy0, wx1, w
   });
 }
 
+// 분기 노드에서 다음 추적 엣지 선택 — banned 제외하고 가장 가파르게 아래로 향하는 가지.
+//   같은 body 안의 fork 노드만 대상. 가지가 모두 위/평행(dy ≤ 0.5) 이면 null →
+//   "끝점 혹은 기울기 음/양이 바뀌는 포인트" 에서 chain 종료.
+function _pickDownBranch(bi, ni, bannedEi) {
+  const bd = world && world.bodies[bi];
+  if (!bd) return null;
+  const curN = bd.nodes[ni];
+  if (!curN || curN.inv) return null;
+  let best = null;
+  for (let ei = 0; ei < bd.edges.length; ei++) {
+    if (ei === bannedEi) continue;
+    const e = bd.edges[ei];
+    if (e.transparent) continue;
+    let other = -1;
+    if (e.a === ni) other = e.b;
+    else if (e.b === ni) other = e.a;
+    else continue;
+    const on = bd.nodes[other];
+    if (!on || on.inv) continue;
+    const dy = on.y - curN.y;
+    if (dy <= 0.5) continue;                       // 위/평행 가지 — slope 부호 변화로 보고 제외
+    const dx = on.x - curN.x;
+    const segLen = Math.hypot(dx, dy);
+    if (segLen < 0.5) continue;
+    const steep = dy / segLen;                     // [0,1], 1 = 수직 아래
+    if (!best || steep > best.steep) {
+      best = { ei, otherIdx: other, steep };
+    }
+  }
+  return best;
+}
+
 // onEdge 가 가리키는 엣지·target node 가 현재 world 에서 유효한지 검사.
 function _isOnEdgeValid(d) {
   if (!d.onEdge) return false;
@@ -4468,8 +4500,16 @@ function _extendDrip(d, dx) {
       const dxSeg = tN.x - head.x, dySeg = tN.y - head.y;
       const segLen = Math.hypot(dxSeg, dySeg);
       if (segLen < 0.5) {
-        // 이미 endpoint 도달 — 해당 엣지 ban 하고 다음 ray cast 로
-        bannedEdge = { bi: d.onEdge.bi, ei: d.onEdge.ei };
+        // 이미 endpoint 도달 — 분기 탐색 후 chain walk 시도, 없으면 ray cast 로
+        const _curOe = d.onEdge;
+        bannedEdge = { bi: _curOe.bi, ei: _curOe.ei };
+        const branch = _pickDownBranch(_curOe.bi, _curOe.targetIdx, _curOe.ei);
+        if (branch) {
+          d.onEdge = { bi: _curOe.bi, ei: branch.ei,
+                       aIdx: _curOe.targetIdx, bIdx: branch.otherIdx, targetIdx: branch.otherIdx };
+          _setHead(d, _curOe.bi, branch.otherIdx, head.x, head.y);
+          continue;
+        }
         d.onEdge = null;
         continue;
       }
@@ -4481,7 +4521,16 @@ function _extendDrip(d, dx) {
       _setHead(d, d.curAnchorBI, d.curAnchorNI, nx, ny);
       dx -= moveLen; d.remaining -= moveLen;
       if (moveLen < segLen - 0.001) break;          // endpoint 미도달 — 다음 프레임에 계속
-      bannedEdge = { bi: d.onEdge.bi, ei: d.onEdge.ei };
+      // endpoint 도달 — 분기 탐색 후 chain walk 시도
+      const _curOe = d.onEdge;
+      bannedEdge = { bi: _curOe.bi, ei: _curOe.ei };
+      const branch = _pickDownBranch(_curOe.bi, _curOe.targetIdx, _curOe.ei);
+      if (branch) {
+        d.onEdge = { bi: _curOe.bi, ei: branch.ei,
+                     aIdx: _curOe.targetIdx, bIdx: branch.otherIdx, targetIdx: branch.otherIdx };
+        _setHead(d, _curOe.bi, branch.otherIdx, nx, ny);
+        continue;
+      }
       d.onEdge = null;
       continue;
     }
@@ -4695,23 +4744,35 @@ function _advanceFlow() {
 }
 
 // 모든 drip 의 drawnSegs (anchor 의 현재 위치 + offset) + 현재 head 끝점.
+//   서로 다른 anchor 의 인접 세그먼트 사이는 body 가 따로 움직이면 시각적 갭이
+//   생기므로, 그 전환 지점 양쪽에 끝점 노드 캡을 추가해 갭을 시각적으로 메움.
 function _collectFlowPrimitives() {
   const out = { lines: [], ends: [] };
   if (!world || !world.bodies || !_drips.length) return out;
   _drips.forEach(d => {
     if (!d.active) return;
+    let pBI = -1, pNI = -1, pEX = 0, pEY = 0, hasPrev = false;
     for (const s of d.drawnSegs) {
       const ab = world.bodies[s.anchorBI];
       const an = ab && ab.nodes[s.anchorNI];
       if (!an || an.inv) continue;
-      out.lines.push({
-        x0: an.x + s.dx0, y0: an.y + s.dy0,
-        x1: an.x + s.dx1, y1: an.y + s.dy1
-      });
+      const x0 = an.x + s.dx0, y0 = an.y + s.dy0;
+      const x1 = an.x + s.dx1, y1 = an.y + s.dy1;
+      out.lines.push({ x0, y0, x1, y1 });
+      if (hasPrev && (s.anchorBI !== pBI || s.anchorNI !== pNI)) {
+        // anchor 전환 — 이전 세그 끝과 현재 세그 시작 양쪽에 캡
+        out.ends.push({ x: pEX, y: pEY });
+        out.ends.push({ x: x0, y: y0 });
+      }
+      pBI = s.anchorBI; pNI = s.anchorNI; pEX = x1; pEY = y1; hasPrev = true;
     }
-    if (d.curAnchorBI >= 0) {
+    if (d.curAnchorBI >= 0 && hasPrev) {
       const head = _headWorld(d);
-      if (d.drawnSegs.length > 0) out.ends.push({ x: head.x, y: head.y });
+      // head anchor 가 마지막 세그 anchor 와 다르면 마지막 세그 끝도 캡
+      if (d.curAnchorBI !== pBI || d.curAnchorNI !== pNI) {
+        out.ends.push({ x: pEX, y: pEY });
+      }
+      out.ends.push({ x: head.x, y: head.y });
     }
   });
   return out;
@@ -7358,7 +7419,11 @@ function _fitHudSectionToLongestRow(section, targetWidth) {
 }
 
 // ── 리셋(B) — 현재 설정으로 글자 다시 출력 (이전 버전 기능 그대로 복원) ──
-function resetWorld() { if (world) world = buildWorld(currentText()); }
+function resetWorld() {
+  if (!world) return;
+  world = buildWorld(currentText());
+  _redrawDrips();    // 글자 리셋 — 흘리기 source 재추첨 + 흐름 처음부터 다시
+}
 
 function togglePanel() {
   if (typeof window._dismissIntro === 'function') window._dismissIntro();  // 설정창 열면 인트로 닫기(좌상단 겹침 방지)
