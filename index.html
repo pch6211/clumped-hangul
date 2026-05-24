@@ -395,10 +395,6 @@
   #pxMeasureOverlay svg { position: absolute; left: 0; top: 0; width: 100%; height: 100%; }
   .cwTooltip.show { opacity: 1; }
   .panel .pillBtn { display: inline-flex; align-items: center; justify-content: center; padding: 5px 14px; border: 1px solid currentColor; background: var(--editor-bg, transparent); color: currentColor; font-family: inherit; font-size: 10px; cursor: pointer; letter-spacing: 0.5px; border-radius: 999px; text-decoration: none; text-align: center; line-height: 1; height: 22px; box-sizing: border-box; }
-  /* 흘리기 완화 테스트 버튼 — 활성 시 색 반전(배경=현재 글자색). */
-  .panel .flowMitRow { margin-top: 8px; gap: 6px; }
-  .panel .flowMitBtn { min-width: 28px; padding: 5px 8px; font-weight: bold; }
-  .panel .flowMitBtn.active { background: currentColor; color: var(--editor-bg, #fff); }
   /* === 에디터 오버레이 (E) — 우측 정렬, 배경 투명, 편집 캔버스만 불투명 === */
   /* [v1.09] 모임꼴/문자 디자인창 독립화 — .editor 자체는 항상 display:block(pointer-events:none).
        자식 요소들이 각자 자체 클래스로 표시/숨김 제어. 사이드바=.open && !.sidebar-hidden,
@@ -4292,52 +4288,33 @@ function step(dt) {
 }
 
 // ── 흘리기 (flow) ────────────────────────────────────────────────────────────
-//   슬라이더 값 = 흘리기 개수(고정값). 1→2: 새 노드 1 개만 추가(기존 유지). 2→1: 뒤에서 제거.
-//   world 재구성 시 노드 인덱스 무효 → 전체 리셋 후 슬라이더 수만큼 재샘플.
-//   주사위(랜덤) 전체에서 제외 (테두리·부드럽게와 동일).
-//   소스 노드는 글자와 함께 움직이며, 매 프레임 경로(다단)를 재계산.
-//   100 px/sec 로 0 → 목표길이 애니메이션. 종착지(마지막 재시작 노드 식별자) 변경 시
-//   직전 프레임의 꼬리 세그먼트를 잔상(residue)으로 옛 종착지 노드에 매달아 보존.
-let _drips = [];                // { srcBody, srcIdx, srcChar, srcOccurrence, targetLen, currentLen, lastTermKey, residues, _lastPath }
-let _dripsLastT = 0;            // 애니메이션 dt 계산용 — performance.now()
-const FLOW_SPEED = 50;          // px / sec — 시작 속도 (이징 곱해서 실제 속도 산출)
-const FLOW_MAX_ITER = 6;        // 다단 (떨어짐 → 따라감) 반복 한도 — 무한루프 방지
-const FLOW_MAX_RES = 50;        // 흘리기 1 개당 잔상 최대 보존 개수 (선이 사라지지 않도록 크게)
-const FLOW_LEN_BIAS = 1.7;      // 거리 분포 멱지수 (>1 → 길수록 확률 감소; 작을수록 평균 길이 ↑)
-const FLOW_SNAP_PX = 0.5;       // 남은 거리가 이 값 미만이면 즉시 targetLen 으로 스냅 (이징 종료)
+//   슬라이더 값 = 개수(고정값). 1→2: 새 노드 1 개 추가, 2→1: 뒤에서 제거.
+//   슬라이더 값 영속 (localStorage 'mh_flow'). 기본 0. 주사위 랜덤 제외(테두리·부드럽게처럼).
+//
+//   [모델] 각 drip 의 drawnSegs 는 body+node 에 anchor 된 세그먼트 (offset 으로 저장).
+//     글자가 움직이면 anchor 따라 같이 이동. 한 번 push 된 세그먼트는 절대 수정·삭제 X.
+//   [거리] initialTarget = (srcIdx 와 같은 body 안에서 획으로 연결된 노드 수) × 15 px.
+//     매 프레임 dx = FLOW_SPEED × √(remaining/initialTarget) × dt 만큼 head 전진,
+//     그 사이를 drawnSegs 에 append. 진행한 만큼 remaining 차감 → 0 도달 시 정지.
+//   [시작 지연] 글자 탄생 후 1~5 초 사이 랜덤 시점에 활성화.
+//   [시작점 변화] 활성 후 매 프레임 소스 body 의 chain-low 재계산. 직전 frame 의
+//     chain-low 와 다르면 head 가 새 chain-low 위치로 점프 — 이미 그려진 세그먼트는
+//     자기 anchor 노드에 매달려 그대로 보존, 새 chain-low 에서 새로 그리기 시작.
+//   [평행선] 마주친 엣지의 |dy| ≤ max(3, |dx|·0.3) 이면 평행으로 간주 → drip 별
+//     고정 horizDir(±1) 로 좌/우 끝점 선택.
+//   [영속 식별자] srcChar + srcOccurrence + srcIdx → world 재구성 시 동일 글자 있으면
+//     srcBody 재바인딩. drawnSegs 의 anchorChar/Occ 로 잔상도 재바인딩. 글자 사라진
+//     drip / 세그먼트만 드롭.
+let _drips = [];
+let _dripsLastT = 0;
+const FLOW_SPEED = 50;
+const FLOW_MAX_ITER = 6;
+const FLOW_LEN_PER_NODE = 15;
+const FLOW_SNAP_PX = 0.5;
 
-// ── 흘리기 완화 토글 (테스트용) ───────────────────────────────────────────────
-//   각 항목 ON 시 보고서의 해당 완화 케이스가 활성화됨. localStorage 'mh_flow_mit' 영속.
-//   기본 OFF (현재 동작 그대로). 설정창 하단 chip 버튼으로 토글.
-const _FLOW_MIT = { A2: false, B1: false, B2: false, C1: false, D1: false };
-const _FLOW_MIT_DEFS = [
-  ['A2', '시작점 안정화', '_findChainLow 슬로프 임계 ↑ + 직전 startIdx 캐싱 (시작점 도약 방지)'],
-  ['B1', '종착지 디바운스', '종착지(termKey) 변경 후 0.3s 동안 추가 변경 무시 (진동 억제)'],
-  ['B2', 'hit 히스테리시스', '직전 frame 의 bestHit 엣지를 우선 (거리 차 3px 이내면 유지)'],
-  ['C1', '슬라이더 페이드', '슬라이더 ↓·랜덤 시 즉시 사라짐 대신 0.3s 페이드아웃(일반 모드만)'],
-  ['D1', '잔상 만료', '잔상 5 초 후 자동 제거 (anchor 멀어진 잔상 시각적 정리)']
-];
-const _FLOW_MIT_FADE_MS = 300;
-const _FLOW_MIT_DEBOUNCE_MS = 300;
-const _FLOW_MIT_HIT_HYST_PX = 3;
-const _FLOW_MIT_RESIDUE_AGE_MS = 5000;
-let _fadingDrips = [];                    // C-1: 페이드 중인 drip 들 (정적 items + fadeStartT)
+function _flowSlider() { return Math.max(0, Math.min(10, Math.round(PARAMS.flow || 0))); }
 
-(function _loadFlowMit() {
-  try {
-    const s = localStorage.getItem('mh_flow_mit');
-    if (s) {
-      const o = JSON.parse(s);
-      Object.keys(_FLOW_MIT).forEach(k => { if (typeof o[k] === 'boolean') _FLOW_MIT[k] = o[k]; });
-    }
-  } catch (_) {}
-})();
-function _saveFlowMit() {
-  try { localStorage.setItem('mh_flow_mit', JSON.stringify(_FLOW_MIT)); } catch (_) {}
-}
-
-// body 의 occurrence (같은 글자 중 몇 번째 등장인지) — 잔상 anchor 영속 식별용.
-//   world 재구성 시 잔상도 같은 글자·같은 순번 body 로 재바인딩 가능.
+// body 의 occurrence (같은 글자 중 몇 번째 등장인지) — anchor 영속 식별용.
 function _bodyOccurrence(bi) {
   if (!world || !world.bodies[bi]) return 0;
   const ch = world.bodies[bi].ch || '';
@@ -4348,12 +4325,32 @@ function _bodyOccurrence(bi) {
   return occ;
 }
 
-function _flowSlider() { return Math.max(0, Math.min(10, Math.round(PARAMS.flow || 0))); }
+// startIdx 와 같은 body 안에서 획으로 연결된 노드 수 (자기 포함 transitive 컴포넌트).
+function _countConnectedNodes(body, startIdx) {
+  if (!body || !body.nodes[startIdx]) return 0;
+  const visited = new Set([startIdx]);
+  const stack = [startIdx];
+  while (stack.length) {
+    const cur = stack.pop();
+    for (const e of body.edges) {
+      if (e.transparent) continue;
+      let other = -1;
+      if (e.a === cur) other = e.b;
+      else if (e.b === cur) other = e.a;
+      else continue;
+      if (visited.has(other)) continue;
+      const on = body.nodes[other];
+      if (!on || on.inv) continue;
+      visited.add(other);
+      stack.push(other);
+    }
+  }
+  return visited.size;
+}
 
 // 수직 ray (cx, cy → cx, cy+maxD) 와 선분 (ax,ay)-(bx,by) 교차. 가장 가까운 hit 반환.
-//   d < 0.5 (시작점 근접) 면 무효 — 직전 따라간 엣지 끝점 재교차 방지.
 function _vRayHitSeg(cx, cy, maxD, ax, ay, bx, by) {
-  if (Math.abs(bx - ax) < 0.001) return null;            // 수직 엣지는 ray 와 면접촉만 → 스킵
+  if (Math.abs(bx - ax) < 0.001) return null;
   const minX = Math.min(ax, bx), maxX = Math.max(ax, bx);
   if (cx < minX - 0.001 || cx > maxX + 0.001) return null;
   const t = (cx - ax) / (bx - ax);
@@ -4363,19 +4360,16 @@ function _vRayHitSeg(cx, cy, maxD, ax, ay, bx, by) {
   return { x: cx, y: hy, d };
 }
 
-// 같은 body 안에서 startIdx 노드로부터 가장 가파른 아래 엣지를 따라 연쇄적으로 내려가
-// 도달하는 마지막 노드 인덱스 반환 (라인 그리지 않음 — 시작점 결정용).
-//   "기울기 음→양 변화점 / 획 끝" = 더 이상 내려갈 엣지 없는 곳 = local low.
-//   [A2] 완화 ON: 슬로프 임계 ↑ + 직전 결과 캐시 → 시작점 도약 억제.
-function _findChainLow(body, startIdx, prevResult) {
+// 같은 body 안에서 startIdx 노드부터 가장 가파른 아래 엣지를 따라 chain walk →
+// 더 내려갈 곳 없는 마지막 노드 인덱스 반환. (시작점·step low 결정용)
+function _findChainLow(body, startIdx) {
   if (!body || !body.nodes[startIdx]) return startIdx;
-  const SLOPE_THR = _FLOW_MIT.A2 ? 3 : 0.5;
   let cur = startIdx;
   const visited = new Set([cur]);
   let iter = 0;
   while (iter++ < FLOW_MAX_ITER) {
     const curN = body.nodes[cur];
-    let bestEi = -1, bestOther = -1, bestY = curN.y;
+    let bestOther = -1, bestY = curN.y;
     for (let ei = 0; ei < body.edges.length; ei++) {
       const e = body.edges[ei];
       if (e.transparent) continue;
@@ -4386,87 +4380,57 @@ function _findChainLow(body, startIdx, prevResult) {
       if (visited.has(other)) continue;
       const on = body.nodes[other];
       if (!on || on.inv) continue;
-      if (on.y > bestY + SLOPE_THR) { bestY = on.y; bestEi = ei; bestOther = other; }
+      if (on.y > bestY + 0.5) { bestY = on.y; bestOther = other; }
     }
-    if (bestEi < 0) break;
+    if (bestOther < 0) break;
     visited.add(bestOther);
     cur = bestOther;
-  }
-  // [A2] 직전 결과가 유효하면, 새 결과가 충분히 더 낮지 않으면 직전을 유지(히스테리시스).
-  if (_FLOW_MIT.A2 && prevResult != null && body.nodes[prevResult] && !body.nodes[prevResult].inv) {
-    if (body.nodes[cur].y < body.nodes[prevResult].y + 4) return prevResult;
   }
   return cur;
 }
 
-// (startX, startY) 에서 시작해 같은 body 안 startNodeIdx 부터 가장 가파른 아래 엣지를
-// 연쇄적으로 따라가며 segs 에 'edge' 세그먼트 추가. local low 도달 또는 remain 소진 시 종료.
-function _drawChainDown(bi, startNodeIdx, startX, startY, maxLen, segs, bannedEi) {
-  const body = world.bodies[bi];
-  if (!body) return { finalX: startX, finalY: startY, finalNI: -1, consumed: 0, bannedLast: null };
-  let cx = startX, cy = startY, cur = startNodeIdx;
-  let consumed = 0, remain = maxLen;
-  let finalNI = -1;
-  let bannedLast = (bannedEi != null) ? { bi, ei: bannedEi } : null;
-  const visitedEdges = new Set();
-  if (bannedEi != null) visitedEdges.add(bannedEi);
-  let iter = 0;
-  while (iter++ < FLOW_MAX_ITER && remain > 0) {
-    const curN = body.nodes[cur];
-    let bestEi = -1, bestOther = -1, bestY = curN.y;
-    for (let ei = 0; ei < body.edges.length; ei++) {
-      if (visitedEdges.has(ei)) continue;
-      const e = body.edges[ei];
-      if (e.transparent) continue;
-      let other = -1;
-      if (e.a === cur) other = e.b;
-      else if (e.b === cur) other = e.a;
-      else continue;
-      const on = body.nodes[other];
-      if (!on || on.inv) continue;
-      if (on.y > bestY + 0.5) { bestY = on.y; bestEi = ei; bestOther = other; }
-    }
-    if (bestEi < 0) break;
-    const on = body.nodes[bestOther];
-    const dx = on.x - cx, dy = on.y - cy;
-    const segLen = Math.hypot(dx, dy);
-    if (segLen < 0.5) break;
-    const moveLen = Math.min(segLen, remain);
-    const nx = cx + dx * moveLen / segLen, ny = cy + dy * moveLen / segLen;
-    segs.push({ x0: cx, y0: cy, x1: nx, y1: ny, type: 'edge' });
-    cx = nx; cy = ny; remain -= moveLen; consumed += moveLen;
-    if (moveLen < segLen) break;     // remain 소진 — 엣지 도중 정지
-    finalNI = bestOther;
-    bannedLast = { bi, ei: bestEi };
-    visitedEdges.add(bestEi);
-    cur = bestOther;
-  }
-  return { finalX: cx, finalY: cy, finalNI, consumed, bannedLast };
+// drip 의 현재 head 의 world 위치.
+function _headWorld(d) {
+  if (!d.curAnchorBI && d.curAnchorBI !== 0) return { x: 0, y: 0 };
+  const ab = world.bodies[d.curAnchorBI];
+  const an = ab && ab.nodes[d.curAnchorNI];
+  if (!an) return { x: 0, y: 0 };
+  return { x: an.x + d.curOffX, y: an.y + d.curOffY };
 }
 
-// drip 한 개의 경로 계산 — maxLen 만큼 소비. 다단 (떨어짐 → chain 따라감 → 떨어짐 …) 반복.
-//   시작점 = 소스 노드에서 같은 body chain 으로 도달하는 local low (slope 반전/획 끝).
-//   각 떨어짐 후 마주친 엣지 → 그 엣지 lower endpoint → 연결된 chain 으로 더 따라감.
-//   반환 { segs: [{x0,y0,x1,y1,type:'down'|'edge'}], termKey, anchorBI, anchorNI, tailStartIdx }
-function _computeDripPath(drip, maxLen) {
-  if (!world || !world.bodies) return { segs: [], termKey: '', anchorBI: -1, anchorNI: -1, tailStartIdx: 0 };
-  const sb = world.bodies[drip.srcBody];
-  const sn = sb && sb.nodes[drip.srcIdx];
-  if (!sb || !sn || sn.inv) return { segs: [], termKey: '', anchorBI: -1, anchorNI: -1, tailStartIdx: 0 };
-  // [시작점] 소스 노드 → 같은 body chain → local low (라인 X). [A2] 캐시 직전 결과.
-  const startIdx = _findChainLow(sb, drip.srcIdx, drip._lastStartIdx);
-  drip._lastStartIdx = startIdx;
-  const startN = sb.nodes[startIdx] || sn;
-  let cx = startN.x, cy = startN.y;
-  let remain = Math.max(0, maxLen);
-  const segs = [];
-  let termKey = '', anchorBI = -1, anchorNI = -1, tailStartIdx = 0;
+// head 를 새 (anchorBI, anchorNI, worldX, worldY) 로 설정 — offset 자동 계산.
+function _setHead(d, bi, ni, wx, wy) {
+  const b = world.bodies[bi];
+  const n = b && b.nodes[ni];
+  if (!n) return;
+  d.curAnchorBI = bi;
+  d.curAnchorNI = ni;
+  d.curOffX = wx - n.x;
+  d.curOffY = wy - n.y;
+  d.curAnchorChar = b.ch || '';
+  d.curAnchorOcc = _bodyOccurrence(bi);
+}
+
+// (worldX0, worldY0)-(worldX1, worldY1) 세그먼트를 anchor 기준 offset 으로 저장.
+function _pushSeg(d, anchorBI, anchorNI, anchorChar, anchorOcc, wx0, wy0, wx1, wy1) {
+  const an = world.bodies[anchorBI] && world.bodies[anchorBI].nodes[anchorNI];
+  if (!an) return;
+  d.drawnSegs.push({
+    anchorBI, anchorNI, anchorChar, anchorOcc,
+    dx0: wx0 - an.x, dy0: wy0 - an.y,
+    dx1: wx1 - an.x, dy1: wy1 - an.y
+  });
+}
+
+// drip 한 개를 dx 만큼 전진 — drawnSegs 에 새 세그먼트 append, head 갱신, remaining 감소.
+//   매 frame 의 새 dx 만큼만 처리. 이미 push 된 세그먼트는 절대 수정 X.
+function _extendDrip(d, dx) {
   let bannedEdge = null;
   let iter = 0;
-  let isFirstIter = true;
-  while (remain > 0 && iter < FLOW_MAX_ITER) {
-    iter++;
-    // 1) 수직 아래로 ray-cast — 가장 가까운 엣지 hit 찾기
+  while (dx > 0 && d.remaining > 0 && iter++ < FLOW_MAX_ITER) {
+    const head = _headWorld(d);
+    const castMax = Math.min(dx, d.remaining);
+    // 1) 수직 ray cast — 가장 가까운 hit
     let best = null;
     for (let bi = 0; bi < world.bodies.length; bi++) {
       const bd = world.bodies[bi];
@@ -4476,86 +4440,59 @@ function _computeDripPath(drip, maxLen) {
         if (e.transparent) continue;
         const a = bd.nodes[e.a], b = bd.nodes[e.b];
         if (!a || !b) continue;
-        const hit = _vRayHitSeg(cx, cy, remain, a.x, a.y, b.x, b.y);
+        const hit = _vRayHitSeg(head.x, head.y, castMax, a.x, a.y, b.x, b.y);
         if (hit && (!best || hit.d < best.d)) {
           best = { d: hit.d, x: hit.x, y: hit.y, bi, ei, aIdx: e.a, bIdx: e.b };
         }
       }
     }
-    // [B2] 첫 iter 한정 — 직전 frame 의 best 엣지가 여전히 hit 하면 우선(거리 차 3px 이내).
-    if (_FLOW_MIT.B2 && isFirstIter && drip._lastBestEdge && best) {
-      const pe = drip._lastBestEdge;
-      if (!(best.bi === pe.bi && best.ei === pe.ei)) {
-        const pbd = world.bodies[pe.bi];
-        const pe_e = pbd && pbd.edges[pe.ei];
-        if (pe_e && !pe_e.transparent
-            && !(bannedEdge && bannedEdge.bi === pe.bi && bannedEdge.ei === pe.ei)) {
-          const pa = pbd.nodes[pe_e.a], pb = pbd.nodes[pe_e.b];
-          if (pa && pb) {
-            const ph = _vRayHitSeg(cx, cy, remain, pa.x, pa.y, pb.x, pb.y);
-            if (ph && ph.d - best.d < _FLOW_MIT_HIT_HYST_PX) {
-              best = { d: ph.d, x: ph.x, y: ph.y, bi: pe.bi, ei: pe.ei, aIdx: pe_e.a, bIdx: pe_e.b };
-            }
-          }
-        }
-      }
-    }
-    if (isFirstIter && best) drip._lastBestEdge = { bi: best.bi, ei: best.ei };
-    isFirstIter = false;
     if (!best) {
-      segs.push({ x0: cx, y0: cy, x1: cx, y1: cy + remain, type: 'down' });
-      remain = 0; break;
+      // 자유낙하 — castMax 만큼. 현재 head 의 anchor 에 매달림.
+      _pushSeg(d, d.curAnchorBI, d.curAnchorNI, d.curAnchorChar, d.curAnchorOcc,
+               head.x, head.y, head.x, head.y + castMax);
+      d.curOffY += castMax;                      // head 만 아래로 (anchor 그대로)
+      dx -= castMax; d.remaining -= castMax;
+      break;
     }
-    // 2) 떨어져서 hit 까지 — 선이 마주친 획에 닿음
-    if (best.d > 0.5) segs.push({ x0: cx, y0: cy, x1: best.x, y1: best.y, type: 'down' });
-    cx = best.x; cy = best.y; remain -= best.d;
-    if (remain <= 0) break;
-    // 3) 마주친 엣지 따라가기 — hit 점 → lower endpoint
-    //    [평행] |y 차| 가 |x 차| · 0.2 보다 작으면 평행선으로 간주 — drip 의 horizDir 로 선택.
+    // 2) hit 까지 떨어짐 — 현재 head 의 anchor 에 매달림 (떨어지는 트레일은 출발 body 와 함께 이동)
+    if (best.d > 0.5) {
+      _pushSeg(d, d.curAnchorBI, d.curAnchorNI, d.curAnchorChar, d.curAnchorOcc,
+               head.x, head.y, best.x, best.y);
+    }
+    // 3) 마주친 엣지 따라가기 — 평행선이면 horizDir 끝점, 아니면 lower endpoint
     const bd = world.bodies[best.bi];
     const aN = bd.nodes[best.aIdx], bN = bd.nodes[best.bIdx];
-    let lowIdx, lowX, lowY;
     const eDy = Math.abs(aN.y - bN.y), eDx = Math.abs(aN.x - bN.x);
-    if (eDy <= Math.max(3, eDx * 0.3)) {
-      const goRight = (drip.horizDir || 1) > 0;
+    const isParallel = eDy <= Math.max(3, eDx * 0.3);
+    let targetIdx, targetX, targetY;
+    if (isParallel) {
+      const goRight = (d.horizDir || 1) > 0;
       const aIsRight = aN.x > bN.x;
-      if (goRight === aIsRight) { lowIdx = best.aIdx; lowX = aN.x; lowY = aN.y; }
-      else                      { lowIdx = best.bIdx; lowX = bN.x; lowY = bN.y; }
-    } else if (aN.y > bN.y) { lowIdx = best.aIdx; lowX = aN.x; lowY = aN.y; }
-    else                    { lowIdx = best.bIdx; lowX = bN.x; lowY = bN.y; }
-    // 평행이면 위로/평평 체크를 건너뜀(평행이 아닐 때만 정지).
-    if (eDy > Math.max(3, eDx * 0.3) && lowY <= cy + 0.5) break;
-    const dx = lowX - cx, dy = lowY - cy;
-    const segLen = Math.hypot(dx, dy);
+      if (goRight === aIsRight) { targetIdx = best.aIdx; targetX = aN.x; targetY = aN.y; }
+      else                      { targetIdx = best.bIdx; targetX = bN.x; targetY = bN.y; }
+    } else if (aN.y > bN.y) { targetIdx = best.aIdx; targetX = aN.x; targetY = aN.y; }
+    else                    { targetIdx = best.bIdx; targetX = bN.x; targetY = bN.y; }
+    // hit 점에서 head 를 마주친 body 의 target 노드로 재anchor (이후 세그먼트는 그 body 따라 이동)
+    _setHead(d, best.bi, targetIdx, best.x, best.y);
+    dx -= best.d; d.remaining -= best.d;
+    if (dx <= 0 || d.remaining <= 0) break;
+    if (!isParallel && targetY <= best.y + 0.5) break;
+    const eDxSeg = targetX - best.x, eDySeg = targetY - best.y;
+    const segLen = Math.hypot(eDxSeg, eDySeg);
     if (segLen < 0.5) break;
-    const moveLen = Math.min(segLen, remain);
-    const nx = cx + dx * moveLen / segLen, ny = cy + dy * moveLen / segLen;
-    segs.push({ x0: cx, y0: cy, x1: nx, y1: ny, type: 'edge' });
-    cx = nx; cy = ny; remain -= moveLen;
-    if (moveLen < segLen) break;     // 엣지 도중 끝남
-    // 4) 엣지 끝점 도달 → 같은 body chain 으로 local low 까지 추가 따라감
-    termKey = best.bi + '-' + lowIdx;
-    anchorBI = best.bi; anchorNI = lowIdx;
-    tailStartIdx = segs.length;
+    const moveLen = Math.min(segLen, dx, d.remaining);
+    const ratio = moveLen / segLen;
+    const nx = best.x + eDxSeg * ratio, ny = best.y + eDySeg * ratio;
+    _pushSeg(d, d.curAnchorBI, d.curAnchorNI, d.curAnchorChar, d.curAnchorOcc,
+             best.x, best.y, nx, ny);
+    _setHead(d, d.curAnchorBI, d.curAnchorNI, nx, ny);
+    dx -= moveLen; d.remaining -= moveLen;
+    if (moveLen < segLen) break;
     bannedEdge = { bi: best.bi, ei: best.ei };
-    if (remain > 0) {
-      const chain = _drawChainDown(best.bi, lowIdx, cx, cy, remain, segs, best.ei);
-      cx = chain.finalX; cy = chain.finalY; remain -= chain.consumed;
-      if (chain.finalNI >= 0) {
-        termKey = best.bi + '-' + chain.finalNI;
-        anchorBI = best.bi; anchorNI = chain.finalNI;
-        tailStartIdx = segs.length;
-      }
-      if (chain.bannedLast) bannedEdge = chain.bannedLast;
-    }
   }
-  return { segs, termKey, anchorBI, anchorNI, tailStartIdx };
 }
 
-// 현재 슬라이더 값에 맞춰 _drips 개수 동기화. 기존 drip 은 유지(시각 안정성).
-//   각 새 drip 은 영속 식별자(srcChar + srcOccurrence + srcIdx) 도 기록 — world 재구성 시
-//   _resetDripsForNewWorld 가 동일 글자·동일 위치 노드로 재바인딩 가능.
-//   길이 분포: pow(rand, FLOW_LEN_BIAS) — 길수록 확률적으로 어렵게.
+// 슬라이더 값에 맞춰 _drips 개수 동기화. 기존 drip 은 그대로 유지(시각 안정성).
 function _syncDripsToWorld(w) {
   if (!w || !w.bodies) { _drips = []; return; }
   const target = _flowSlider();
@@ -4578,199 +4515,154 @@ function _syncDripsToWorld(w) {
     while (_drips.length < target && pool.length > 0) {
       const k = Math.floor(Math.random() * pool.length);
       const c = pool.splice(k, 1)[0];
-      const node = w.bodies[c.b].nodes[c.n];
-      const maxLen = Math.max(0, cssH + 50 - node.y);
-      const targetLen = Math.max(0, Math.pow(Math.random(), FLOW_LEN_BIAS) * maxLen);
-      // [시작 지연] 글자 탄생(샘플 시각) 후 1000~5000 ms 사이 랜덤 시점에 흘리기 시작.
-      // [평행 방향] horizDir = -1(왼쪽) 또는 +1(오른쪽), drip 별 고정 (만난 평행선에서 사용).
+      const body = w.bodies[c.b];
+      const connected = _countConnectedNodes(body, c.n);
+      const initialTarget = Math.max(0, connected * FLOW_LEN_PER_NODE);
       _drips.push({
         srcBody: c.b, srcIdx: c.n,
         srcChar: c.ch, srcOccurrence: c.occ,
-        targetLen,
-        currentLen: 0,
-        lastTermKey: '',
-        residues: [],
-        _lastPath: null,
+        initialTarget,
+        remaining: initialTarget,
+        drawnSegs: [],
+        // head 상태 (활성화 시점에 설정)
+        curAnchorBI: -1, curAnchorNI: -1,
+        curAnchorChar: '', curAnchorOcc: 0,
+        curOffX: 0, curOffY: 0,
+        curStartIdx: -1,                 // 직전 frame 의 chain-low (시작점 변경 감지용)
+        active: false,
         bornT: performance.now(),
         startDelay: 1000 + Math.random() * 4000,
         horizDir: Math.random() < 0.5 ? -1 : 1
       });
     }
   } else if (_drips.length > target) {
-    // [C1] 슬라이더 ↓ — 즉시 제거 대신 페이드 리스트로 옮김.
-    const removed = _drips.splice(target);
-    if (_FLOW_MIT.C1) removed.forEach(_flowFadeSnapshot);
+    _drips.length = target;
   }
 }
 
-// [C1] drip 의 현재 시각 상태를 정적 스냅샷으로 페이드 리스트에 추가.
-function _flowFadeSnapshot(d) {
-  if (!d || !world) return;
-  const items = _collectDripItems(d);
-  if (items.lines.length === 0 && items.ends.length === 0) return;
-  _fadingDrips.push({ items, _fadeStartT: performance.now(), lineW: PARAMS.lineW || 0, endR: (PARAMS.nodeR || 0) / 2 });
-}
-
-// world 재구성 시 — 기존 drip 영속 식별자(srcChar, srcOccurrence, srcIdx) 로
-//   새 world 에 동일 노드 있으면 재바인딩 유지. 없으면 그 drip 만 드롭.
-//   잔상은 옛 world 의 노드를 anchor 로 잡고 있어 무효 → 비움.
+// world 재구성 시 — srcBody 와 drawnSegs 의 anchor 모두 (char,occ) 로 재바인딩.
+//   글자 살아있으면 drip 유지(드로잉 거리·세그먼트 모두 보존), 사라지면 드롭.
 function _resetDripsForNewWorld(w) {
   _dripsLastT = 0;
   if (!w || !w.bodies) { _drips = []; return; }
-  // 새 world 의 글자별 occurrence → bodyIdx 맵
   const occByChar = new Map();
   const bodyByCharOcc = new Map();
   w.bodies.forEach((b, bi) => {
     const ch = (b && b.ch) || '';
     const occ = occByChar.get(ch) || 0;
     occByChar.set(ch, occ + 1);
-    bodyByCharOcc.set(ch + '' + occ, bi);
+    bodyByCharOcc.set(ch + '\x01' + occ, bi);
   });
+  const _lookup = (ch, occ) => bodyByCharOcc.get((ch || '') + '\x01' + (occ || 0));
   _drips = _drips.filter(d => {
-    if (d.srcChar == null) { if (_FLOW_MIT.C1) _flowFadeSnapshot(d); return false; }  // 옛 drip — 드롭(+페이드)
-    const newBi = bodyByCharOcc.get(d.srcChar + '' + d.srcOccurrence);
-    if (newBi == null) { if (_FLOW_MIT.C1) _flowFadeSnapshot(d); return false; }     // 글자 없음 (+페이드)
+    if (d.srcChar == null) return false;
+    const newBi = _lookup(d.srcChar, d.srcOccurrence);
+    if (newBi == null) return false;
     const newBody = w.bodies[newBi];
     const n = newBody && newBody.nodes[d.srcIdx];
-    if (!n || n.inv) { if (_FLOW_MIT.C1) _flowFadeSnapshot(d); return false; }
+    if (!n || n.inv) return false;
     d.srcBody = newBi;
-    // 잔상 재바인딩 — 옛 anchor body 의 character·occurrence 로 새 body 매핑. 못 찾는 잔상만 드롭.
-    d.residues = (d.residues || []).map(res => {
-      if (res.anchorChar == null) return null;
-      const nbi = bodyByCharOcc.get(res.anchorChar + '\x01' + res.anchorOcc);
-      if (nbi == null) return null;
+    // drawnSegs anchor 재바인딩 — 글자 없는 세그먼트만 드롭.
+    d.drawnSegs = d.drawnSegs.filter(s => {
+      const nbi = _lookup(s.anchorChar, s.anchorOcc);
+      if (nbi == null) return false;
       const nb = w.bodies[nbi];
-      if (!nb || !nb.nodes[res.anchorNI] || nb.nodes[res.anchorNI].inv) return null;
-      return { anchorBI: nbi, anchorNI: res.anchorNI,
-               anchorChar: res.anchorChar, anchorOcc: res.anchorOcc,
-               segs: res.segs };
-    }).filter(Boolean);
-    d._lastPath = null;
-    d.lastTermKey = '';                         // 종착지 추적 리셋(새 path 첫 프레임 시 결정)
+      if (!nb || !nb.nodes[s.anchorNI] || nb.nodes[s.anchorNI].inv) return false;
+      s.anchorBI = nbi;
+      return true;
+    });
+    // head anchor 재바인딩 — 못 찾으면 head 리셋(다음 frame 에서 새 chain-low 로 점프됨)
+    if (d.active && d.curAnchorBI >= 0) {
+      const cbi = _lookup(d.curAnchorChar, d.curAnchorOcc);
+      if (cbi != null && w.bodies[cbi] && w.bodies[cbi].nodes[d.curAnchorNI]
+          && !w.bodies[cbi].nodes[d.curAnchorNI].inv) {
+        d.curAnchorBI = cbi;
+      } else {
+        d.curAnchorBI = -1;     // 다음 frame 에서 새로 잡힘
+        d.curStartIdx = -1;
+      }
+    }
     return true;
   });
   _syncDripsToWorld(w);
 }
 
-// 랜덤 트리거 — 흘리기 노드+길이 다시 뽑기 (슬라이더 값 유지, 잔상 비움).
-//   [C1] ON 이면 기존 drip 들을 페이드 리스트로 옮겨 0.3s 동안 보임.
+// 랜덤 트리거 — 노드+길이+drawnSegs 전부 초기화 후 슬라이더 수 만큼 새로 샘플.
 function _redrawDrips() {
-  if (_FLOW_MIT.C1) _drips.forEach(_flowFadeSnapshot);
   _drips = [];
   if (world) _syncDripsToWorld(world);
 }
 
-// 매 프레임 1 회: 이징 적용 dt 전진 + 경로 재계산 + 종착지 변경 시 잔상 보존.
-//   draw() 전반부에서 호출. _lastPath 갱신 → _collectFlowPrimitives 가 읽음.
-//   [단조 증가] currentLen 은 절대 감소하지 않음 — 회수/삭제 없음. 종착지 변경 시
-//     max(현재값, lenToRestart) 로 점프(상향)만 가능. 옛 꼬리는 잔상으로 보존.
-//   [이징] 속도 = FLOW_SPEED × √(remaining / targetLen). remaining=0 이면 속도=0.
-//     targetLen=0 인 drip 은 정지 상태(애니메이션 없음).
+// 매 프레임 1 회: 활성화 + chain-low 변화 감지(head 점프) + dx 전진.
 function _advanceFlow() {
   const now = performance.now();
   const dt = _dripsLastT > 0 ? Math.min(0.1, (now - _dripsLastT) / 1000) : 0;
   _dripsLastT = now;
   if (!world || !world.bodies) return;
   _drips.forEach(d => {
-    // [시작 지연] bornT + startDelay 전에는 애니메이션 정지 (보이지도 않음).
-    if (d.bornT != null && (now - d.bornT) < (d.startDelay || 0)) {
-      d._lastPath = null;
-      return;
-    }
-    const full = _computeDripPath(d, d.targetLen);
-    // [B1] 종착지 변경 debounce — 직전 변경 후 N ms 내면 무시.
-    const allowChange = !_FLOW_MIT.B1
-      || ((now - (d._termKeyChangedT || -1e9)) >= _FLOW_MIT_DEBOUNCE_MS);
-    if (full.termKey !== d.lastTermKey && allowChange) {
-      // 1) 직전 꼬리(옛 재시작 점 너머) 를 잔상으로 보존 — 옛 종착지 노드에 매달림.
-      if (d.lastTermKey !== '') {
-        const prev = d._lastPath;
-        if (prev && prev.anchorBI >= 0 && prev.tailStartIdx < prev.segs.length) {
-          const anBody = world.bodies[prev.anchorBI];
-          const an = anBody && anBody.nodes[prev.anchorNI];
-          if (an) {
-            const tailSegs = prev.segs.slice(prev.tailStartIdx).map(s => ({
-              dx0: s.x0 - an.x, dy0: s.y0 - an.y,
-              dx1: s.x1 - an.x, dy1: s.y1 - an.y
-            }));
-            if (tailSegs.length > 0) {
-              d.residues.push({
-                anchorBI: prev.anchorBI, anchorNI: prev.anchorNI,
-                anchorChar: anBody.ch || '', anchorOcc: _bodyOccurrence(prev.anchorBI),
-                segs: tailSegs,
-                _createdT: now                                 // [D1] 나이 추적용
-              });
-              while (d.residues.length > FLOW_MAX_RES) d.residues.shift();
-            }
-          }
-        }
-      }
-      // 2) 새 경로 재시작 점까지의 거리만큼 currentLen 단조 상향만(감소 X).
-      if (full.termKey !== '') {
-        let lenToRestart = 0;
-        for (let i = 0; i < full.tailStartIdx; i++) {
-          const s = full.segs[i];
-          lenToRestart += Math.hypot(s.x1 - s.x0, s.y1 - s.y0);
-        }
-        d.currentLen = Math.min(d.targetLen, Math.max(d.currentLen, lenToRestart));
-      }
-      d.lastTermKey = full.termKey;
-      d._termKeyChangedT = now;
-    }
-    // [D1] 잔상 만료 — 오래된 잔상 제거 (anchor 멀어진 잔상 시각적 정리)
-    if (_FLOW_MIT.D1 && d.residues.length) {
-      d.residues = d.residues.filter(r => (now - (r._createdT || 0)) < _FLOW_MIT_RESIDUE_AGE_MS);
-    }
-    // [이징] remaining 작아질수록 속도 ↓. remaining < FLOW_SNAP_PX 면 즉시 완성.
-    const remaining = Math.max(0, d.targetLen - d.currentLen);
-    if (d.targetLen <= 0 || remaining <= 0) {
-      // 이미 끝남 — 진행 없음
-    } else if (remaining < FLOW_SNAP_PX) {
-      d.currentLen = d.targetLen;
+    const sb = world.bodies[d.srcBody];
+    if (!sb) return;
+    if (!d.active) {
+      if ((now - (d.bornT || 0)) < (d.startDelay || 0)) return;       // 대기 중
+      const startIdx = _findChainLow(sb, d.srcIdx);
+      const startN = sb.nodes[startIdx];
+      if (!startN || startN.inv) return;
+      _setHead(d, d.srcBody, startIdx, startN.x, startN.y);
+      d.curStartIdx = startIdx;
+      d.active = true;
+    } else if (d.curAnchorBI < 0) {
+      // world 재구성으로 head anchor 잃음 → 새 chain-low 로 재설정
+      const startIdx = _findChainLow(sb, d.srcIdx);
+      const startN = sb.nodes[startIdx];
+      if (!startN || startN.inv) return;
+      _setHead(d, d.srcBody, startIdx, startN.x, startN.y);
+      d.curStartIdx = startIdx;
     } else {
-      const eased = FLOW_SPEED * Math.sqrt(remaining / d.targetLen);
-      d.currentLen = Math.min(d.targetLen, d.currentLen + dt * eased);
+      // 시작점(chain-low) 변경 감지 — 변했으면 head 만 새 chain-low 로 점프.
+      //   이미 그려진 drawnSegs 는 자기 anchor 에 매달려 그대로. 새 chain-low 에서
+      //   남은 거리만큼 계속 흐름. (거리 차감은 _extendDrip 내부에서)
+      const newStartIdx = _findChainLow(sb, d.srcIdx);
+      if (newStartIdx !== d.curStartIdx) {
+        const sn = sb.nodes[newStartIdx];
+        if (sn && !sn.inv) {
+          _setHead(d, d.srcBody, newStartIdx, sn.x, sn.y);
+          d.curStartIdx = newStartIdx;
+        }
+      }
     }
-    d._lastPath = _computeDripPath(d, d.currentLen);
+    if (d.remaining <= 0) return;
+    if (d.initialTarget <= 0) { d.remaining = 0; return; }
+    // [이징] 남은 거리 짧을수록 속도 ↓. 0.5 px 미만이면 한방에 마무리.
+    if (d.remaining < FLOW_SNAP_PX) { _extendDrip(d, d.remaining); d.remaining = 0; return; }
+    const eased = FLOW_SPEED * Math.sqrt(d.remaining / d.initialTarget);
+    const dx = dt * eased;
+    if (dx > 0) _extendDrip(d, dx);
   });
 }
 
-// 한 drip 의 현재 라인·끝점 절대좌표 수집 — C1 페이드 스냅샷에도 사용.
-function _collectDripItems(d) {
-  const out = { lines: [], ends: [] };
-  if (d._lastPath) {
-    const p = d._lastPath;
-    p.segs.forEach(s => out.lines.push({ x0: s.x0, y0: s.y0, x1: s.x1, y1: s.y1 }));
-    if (p.segs.length > 0) {
-      const last = p.segs[p.segs.length - 1];
-      out.ends.push({ x: last.x1, y: last.y1 });
-    }
-  }
-  d.residues.forEach(res => {
-    const an = world && world.bodies[res.anchorBI] && world.bodies[res.anchorBI].nodes[res.anchorNI];
-    if (!an || an.inv) return;
-    res.segs.forEach((s, i) => {
-      out.lines.push({
-        x0: an.x + s.dx0, y0: an.y + s.dy0,
-        x1: an.x + s.dx1, y1: an.y + s.dy1
-      });
-      if (i === res.segs.length - 1) out.ends.push({ x: an.x + s.dx1, y: an.y + s.dy1 });
-    });
-  });
-  return out;
-}
-
-// 현재 _drips 의 라인·끝점 노드를 플랫 리스트로 수집. 모든 렌더 타깃에서 공유.
+// 모든 drip 의 drawnSegs (anchor 의 현재 위치 + offset) + 현재 head 끝점.
 function _collectFlowPrimitives() {
   const out = { lines: [], ends: [] };
   if (!world || !world.bodies || !_drips.length) return out;
   _drips.forEach(d => {
-    const it = _collectDripItems(d);
-    out.lines.push(...it.lines);
-    out.ends.push(...it.ends);
+    if (!d.active) return;
+    for (const s of d.drawnSegs) {
+      const ab = world.bodies[s.anchorBI];
+      const an = ab && ab.nodes[s.anchorNI];
+      if (!an || an.inv) continue;
+      out.lines.push({
+        x0: an.x + s.dx0, y0: an.y + s.dy0,
+        x1: an.x + s.dx1, y1: an.y + s.dy1
+      });
+    }
+    if (d.curAnchorBI >= 0) {
+      const head = _headWorld(d);
+      if (d.drawnSegs.length > 0) out.ends.push({ x: head.x, y: head.y });
+    }
   });
   return out;
 }
+
 
 // 흘리기 라인·끝점 노드를 ctx 에 직접 렌더. 두께·끝점반경은 호출자가 결정(inflation 포함).
 //   끝점은 PARAMS.shape 반영(원/라운드/사각). fillStyle·strokeStyle 은 호출 전에 설정.
@@ -5201,28 +5093,7 @@ function draw() {
   });
   // 흘리기 — 일반 모드에서는 글자 위에 솔리드로 그려짐 (테두리/부드럽게 OFF 일 때만 이 경로).
   _drawFlowItemsCanvas(ctx, _collectFlowPrimitives(), lineW, nodeR);
-  // [C1] 페이드 중 drip 들 — 일반 모드에서만 렌더 (보조 효과). 만료 시 자동 제거.
-  if (_fadingDrips.length) _drawFadingDripsCanvas(ctx);
   drawInteractionOverlay();
-}
-
-// [C1] 페이드 중 drip 들 렌더 — 각 drip 별로 alpha 곱해 그리고, 만료된 항목은 제거.
-function _drawFadingDripsCanvas(targetCtx) {
-  const now = performance.now();
-  const kept = [];
-  for (const fd of _fadingDrips) {
-    const age = now - fd._fadeStartT;
-    if (age >= _FLOW_MIT_FADE_MS) continue;     // 만료 → 제거
-    const alpha = 1 - (age / _FLOW_MIT_FADE_MS);
-    targetCtx.save();
-    targetCtx.globalAlpha = Math.max(0, alpha);
-    targetCtx.fillStyle = currentFgColor();
-    targetCtx.strokeStyle = currentFgColor();
-    _drawFlowItemsCanvas(targetCtx, fd.items, fd.lineW, fd.endR);
-    targetCtx.restore();
-    kept.push(fd);
-  }
-  _fadingDrips = kept;
 }
 
 // [v1.09] 호버·붙임·떼기 인터랙션 표시 — draw() 의 일반 경로 + drawBorders/drawSmoothedBodies
@@ -6874,26 +6745,6 @@ function buildPanel() {
   loadBtn.addEventListener('click', () => triggerSettingsLoad());
   btnRow.appendChild(loadBtn);
   body.appendChild(btnRow);
-
-  // 흘리기 완화 테스트 토글 (개발 진단용) — 각 케이스 독립 ON/OFF, localStorage 영속.
-  body.appendChild(makeGap());
-  body.appendChild(makeTitle('흘리기 테스트'));
-  const _mitRow = document.createElement('div');
-  _mitRow.className = 'btnRow flowMitRow';
-  _FLOW_MIT_DEFS.forEach(([key, label, desc]) => {
-    const b = document.createElement('button');
-    b.className = 'pillBtn flowMitBtn' + (_FLOW_MIT[key] ? ' active' : '');
-    b.type = 'button';
-    b.textContent = key;
-    b.title = label + ' — ' + desc;
-    b.addEventListener('click', () => {
-      _FLOW_MIT[key] = !_FLOW_MIT[key];
-      b.classList.toggle('active', _FLOW_MIT[key]);
-      _saveFlowMit();
-    });
-    _mitRow.appendChild(b);
-  });
-  body.appendChild(_mitRow);
 
   // [G1] 의견 보내기 / 커피 사주기 = 속성 패널에서 제거 → 크레딧 바로 위 우하단 고정
   //   클러스터(#mhBottomBtns)로 이동. btnRow2 가 빠진 만큼 아래 가이드가 자연히 위로 올라감.
