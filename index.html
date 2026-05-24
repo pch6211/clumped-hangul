@@ -4285,7 +4285,19 @@ let _dripsLastT = 0;            // 애니메이션 dt 계산용 — performance.
 const FLOW_SPEED = 50;          // px / sec — 자라는 속도
 const FLOW_MAX_ITER = 6;        // 다단 (떨어짐 → 따라감) 반복 한도 — 무한루프 방지
 const FLOW_MAX_RES = 3;         // 흘리기 1 개당 잔상 최대 보존 개수
-const FLOW_LEN_BIAS = 2.5;      // 거리 분포 멱지수 (>1 → 길수록 확률 감소; pow(rand, 2.5))
+const FLOW_LEN_BIAS = 1.7;      // 거리 분포 멱지수 (>1 → 길수록 확률 감소; 작을수록 평균 길이 ↑)
+
+// body 의 occurrence (같은 글자 중 몇 번째 등장인지) — 잔상 anchor 영속 식별용.
+//   world 재구성 시 잔상도 같은 글자·같은 순번 body 로 재바인딩 가능.
+function _bodyOccurrence(bi) {
+  if (!world || !world.bodies[bi]) return 0;
+  const ch = world.bodies[bi].ch || '';
+  let occ = 0;
+  for (let i = 0; i < bi; i++) {
+    if ((world.bodies[i].ch || '') === ch) occ++;
+  }
+  return occ;
+}
 
 function _flowSlider() { return Math.max(0, Math.min(10, Math.round(PARAMS.flow || 0))); }
 
@@ -4522,12 +4534,28 @@ function _resetDripsForNewWorld(w) {
     const n = newBody && newBody.nodes[d.srcIdx];
     if (!n || n.inv) return false;
     d.srcBody = newBi;
-    d.residues = [];                            // 잔상은 옛 world anchor — 비움
+    // 잔상 재바인딩 — 옛 anchor body 의 character·occurrence 로 새 body 매핑. 못 찾는 잔상만 드롭.
+    d.residues = (d.residues || []).map(res => {
+      if (res.anchorChar == null) return null;
+      const nbi = bodyByCharOcc.get(res.anchorChar + '\x01' + res.anchorOcc);
+      if (nbi == null) return null;
+      const nb = w.bodies[nbi];
+      if (!nb || !nb.nodes[res.anchorNI] || nb.nodes[res.anchorNI].inv) return null;
+      return { anchorBI: nbi, anchorNI: res.anchorNI,
+               anchorChar: res.anchorChar, anchorOcc: res.anchorOcc,
+               segs: res.segs };
+    }).filter(Boolean);
     d._lastPath = null;
     d.lastTermKey = '';                         // 종착지 추적 리셋(새 path 첫 프레임 시 결정)
     return true;
   });
   _syncDripsToWorld(w);
+}
+
+// 랜덤 트리거 — 흘리기 노드+길이 다시 뽑기 (슬라이더 값 유지, 잔상 비움).
+function _redrawDrips() {
+  _drips = [];
+  if (world) _syncDripsToWorld(world);
 }
 
 // 매 프레임 1 회: dt 만큼 currentLen 전진 + 경로 재계산 + 종착지 변경 시 잔상 보존.
@@ -4542,17 +4570,23 @@ function _advanceFlow() {
     const full = _computeDripPath(d, d.targetLen);
     if (full.termKey !== d.lastTermKey) {
       // 1) 직전 꼬리(옛 재시작 점 너머) 를 잔상으로 보존 — 옛 종착지 노드에 매달림.
+      //    anchorChar/anchorOcc 도 같이 저장 → world 재구성 시 재바인딩 유지.
       if (d.lastTermKey !== '') {
         const prev = d._lastPath;
         if (prev && prev.anchorBI >= 0 && prev.tailStartIdx < prev.segs.length) {
-          const an = world.bodies[prev.anchorBI] && world.bodies[prev.anchorBI].nodes[prev.anchorNI];
+          const anBody = world.bodies[prev.anchorBI];
+          const an = anBody && anBody.nodes[prev.anchorNI];
           if (an) {
             const tailSegs = prev.segs.slice(prev.tailStartIdx).map(s => ({
               dx0: s.x0 - an.x, dy0: s.y0 - an.y,
               dx1: s.x1 - an.x, dy1: s.y1 - an.y
             }));
             if (tailSegs.length > 0) {
-              d.residues.push({ anchorBI: prev.anchorBI, anchorNI: prev.anchorNI, segs: tailSegs });
+              d.residues.push({
+                anchorBI: prev.anchorBI, anchorNI: prev.anchorNI,
+                anchorChar: anBody.ch || '', anchorOcc: _bodyOccurrence(prev.anchorBI),
+                segs: tailSegs
+              });
               while (d.residues.length > FLOW_MAX_RES) d.residues.shift();
             }
           }
@@ -7346,6 +7380,8 @@ function randomizeAll() {
     if (DERIVED_KEYS.has(key)) return;
     setParamValue(key, randInt(mn, mx), { silent: true });
   }));
+  // 흘리기 — 랜덤 트리거 시 노드+길이 재추첨 (슬라이더 개수는 유지). 잔상도 비움.
+  _redrawDrips();
   // 부드럽게는 0~30 자유 랜덤 (선택적 효과)
   // 부드럽게(cornerR)는 전체 랜덤에서 선택하지 않음 — 사용자 슬라이더 값 유지
 
