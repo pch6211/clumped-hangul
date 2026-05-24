@@ -4312,19 +4312,38 @@ function step(dt) {
 let _drips = [];
 let _dripsLastT = 0;
 const FLOW_SPEED = 50;
-const FLOW_SIZE_RATIO = 0.8;                  // 페인트 선 두께 = 글자 획두께 × 이 비율
-const FLOW_END_NODE_RATIO = 1.07;             // 획 끝 노드 사이즈 = 페인트 선 두께 × 이 비율
+const FLOW_THICK_RATIO = 0.75;                // case C 의 페인트 두께 = 획 두께 × 이 비율
+const FLOW_END_NODE_RATIO = 1.07;             // case A/C 의 끝 노드 사이즈 = 페인트 두께 × 이 비율
+const FLOW_THIN_LINEW = 10;                   // 획 두께 이 값 이하면 "얇은" 케이스 (case A)
 const FLOW_MAX_ITER = 6;
 const FLOW_LEN_PER_NODE = 10;
 const FLOW_SNAP_PX = 0.5;
 
 function _flowSlider() { return Math.max(0, Math.min(10, Math.round(PARAMS.flow || 0))); }
 
-// 페인트 선 두께 (diameter) = 글자 획두께 (lineW) × FLOW_SIZE_RATIO. 단 lineW ≤ 1 이면
-//   줄이지 않고 그대로 (최소 두께 보장).
-function _flowLineWidth(lineW) {
-  const w = lineW || 0;
-  return w <= 1 ? w : w * FLOW_SIZE_RATIO;
+// 페인트 선·끝점 스타일 — 슬라이더 PARAMS.lineW (획 두께) vs PARAMS.nodeR (점 크기) 비교로 분기.
+//   case A (lineW ≤ 10): 페인트 = lineW 그대로, 끝점 = lineW × 1.07 동그란 노드 (shape 고정 원).
+//   case B (lineW > 10, nodeR > lineW): 페인트 = lineW 그대로, 끝점 = nodeR 사이즈·모양 (PARAMS.shape).
+//   case C (lineW > 10, nodeR ≤ lineW): 페인트 = lineW × 0.75, 끝점 = 페인트 × 1.07 동그란 노드.
+//   반환 { lineW, endR (radius), endShape: 'circle'|'param' }.
+function _flowStyle() {
+  const lineW = PARAMS.lineW || 0;
+  const nodeRDiam = PARAMS.nodeR || 0;            // 슬라이더 값 = diameter
+  let flowW, endR, endShape;
+  if (lineW <= FLOW_THIN_LINEW) {
+    flowW = lineW;
+    endR = flowW * FLOW_END_NODE_RATIO * 0.5;
+    endShape = 'circle';
+  } else if (nodeRDiam > lineW) {
+    flowW = lineW;
+    endR = nodeRDiam * 0.5;                       // 점 크기 그대로 → radius = diameter/2
+    endShape = 'param';
+  } else {
+    flowW = lineW * FLOW_THICK_RATIO;
+    endR = flowW * FLOW_END_NODE_RATIO * 0.5;
+    endShape = 'circle';
+  }
+  return { lineW: flowW, endR, endShape };
 }
 
 // body 의 occurrence (같은 글자 중 몇 번째 등장인지) — anchor 영속 식별용.
@@ -4838,14 +4857,14 @@ function _collectFlowPrimitives() {
 }
 
 
-// 흘리기 렌더: lineW 두께로 line 그리고 endR 반경으로 head 끝점 노드 그림.
-//   endR = lineW × 1.07 / 2 (두께보다 7% 큰 노드 사이즈, 반경 단위). PARAMS.shape 적용.
+// 흘리기 렌더 — style 은 _flowStyle() 결과 ({ lineW, endR, endShape }).
 //   extraLine/extraEnd 는 테두리 inflation 등 추가량 (line/end 각각 더해짐).
-function _drawFlowItemsCanvas(targetCtx, items, lineW, extraLine, extraEnd) {
-  if (!items) return;
+//   endShape='circle' 이면 무조건 원형, 'param' 이면 PARAMS.shape 반영.
+function _drawFlowItemsCanvas(targetCtx, items, style, extraLine, extraEnd) {
+  if (!items || !style) return;
   const _extraL = extraLine || 0;
   const _extraE = extraEnd || 0;
-  const finalLineW = lineW + _extraL;
+  const finalLineW = (style.lineW || 0) + _extraL;
   if (finalLineW > 0 && items.lines.length > 0) {
     targetCtx.lineCap = 'round';
     targetCtx.lineWidth = finalLineW;
@@ -4856,16 +4875,17 @@ function _drawFlowItemsCanvas(targetCtx, items, lineW, extraLine, extraEnd) {
       targetCtx.stroke();
     });
   }
-  const endR = lineW * FLOW_END_NODE_RATIO * 0.5 + _extraE;     // 두께 × 1.07 → 반경 = 그 절반
-  if (endR > 0 && items.ends.length > 0) {
-    const _shape = PARAMS.shape || 0;
-    const sCornerR = Math.max(0, Math.min(endR, endR * (100 - _shape) / 100));
+  const finalEndR = (style.endR || 0) + _extraE;
+  if (finalEndR > 0 && items.ends.length > 0) {
+    const sCornerR = (style.endShape === 'circle')
+      ? finalEndR
+      : Math.max(0, Math.min(finalEndR, finalEndR * (100 - (PARAMS.shape || 0)) / 100));
     items.ends.forEach(e => {
       targetCtx.beginPath();
-      if (sCornerR >= endR - 0.5) {
-        targetCtx.arc(e.x, e.y, endR, 0, Math.PI * 2);
+      if (sCornerR >= finalEndR - 0.5) {
+        targetCtx.arc(e.x, e.y, finalEndR, 0, Math.PI * 2);
       } else {
-        const x = e.x - endR, y = e.y - endR, w = 2 * endR, h = 2 * endR;
+        const x = e.x - finalEndR, y = e.y - finalEndR, w = 2 * finalEndR, h = 2 * finalEndR;
         if (sCornerR <= 0.5) {
           targetCtx.rect(x, y, w, h);
         } else {
@@ -5046,9 +5066,9 @@ function drawSmoothedBodies(targetCtx, bodies, fg, bg, viewport) {
     });
   });
   // 흘리기 (flow) 도 마스크에 포함 — 부드럽게가 글자+흘리기 통째로 처리.
-  //   페인트 선 두께 = _flowLineWidth(lineW) 고정 (글자획 × 0.8, lineW≤1 은 그대로).
+  //   페인트 스타일 = _flowStyle() (lineW/nodeR 관계로 두께·끝 노드 결정).
   const _flowItemsSm = _collectFlowPrimitives();
-  _drawFlowItemsCanvas(mctx, _flowItemsSm, _flowLineWidth(lineW));
+  _drawFlowItemsCanvas(mctx, _flowItemsSm, _flowStyle());
 
   // 모퉁이 둥글리기 — JS 박스블러 + 알파 임계값
   //   ctx.filter='blur' 네이티브 경로는 Safari 17.x 이하 미지원 → A/B 테스트 결과 JS 경로로 통합 (v1.12b).
@@ -5182,8 +5202,8 @@ function drawBorders(targetCtx, bodies, fg, viewport) {
     // 흘리기 (flow) 도 실루엣에 포함 — 테두리가 글자+흘리기 모두 감쌈.
     //   라인 두께 = lineW + 2·infl, 끝점 반경 = nodeR/2 + infl. fill·stroke = '#000' 유지.
     const _flowItems = _collectFlowPrimitives();
-    // 페인트 두께 = _flowLineWidth(lineW) + 테두리 inflation (extraLine=2·infl, extraEnd=infl).
-    _drawFlowItemsCanvas(mctx, _flowItems, _flowLineWidth(lineW), 2 * infl, infl);
+    // 페인트 스타일 = _flowStyle() + 테두리 inflation (extraLine=2·infl, extraEnd=infl).
+    _drawFlowItemsCanvas(mctx, _flowItems, _flowStyle(), 2 * infl, infl);
     mctx.restore();
   };
   // 단일 윤곽 밴드 = 글자+흘리기 실루엣(infl 0) 바로 밖, 두께 bW
@@ -5273,8 +5293,8 @@ function draw() {
     });
   });
   // 흘리기 — 일반 모드에서는 글자 위에 솔리드로 그려짐 (테두리/부드럽게 OFF 일 때만 이 경로).
-  //   페인트 두께 = _flowLineWidth(lineW) 고정.
-  _drawFlowItemsCanvas(ctx, _collectFlowPrimitives(), _flowLineWidth(lineW));
+  //   페인트 스타일 = _flowStyle().
+  _drawFlowItemsCanvas(ctx, _collectFlowPrimitives(), _flowStyle());
   drawInteractionOverlay();
 }
 
@@ -8963,20 +8983,22 @@ function saveSVG() {
   // SVG: 일반 획·노드 (부드럽게는 _useSmooth 시 SVG <filter> 로 적용)
   //   파이프라인 순서대로: 흘리기 → 글자 (정상모드는 함께 fill; 부드럽게는 동일 마스크에 합쳐짐).
   const _flowSvg = _collectFlowPrimitives();
-  // 페인트 선: 두께 _flowLineWidth(lineW) 고정. 획 끝 노드: 두께 × FLOW_END_NODE_RATIO 사이즈, PARAMS.shape 적용.
-  const _flowW = _flowLineWidth(lineW);
+  // 페인트 선·끝 노드: _flowStyle() 의 결과 사용. endShape='circle' 이면 원형 강제.
+  const _flowSty = _flowStyle();
   _flowSvg.lines.forEach(l => {
-    if (_flowW <= 0) return;
+    if (_flowSty.lineW <= 0) return;
     parts.push('<line x1="' + l.x0.toFixed(2) + '" y1="' + l.y0.toFixed(2) +
                '" x2="' + l.x1.toFixed(2) + '" y2="' + l.y1.toFixed(2) +
-               '" stroke-width="' + _flowW.toFixed(2) + '"/>');
+               '" stroke-width="' + _flowSty.lineW.toFixed(2) + '"/>');
   });
-  const _flowER = _flowW * FLOW_END_NODE_RATIO * 0.5;
   _flowSvg.ends.forEach(e => {
-    if (_flowER <= 0) return;
-    const cornerR = Math.max(0, Math.min(_flowER, _flowER * (100 - (PARAMS.shape || 0)) / 100));
-    parts.push('<rect x="' + (e.x - _flowER).toFixed(2) + '" y="' + (e.y - _flowER).toFixed(2) +
-               '" width="' + (_flowER * 2) + '" height="' + (_flowER * 2) +
+    const r = _flowSty.endR;
+    if (r <= 0) return;
+    const cornerR = (_flowSty.endShape === 'circle')
+      ? r
+      : Math.max(0, Math.min(r, r * (100 - (PARAMS.shape || 0)) / 100));
+    parts.push('<rect x="' + (e.x - r).toFixed(2) + '" y="' + (e.y - r).toFixed(2) +
+               '" width="' + (r * 2) + '" height="' + (r * 2) +
                '" rx="' + cornerR.toFixed(2) + '" stroke="none"/>');
   });
   world.bodies.forEach(body => {
@@ -9086,8 +9108,8 @@ function savePNG() {
       octx.restore();
     });
   });
-  // 일반 모드: 흘리기 라인을 글자 위에 추가로 솔리드 렌더 (_flowLineWidth(lineW) 두께).
-  _drawFlowItemsCanvas(octx, _collectFlowPrimitives(), _flowLineWidth(lineW));
+  // 일반 모드: 흘리기 라인을 글자 위에 추가로 솔리드 렌더 (_flowStyle() 사용).
+  _drawFlowItemsCanvas(octx, _collectFlowPrimitives(), _flowStyle());
   }
   off.toBlob(blob => {
     if (!blob) return;
