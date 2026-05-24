@@ -760,28 +760,24 @@ function _tag(key, val) {
   _clarity('set', String(key), String(val).slice(0, 255));
 }
 
-// 글자 입력은 키 하나마다 이벤트 보내면 노이즈 — 1.5초 디바운스로 1 회만 기록.
-let _trackTextTimer = null;
-function _trackTextChangeDebounced() {
-  if (_trackTextTimer) clearTimeout(_trackTextTimer);
-  _trackTextTimer = setTimeout(() => {
-    _trackTextTimer = null;
-    _track('글자 입력');
-    if (typeof TEXT === 'string') {
-      const n = TEXT.length;
-      const bucket = n === 0 ? '0' : n <= 5 ? '1-5' : n <= 20 ? '6-20' : n <= 100 ? '21-100' : '100+';
-      _tag('text_len_bucket', bucket);
-      // 한글 비율 — 텍스트 종류 세그먼트 (대시보드 Filters 에서 활용)
-      let han = 0, total = 0;
-      for (const ch of TEXT) {
-        if (ch === ' ' || ch === '\n') continue;
-        total++;
-        const c = ch.charCodeAt(0);
-        if (c >= 0xAC00 && c <= 0xD7A3) han++;
-      }
-      _tag('text_kind', total === 0 ? 'empty' : han === total ? 'hangul' : han === 0 ? 'non-hangul' : 'mixed');
-    }
-  }, 1500);
+// 글자 입력 — 입력창에서 blur 되는 순간(입력 종료) 1회 기록. 직전 값과 동일하면 스킵.
+let _trackTextLastSnapshot = null;
+function _trackTextOnBlur() {
+  if (typeof TEXT !== 'string') return;
+  if (TEXT === _trackTextLastSnapshot) return;     // 변경 없으면 스킵 (포커스만 옮긴 경우)
+  _trackTextLastSnapshot = TEXT;
+  _track('글자 입력');
+  const n = TEXT.length;
+  const bucket = n === 0 ? '0' : n <= 5 ? '1-5' : n <= 20 ? '6-20' : n <= 100 ? '21-100' : '100+';
+  _tag('text_len_bucket', bucket);
+  let han = 0, total = 0;
+  for (const ch of TEXT) {
+    if (ch === ' ' || ch === '\n') continue;
+    total++;
+    const c = ch.charCodeAt(0);
+    if (c >= 0xAC00 && c <= 0xD7A3) han++;
+  }
+  _tag('text_kind', total === 0 ? 'empty' : han === total ? 'hangul' : han === 0 ? 'non-hangul' : 'mixed');
 }
 
 // 세션 시작 메타 — 1회. 디바이스(세로>가로=mobile) 와 터치 여부.
@@ -1445,7 +1441,6 @@ function pickRandomText() {
 function applyRandomText() {
   const t = pickRandomText();
   if (!t) return;
-  _track('임의 텍스트');
   TEXT = t;
   if (typeof saveTextLocal === 'function') saveTextLocal();
   const ta = document.getElementById('mainText');
@@ -4285,11 +4280,12 @@ function step(dt) {
 //   소스 노드는 글자와 함께 움직이며, 매 프레임 경로(다단)를 재계산.
 //   100 px/sec 로 0 → 목표길이 애니메이션. 종착지(마지막 재시작 노드 식별자) 변경 시
 //   직전 프레임의 꼬리 세그먼트를 잔상(residue)으로 옛 종착지 노드에 매달아 보존.
-let _drips = [];                // { srcBody, srcIdx, targetLen, currentLen, lastTermKey, residues, _lastPath }
+let _drips = [];                // { srcBody, srcIdx, srcChar, srcOccurrence, targetLen, currentLen, lastTermKey, residues, _lastPath }
 let _dripsLastT = 0;            // 애니메이션 dt 계산용 — performance.now()
-const FLOW_SPEED = 100;         // px / sec — 자라는 속도
+const FLOW_SPEED = 50;          // px / sec — 자라는 속도
 const FLOW_MAX_ITER = 6;        // 다단 (떨어짐 → 따라감) 반복 한도 — 무한루프 방지
 const FLOW_MAX_RES = 3;         // 흘리기 1 개당 잔상 최대 보존 개수
+const FLOW_LEN_BIAS = 2.5;      // 거리 분포 멱지수 (>1 → 길수록 확률 감소; pow(rand, 2.5))
 
 function _flowSlider() { return Math.max(0, Math.min(10, Math.round(PARAMS.flow || 0))); }
 
@@ -4370,6 +4366,9 @@ function _computeDripPath(drip, maxLen) {
 }
 
 // 현재 슬라이더 값에 맞춰 _drips 개수 동기화. 기존 drip 은 유지(시각 안정성).
+//   각 새 drip 은 영속 식별자(srcChar + srcOccurrence + srcIdx) 도 기록 — world 재구성 시
+//   _resetDripsForNewWorld 가 동일 글자·동일 위치 노드로 재바인딩 가능.
+//   길이 분포: pow(rand, FLOW_LEN_BIAS) — 길수록 확률적으로 어렵게.
 function _syncDripsToWorld(w) {
   if (!w || !w.bodies) { _drips = []; return; }
   const target = _flowSlider();
@@ -4380,17 +4379,25 @@ function _syncDripsToWorld(w) {
   if (_drips.length < target) {
     const used = new Set(_drips.map(d => d.srcBody + '-' + d.srcIdx));
     const pool = [];
-    w.bodies.forEach((b, bi) => b.nodes.forEach((n, ni) => {
-      if (!n.inv && !used.has(bi + '-' + ni)) pool.push({ b: bi, n: ni });
-    }));
+    const occByChar = new Map();
+    w.bodies.forEach((b, bi) => {
+      const ch = (b && b.ch) || '';
+      const occ = occByChar.get(ch) || 0;
+      occByChar.set(ch, occ + 1);
+      b.nodes.forEach((n, ni) => {
+        if (!n.inv && !used.has(bi + '-' + ni)) pool.push({ b: bi, n: ni, ch, occ });
+      });
+    });
     while (_drips.length < target && pool.length > 0) {
       const k = Math.floor(Math.random() * pool.length);
       const c = pool.splice(k, 1)[0];
       const node = w.bodies[c.b].nodes[c.n];
       const maxLen = Math.max(0, cssH + 50 - node.y);
+      const targetLen = Math.max(0, Math.pow(Math.random(), FLOW_LEN_BIAS) * maxLen);
       _drips.push({
         srcBody: c.b, srcIdx: c.n,
-        targetLen: Math.max(0, Math.random() * maxLen),
+        srcChar: c.ch, srcOccurrence: c.occ,
+        targetLen,
         currentLen: 0,
         lastTermKey: '',
         residues: [],
@@ -4402,15 +4409,40 @@ function _syncDripsToWorld(w) {
   }
 }
 
-// world 재구성 시 — 인덱스 전부 무효이므로 drips·잔상 모두 리셋 후 재샘플.
+// world 재구성 시 — 기존 drip 영속 식별자(srcChar, srcOccurrence, srcIdx) 로
+//   새 world 에 동일 노드 있으면 재바인딩 유지. 없으면 그 drip 만 드롭.
+//   잔상은 옛 world 의 노드를 anchor 로 잡고 있어 무효 → 비움.
 function _resetDripsForNewWorld(w) {
-  _drips = [];
   _dripsLastT = 0;
+  if (!w || !w.bodies) { _drips = []; return; }
+  // 새 world 의 글자별 occurrence → bodyIdx 맵
+  const occByChar = new Map();
+  const bodyByCharOcc = new Map();
+  w.bodies.forEach((b, bi) => {
+    const ch = (b && b.ch) || '';
+    const occ = occByChar.get(ch) || 0;
+    occByChar.set(ch, occ + 1);
+    bodyByCharOcc.set(ch + '' + occ, bi);
+  });
+  _drips = _drips.filter(d => {
+    if (d.srcChar == null) return false;       // 영속 식별자 없는 옛 drip — 드롭
+    const newBi = bodyByCharOcc.get(d.srcChar + '' + d.srcOccurrence);
+    if (newBi == null) return false;           // 동일 글자·occurrence 없음 → 드롭
+    const newBody = w.bodies[newBi];
+    const n = newBody && newBody.nodes[d.srcIdx];
+    if (!n || n.inv) return false;
+    d.srcBody = newBi;
+    d.residues = [];                            // 잔상은 옛 world anchor — 비움
+    d._lastPath = null;
+    d.lastTermKey = '';                         // 종착지 추적 리셋(새 path 첫 프레임 시 결정)
+    return true;
+  });
   _syncDripsToWorld(w);
 }
 
 // 매 프레임 1 회: dt 만큼 currentLen 전진 + 경로 재계산 + 종착지 변경 시 잔상 보존.
 //   draw() 전반부에서 호출. _lastPath 갱신 → _collectFlowPrimitives 가 읽음.
+//   종착지 변경 시: 시작점→새 만난점까지는 즉시 표시(currentLen 점프), 그 너머만 새로 자라남.
 function _advanceFlow() {
   const now = performance.now();
   const dt = _dripsLastT > 0 ? Math.min(0.1, (now - _dripsLastT) / 1000) : 0;
@@ -4418,23 +4450,34 @@ function _advanceFlow() {
   if (!world || !world.bodies) return;
   _drips.forEach(d => {
     const full = _computeDripPath(d, d.targetLen);
-    // 종착지(termKey) 변경 + 직전 잔상 보존
-    if (full.termKey !== d.lastTermKey && d.lastTermKey !== '') {
-      const prev = d._lastPath;
-      if (prev && prev.anchorBI >= 0 && prev.tailStartIdx < prev.segs.length) {
-        const an = world.bodies[prev.anchorBI] && world.bodies[prev.anchorBI].nodes[prev.anchorNI];
-        if (an) {
-          const tailSegs = prev.segs.slice(prev.tailStartIdx).map(s => ({
-            dx0: s.x0 - an.x, dy0: s.y0 - an.y,
-            dx1: s.x1 - an.x, dy1: s.y1 - an.y
-          }));
-          if (tailSegs.length > 0) {
-            d.residues.push({ anchorBI: prev.anchorBI, anchorNI: prev.anchorNI, segs: tailSegs });
-            while (d.residues.length > FLOW_MAX_RES) d.residues.shift();
+    if (full.termKey !== d.lastTermKey) {
+      // 1) 직전 꼬리(옛 재시작 점 너머) 를 잔상으로 보존 — 옛 종착지 노드에 매달림.
+      if (d.lastTermKey !== '') {
+        const prev = d._lastPath;
+        if (prev && prev.anchorBI >= 0 && prev.tailStartIdx < prev.segs.length) {
+          const an = world.bodies[prev.anchorBI] && world.bodies[prev.anchorBI].nodes[prev.anchorNI];
+          if (an) {
+            const tailSegs = prev.segs.slice(prev.tailStartIdx).map(s => ({
+              dx0: s.x0 - an.x, dy0: s.y0 - an.y,
+              dx1: s.x1 - an.x, dy1: s.y1 - an.y
+            }));
+            if (tailSegs.length > 0) {
+              d.residues.push({ anchorBI: prev.anchorBI, anchorNI: prev.anchorNI, segs: tailSegs });
+              while (d.residues.length > FLOW_MAX_RES) d.residues.shift();
+            }
           }
         }
       }
-      d.currentLen = 0;
+      // 2) 새 경로에 재시작 점 있으면 currentLen 을 그 점까지로 점프 (시작점 그대로,
+      //    만난 점부터 다시 자라남). 없으면(free fall) 그대로 유지.
+      if (full.termKey !== '') {
+        let lenToRestart = 0;
+        for (let i = 0; i < full.tailStartIdx; i++) {
+          const s = full.segs[i];
+          lenToRestart += Math.hypot(s.x1 - s.x0, s.y1 - s.y0);
+        }
+        d.currentLen = Math.min(d.targetLen, lenToRestart);
+      }
     }
     d.lastTermKey = full.termKey;
     d.currentLen = Math.min(d.targetLen, d.currentLen + dt * FLOW_SPEED);
@@ -6477,7 +6520,6 @@ function setupPcTextBar() {
     saveTextLocal();
     _adjustTaHeight();
     if (typeof _refreshUsedInTextHighlight === 'function') _refreshUsedInTextHighlight();
-    _trackTextChangeDebounced();
   });
   // [v1.09] 입력 완료(엔터/blur) 시 비어있으면 초기 문구(MOBILE_NOTICE)로 복귀.
   const _restoreDefaultIfEmpty = () => {
@@ -6486,6 +6528,7 @@ function setupPcTextBar() {
       if (world) world = buildWorld(currentText());
       if (typeof _refreshUsedInTextHighlight === 'function') _refreshUsedInTextHighlight();
     }
+    _trackTextOnBlur();
   };
   ta.addEventListener('blur', _restoreDefaultIfEmpty);
   // [v1.10b] Enter = 행갈이(브라우저 기본 동작). 입력 종료는 blur(다른 곳 클릭) 로 처리.
@@ -7208,7 +7251,6 @@ const DERIVED_KEYS = new Set([
 //   4) K_ROT·K_SPRING 가까이, K_ANGLE은 자유로 다채로움 유지
 //   5) 색상: 70% 풍부한 색, 30% 차분한 톤 (안전 대비)
 function randomizeAll() {
-  _track('전체 랜덤');
   // 0) 자유 슬라이더 (gravity 등): 그대로 풀 범위 — DERIVED_KEYS는 아래에서 별도 처리
   PANEL_GROUPS.forEach(group => group.items.forEach(([key, label, mn, mx, step]) => {
     if (DERIVED_KEYS.has(key)) return;
@@ -7657,7 +7699,6 @@ function _panelInputWidthPx() {
 function openFeedbackDialog(anchor) {
   const old = document.getElementById('mhFeedbackDialog');
   if (old) { old.remove(); return; }
-  _track('의견창 열기');
   const box = document.createElement('div');
   box.id = 'mhFeedbackDialog';
   box.className = 'mhDialog';
@@ -8166,7 +8207,6 @@ function _wireMobileTextarea() {
     if (typeof world !== 'undefined' && world && typeof buildWorld === 'function') world = buildWorld(currentText());
     if (typeof saveTextLocal === 'function') saveTextLocal();
     if (typeof _refreshUsedInTextHighlight === 'function') _refreshUsedInTextHighlight();  // [항목1·2]
-    _trackTextChangeDebounced();
   });
   // [F9] 엔터 = 줄바꿈 아니라 입력 종료(blur). Shift+Enter 도 종료(모바일 한 줄 입력).
   mta.addEventListener('keydown', (ev) => {
@@ -8178,6 +8218,7 @@ function _wireMobileTextarea() {
     requestAnimationFrame(() => {
       if (typeof world !== 'undefined' && world && typeof buildWorld === 'function') world = buildWorld(currentText());
     });
+    _trackTextOnBlur();
   });
   // [F9] 모바일 키보드 노출/숨김(visualViewport) → 보이는 영역 기준으로 글자영역 재계산
   if (window.visualViewport && !window.visualViewport._mhBound) {
