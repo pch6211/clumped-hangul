@@ -4355,15 +4355,29 @@ function _countConnectedNodes(body, startIdx) {
 }
 
 // 수직 ray (cx, cy → cx, cy+maxD) 와 선분 (ax,ay)-(bx,by) 교차. 가장 가까운 hit 반환.
+//   시각적으로 drip 과 stroke 가 lineW 두께를 가지므로 hit 판정에도 lineW/2 정도의
+//   tolerance 적용 — 수직 엣지(ray 와 평행)도 x 거리 ≤ TOL 이면 top y 에서 hit,
+//   비수직 엣지도 ray 가 엣지 x 범위 바깥이면 가장 가까운 endpoint 로 클램프.
 function _vRayHitSeg(cx, cy, maxD, ax, ay, bx, by) {
-  if (Math.abs(bx - ax) < 0.001) return null;
+  const TOL = Math.max(1, (PARAMS.lineW || 0) * 0.5);
+  // 수직 엣지: 일반 교차식 degenerate → drip 이 x 거리 TOL 이내로 접근하면 위쪽 endpoint 가 hit
+  if (Math.abs(bx - ax) < 0.001) {
+    if (Math.abs(cx - ax) > TOL) return null;
+    const topY = Math.min(ay, by);
+    if (cy >= topY) return null;                     // drip 이 이미 엣지 top 보다 아래면 hit 안 됨
+    const d = topY - cy;
+    if (d < 0.5 || d > maxD) return null;
+    return { x: ax, y: topY, d };                    // x 는 엣지에 snap
+  }
   const minX = Math.min(ax, bx), maxX = Math.max(ax, bx);
-  if (cx < minX - 0.001 || cx > maxX + 0.001) return null;
-  const t = (cx - ax) / (bx - ax);
+  if (cx < minX - TOL || cx > maxX + TOL) return null;
+  // 엣지 x 범위 바깥이면 가장 가까운 endpoint 로 클램프 → 그 점에서 hit (drip 이 stroke 의 옆 끝에 닿는 case)
+  const clampedCX = Math.max(minX, Math.min(maxX, cx));
+  const t = (clampedCX - ax) / (bx - ax);
   const hy = ay + t * (by - ay);
   const d = hy - cy;
   if (d < 0.5 || d > maxD) return null;
-  return { x: cx, y: hy, d };
+  return { x: clampedCX, y: hy, d };
 }
 
 // 같은 body 안에서 startIdx 노드부터 가장 가파른 아래 엣지를 따라 chain walk →
