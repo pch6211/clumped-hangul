@@ -4302,16 +4302,94 @@ function _vRayHitSeg(cx, cy, maxD, ax, ay, bx, by) {
   return { x: cx, y: hy, d };
 }
 
-// drip 한 개의 경로 계산 — maxLen 만큼 소비. 다단 (떨어짐 → 따라감 → 떨어짐 …) 반복.
+// 같은 body 안에서 startIdx 노드로부터 가장 가파른 아래 엣지를 따라 연쇄적으로 내려가
+// 도달하는 마지막 노드 인덱스 반환 (라인 그리지 않음 — 시작점 결정용).
+//   "기울기 음→양 변화점 / 획 끝" = 더 이상 내려갈 엣지 없는 곳 = local low.
+function _findChainLow(body, startIdx) {
+  if (!body || !body.nodes[startIdx]) return startIdx;
+  let cur = startIdx;
+  const visited = new Set([cur]);
+  let iter = 0;
+  while (iter++ < FLOW_MAX_ITER) {
+    const curN = body.nodes[cur];
+    let bestEi = -1, bestOther = -1, bestY = curN.y;
+    for (let ei = 0; ei < body.edges.length; ei++) {
+      const e = body.edges[ei];
+      if (e.transparent) continue;
+      let other = -1;
+      if (e.a === cur) other = e.b;
+      else if (e.b === cur) other = e.a;
+      else continue;
+      if (visited.has(other)) continue;
+      const on = body.nodes[other];
+      if (!on || on.inv) continue;
+      if (on.y > bestY + 0.5) { bestY = on.y; bestEi = ei; bestOther = other; }
+    }
+    if (bestEi < 0) break;
+    visited.add(bestOther);
+    cur = bestOther;
+  }
+  return cur;
+}
+
+// (startX, startY) 에서 시작해 같은 body 안 startNodeIdx 부터 가장 가파른 아래 엣지를
+// 연쇄적으로 따라가며 segs 에 'edge' 세그먼트 추가. local low 도달 또는 remain 소진 시 종료.
+function _drawChainDown(bi, startNodeIdx, startX, startY, maxLen, segs, bannedEi) {
+  const body = world.bodies[bi];
+  if (!body) return { finalX: startX, finalY: startY, finalNI: -1, consumed: 0, bannedLast: null };
+  let cx = startX, cy = startY, cur = startNodeIdx;
+  let consumed = 0, remain = maxLen;
+  let finalNI = -1;
+  let bannedLast = (bannedEi != null) ? { bi, ei: bannedEi } : null;
+  const visitedEdges = new Set();
+  if (bannedEi != null) visitedEdges.add(bannedEi);
+  let iter = 0;
+  while (iter++ < FLOW_MAX_ITER && remain > 0) {
+    const curN = body.nodes[cur];
+    let bestEi = -1, bestOther = -1, bestY = curN.y;
+    for (let ei = 0; ei < body.edges.length; ei++) {
+      if (visitedEdges.has(ei)) continue;
+      const e = body.edges[ei];
+      if (e.transparent) continue;
+      let other = -1;
+      if (e.a === cur) other = e.b;
+      else if (e.b === cur) other = e.a;
+      else continue;
+      const on = body.nodes[other];
+      if (!on || on.inv) continue;
+      if (on.y > bestY + 0.5) { bestY = on.y; bestEi = ei; bestOther = other; }
+    }
+    if (bestEi < 0) break;
+    const on = body.nodes[bestOther];
+    const dx = on.x - cx, dy = on.y - cy;
+    const segLen = Math.hypot(dx, dy);
+    if (segLen < 0.5) break;
+    const moveLen = Math.min(segLen, remain);
+    const nx = cx + dx * moveLen / segLen, ny = cy + dy * moveLen / segLen;
+    segs.push({ x0: cx, y0: cy, x1: nx, y1: ny, type: 'edge' });
+    cx = nx; cy = ny; remain -= moveLen; consumed += moveLen;
+    if (moveLen < segLen) break;     // remain 소진 — 엣지 도중 정지
+    finalNI = bestOther;
+    bannedLast = { bi, ei: bestEi };
+    visitedEdges.add(bestEi);
+    cur = bestOther;
+  }
+  return { finalX: cx, finalY: cy, finalNI, consumed, bannedLast };
+}
+
+// drip 한 개의 경로 계산 — maxLen 만큼 소비. 다단 (떨어짐 → chain 따라감 → 떨어짐 …) 반복.
+//   시작점 = 소스 노드에서 같은 body chain 으로 도달하는 local low (slope 반전/획 끝).
+//   각 떨어짐 후 마주친 엣지 → 그 엣지 lower endpoint → 연결된 chain 으로 더 따라감.
 //   반환 { segs: [{x0,y0,x1,y1,type:'down'|'edge'}], termKey, anchorBI, anchorNI, tailStartIdx }
-//   termKey = 마지막 재시작 노드 식별자 (bi-nodeIdx). 재시작 점 미도달이면 ''.
-//   tailStartIdx = 마지막 재시작 노드 이후의 첫 세그먼트 인덱스(= 잔상으로 떼낼 시작점).
 function _computeDripPath(drip, maxLen) {
   if (!world || !world.bodies) return { segs: [], termKey: '', anchorBI: -1, anchorNI: -1, tailStartIdx: 0 };
   const sb = world.bodies[drip.srcBody];
   const sn = sb && sb.nodes[drip.srcIdx];
   if (!sb || !sn || sn.inv) return { segs: [], termKey: '', anchorBI: -1, anchorNI: -1, tailStartIdx: 0 };
-  let cx = sn.x, cy = sn.y;
+  // [시작점] 소스 노드 → 같은 body chain → local low (라인 X)
+  const startIdx = _findChainLow(sb, drip.srcIdx);
+  const startN = sb.nodes[startIdx] || sn;
+  let cx = startN.x, cy = startN.y;
   let remain = Math.max(0, maxLen);
   const segs = [];
   let termKey = '', anchorBI = -1, anchorNI = -1, tailStartIdx = 0;
@@ -4319,6 +4397,7 @@ function _computeDripPath(drip, maxLen) {
   let iter = 0;
   while (remain > 0 && iter < FLOW_MAX_ITER) {
     iter++;
+    // 1) 수직 아래로 ray-cast — 가장 가까운 엣지 hit 찾기
     let best = null;
     for (let bi = 0; bi < world.bodies.length; bi++) {
       const bd = world.bodies[bi];
@@ -4338,16 +4417,17 @@ function _computeDripPath(drip, maxLen) {
       segs.push({ x0: cx, y0: cy, x1: cx, y1: cy + remain, type: 'down' });
       remain = 0; break;
     }
+    // 2) 떨어져서 hit 까지 — 선이 마주친 획에 닿음
     if (best.d > 0.5) segs.push({ x0: cx, y0: cy, x1: best.x, y1: best.y, type: 'down' });
     cx = best.x; cy = best.y; remain -= best.d;
     if (remain <= 0) break;
-    // 따라감 — 양 끝점 중 y 가 큰(낮은) 쪽으로
+    // 3) 마주친 엣지 따라가기 — hit 점 → lower endpoint
     const bd = world.bodies[best.bi];
     const aN = bd.nodes[best.aIdx], bN = bd.nodes[best.bIdx];
     let lowIdx, lowX, lowY;
     if (aN.y > bN.y) { lowIdx = best.aIdx; lowX = aN.x; lowY = aN.y; }
     else             { lowIdx = best.bIdx; lowX = bN.x; lowY = bN.y; }
-    if (lowY <= cy + 0.5) break;                        // 위로/평평 — 정지(물 흐름)
+    if (lowY <= cy + 0.5) break;
     const dx = lowX - cx, dy = lowY - cy;
     const segLen = Math.hypot(dx, dy);
     if (segLen < 0.5) break;
@@ -4355,12 +4435,22 @@ function _computeDripPath(drip, maxLen) {
     const nx = cx + dx * moveLen / segLen, ny = cy + dy * moveLen / segLen;
     segs.push({ x0: cx, y0: cy, x1: nx, y1: ny, type: 'edge' });
     cx = nx; cy = ny; remain -= moveLen;
-    if (moveLen < segLen) break;                        // 엣지 도중 끝남
-    // 엣지 끝점 도달 → 재시작 노드 갱신
+    if (moveLen < segLen) break;     // 엣지 도중 끝남
+    // 4) 엣지 끝점 도달 → 같은 body chain 으로 local low 까지 추가 따라감
     termKey = best.bi + '-' + lowIdx;
     anchorBI = best.bi; anchorNI = lowIdx;
     tailStartIdx = segs.length;
     bannedEdge = { bi: best.bi, ei: best.ei };
+    if (remain > 0) {
+      const chain = _drawChainDown(best.bi, lowIdx, cx, cy, remain, segs, best.ei);
+      cx = chain.finalX; cy = chain.finalY; remain -= chain.consumed;
+      if (chain.finalNI >= 0) {
+        termKey = best.bi + '-' + chain.finalNI;
+        anchorBI = best.bi; anchorNI = chain.finalNI;
+        tailStartIdx = segs.length;
+      }
+      if (chain.bannedLast) bannedEdge = chain.bannedLast;
+    }
   }
   return { segs, termKey, anchorBI, anchorNI, tailStartIdx };
 }
