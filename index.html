@@ -4321,29 +4321,20 @@ const FLOW_SNAP_PX = 0.5;
 
 function _flowSlider() { return Math.max(0, Math.min(10, Math.round(PARAMS.flow || 0))); }
 
-// 페인트 선·끝점 스타일 — 슬라이더 PARAMS.lineW (획 두께) vs PARAMS.nodeR (점 크기) 비교로 분기.
-//   case A (lineW ≤ 10): 페인트 = lineW 그대로, 끝점 = lineW × 1.07 동그란 노드 (shape 고정 원).
-//   case B (lineW > 10, nodeR > lineW): 페인트 = lineW 그대로, 끝점 = nodeR 사이즈·모양 (PARAMS.shape).
-//   case C (lineW > 10, nodeR ≤ lineW): 페인트 = lineW × 0.75, 끝점 = 페인트 × 1.07 동그란 노드.
+// 페인트 선·끝점 스타일 — 슬라이더 PARAMS.lineW (획 두께) vs PARAMS.nodeR (점 크기) 로 분기.
+//   case 점크기-그대로 (lineW < 10 OR nodeR > lineW):
+//     페인트 = lineW 그대로, 끝점 = nodeR 사이즈·모양 (PARAMS.shape).
+//   case 줄임 (lineW ≥ 10 AND nodeR ≤ lineW):
+//     페인트 = lineW × 0.75, 끝점 = 페인트 × 1.07 동그란 노드 (shape 고정 원).
 //   반환 { lineW, endR (radius), endShape: 'circle'|'param' }.
 function _flowStyle() {
   const lineW = PARAMS.lineW || 0;
   const nodeRDiam = PARAMS.nodeR || 0;            // 슬라이더 값 = diameter
-  let flowW, endR, endShape;
-  if (lineW <= FLOW_THIN_LINEW) {
-    flowW = lineW;
-    endR = flowW * FLOW_END_NODE_RATIO * 0.5;
-    endShape = 'circle';
-  } else if (nodeRDiam > lineW) {
-    flowW = lineW;
-    endR = nodeRDiam * 0.5;                       // 점 크기 그대로 → radius = diameter/2
-    endShape = 'param';
-  } else {
-    flowW = lineW * FLOW_THICK_RATIO;
-    endR = flowW * FLOW_END_NODE_RATIO * 0.5;
-    endShape = 'circle';
+  if (lineW < FLOW_THIN_LINEW || nodeRDiam > lineW) {
+    return { lineW: lineW, endR: nodeRDiam * 0.5, endShape: 'param' };
   }
-  return { lineW: flowW, endR, endShape };
+  const flowW = lineW * FLOW_THICK_RATIO;
+  return { lineW: flowW, endR: flowW * FLOW_END_NODE_RATIO * 0.5, endShape: 'circle' };
 }
 
 // body 의 occurrence (같은 글자 중 몇 번째 등장인지) — anchor 영속 식별용.
