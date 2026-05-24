@@ -4312,6 +4312,7 @@ function step(dt) {
 let _drips = [];
 let _dripsLastT = 0;
 const FLOW_SPEED = 50;
+const FLOW_SIZE_RATIO = 0.5;                  // 페인트 선 두께·끝점 반경 = 글자 lineW/nodeR × 이 비율
 const FLOW_MAX_ITER = 6;
 const FLOW_LEN_PER_NODE = 15;
 const FLOW_SNAP_PX = 0.5;
@@ -4604,9 +4605,12 @@ function _extendDrip(d, dx) {
       break;
     }
 
-    // hit 가 reach 안 — hit point 까지 떨어지는 선 push (어떤 기울기든 일단 멈춤)
+    // hit 가 reach 안 — hit point 까지 떨어지는 선 push (어떤 기울기든 일단 멈춤).
+    //   바로 멈추지 않고 drip 선 두께(lineW × FLOW_SIZE_RATIO)만큼 살짝 overshoot 해서 hit
+    //   한 stroke 안으로 파고들도록 (시각적으로 두 선이 자연스럽게 만나도록).
+    const overshoot = (PARAMS.lineW || 0) * FLOW_SIZE_RATIO;
     _pushSeg(d, d.curAnchorBI, d.curAnchorNI, d.curAnchorChar, d.curAnchorOcc,
-             head.x, head.y, best.x, best.y);
+             head.x, head.y, best.x, best.y + overshoot);
     dx -= best.d; d.remaining -= best.d;
 
     // hit edge 의 down endpoint (chain exit 출발점) 결정
@@ -5027,8 +5031,9 @@ function drawSmoothedBodies(targetCtx, bodies, fg, bg, viewport) {
     });
   });
   // 흘리기 (flow) 도 마스크에 포함 — 부드럽게가 글자+흘리기 통째로 처리.
+  //   페인트 선·끝점은 글자 lineW/nodeR 의 절반 두께로 렌더 (FLOW_SIZE_RATIO).
   const _flowItemsSm = _collectFlowPrimitives();
-  _drawFlowItemsCanvas(mctx, _flowItemsSm, lineW, nodeR);
+  _drawFlowItemsCanvas(mctx, _flowItemsSm, lineW * FLOW_SIZE_RATIO, nodeR * FLOW_SIZE_RATIO);
 
   // 모퉁이 둥글리기 — JS 박스블러 + 알파 임계값
   //   ctx.filter='blur' 네이티브 경로는 Safari 17.x 이하 미지원 → A/B 테스트 결과 JS 경로로 통합 (v1.12b).
@@ -5162,7 +5167,8 @@ function drawBorders(targetCtx, bodies, fg, viewport) {
     // 흘리기 (flow) 도 실루엣에 포함 — 테두리가 글자+흘리기 모두 감쌈.
     //   라인 두께 = lineW + 2·infl, 끝점 반경 = nodeR/2 + infl. fill·stroke = '#000' 유지.
     const _flowItems = _collectFlowPrimitives();
-    _drawFlowItemsCanvas(mctx, _flowItems, Math.max(0, lineW + 2 * infl), Math.max(0, nodeR + infl));
+    // 페인트는 lineW/nodeR 의 절반(FLOW_SIZE_RATIO) 기반 + 테두리 infl 적용.
+    _drawFlowItemsCanvas(mctx, _flowItems, Math.max(0, lineW * FLOW_SIZE_RATIO + 2 * infl), Math.max(0, nodeR * FLOW_SIZE_RATIO + infl));
     mctx.restore();
   };
   // 단일 윤곽 밴드 = 글자+흘리기 실루엣(infl 0) 바로 밖, 두께 bW
@@ -5252,7 +5258,8 @@ function draw() {
     });
   });
   // 흘리기 — 일반 모드에서는 글자 위에 솔리드로 그려짐 (테두리/부드럽게 OFF 일 때만 이 경로).
-  _drawFlowItemsCanvas(ctx, _collectFlowPrimitives(), lineW, nodeR);
+  //   페인트 선·끝점은 글자 lineW/nodeR 의 절반 두께 (FLOW_SIZE_RATIO).
+  _drawFlowItemsCanvas(ctx, _collectFlowPrimitives(), lineW * FLOW_SIZE_RATIO, nodeR * FLOW_SIZE_RATIO);
   drawInteractionOverlay();
 }
 
@@ -8941,17 +8948,19 @@ function saveSVG() {
   // SVG: 일반 획·노드 (부드럽게는 _useSmooth 시 SVG <filter> 로 적용)
   //   파이프라인 순서대로: 흘리기 → 글자 (정상모드는 함께 fill; 부드럽게는 동일 마스크에 합쳐짐).
   const _flowSvg = _collectFlowPrimitives();
+  const _flowLW = lineW * FLOW_SIZE_RATIO;
+  const _flowNR = nodeR * FLOW_SIZE_RATIO;
   _flowSvg.lines.forEach(l => {
-    if (lineW <= 0) return;
+    if (_flowLW <= 0) return;
     parts.push('<line x1="' + l.x0.toFixed(2) + '" y1="' + l.y0.toFixed(2) +
                '" x2="' + l.x1.toFixed(2) + '" y2="' + l.y1.toFixed(2) +
-               '" stroke-width="' + lineW + '"/>');
+               '" stroke-width="' + _flowLW + '"/>');
   });
   _flowSvg.ends.forEach(e => {
-    if (nodeR <= 0) return;
-    const cornerR = Math.max(0, Math.min(nodeR, nodeR * (100 - (PARAMS.shape || 0)) / 100));
-    parts.push('<rect x="' + (e.x - nodeR).toFixed(2) + '" y="' + (e.y - nodeR).toFixed(2) +
-               '" width="' + (nodeR * 2) + '" height="' + (nodeR * 2) +
+    if (_flowNR <= 0) return;
+    const cornerR = Math.max(0, Math.min(_flowNR, _flowNR * (100 - (PARAMS.shape || 0)) / 100));
+    parts.push('<rect x="' + (e.x - _flowNR).toFixed(2) + '" y="' + (e.y - _flowNR).toFixed(2) +
+               '" width="' + (_flowNR * 2) + '" height="' + (_flowNR * 2) +
                '" rx="' + cornerR.toFixed(2) + '" stroke="none"/>');
   });
   world.bodies.forEach(body => {
@@ -9061,8 +9070,8 @@ function savePNG() {
       octx.restore();
     });
   });
-  // 일반 모드: 흘리기 라인·끝점을 글자 위에 추가로 솔리드 렌더.
-  _drawFlowItemsCanvas(octx, _collectFlowPrimitives(), lineW, nodeR);
+  // 일반 모드: 흘리기 라인·끝점을 글자 위에 추가로 솔리드 렌더 (절반 두께).
+  _drawFlowItemsCanvas(octx, _collectFlowPrimitives(), lineW * FLOW_SIZE_RATIO, nodeR * FLOW_SIZE_RATIO);
   }
   off.toBlob(blob => {
     if (!blob) return;
