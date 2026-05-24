@@ -4352,6 +4352,20 @@ function _countConnectedNodes(body, startIdx) {
   return visited.size;
 }
 
+// 노드가 속한 자모의 노드수 반환. jamos 없으면 (isPunct 등) body 전체 노드수로 fallback.
+function _nodesInJamoOf(body, nodeIdx) {
+  if (!body) return 0;
+  if (Array.isArray(body.jamos)) {
+    for (const j of body.jamos) {
+      if (j.nodeIndices && j.nodeIndices.indexOf(nodeIdx) >= 0) {
+        return j.nodeIndices.length;
+      }
+    }
+  }
+  // jamos 없거나 어떤 자모에도 안 속함 → body 전체로 fallback
+  return body.nodes ? body.nodes.filter(n => n && !n.inv).length : 0;
+}
+
 // 수직 ray (cx, cy → cx, cy+maxD) 와 선분 (ax,ay)-(bx,by) 교차. 가장 가까운 hit 반환.
 //   시각적으로 drip 과 stroke 가 lineW 두께를 가지므로 hit 판정에도 lineW/2 정도의
 //   tolerance 적용 — 수직 엣지(ray 와 평행)도 x 거리 ≤ TOL 이면 top y 에서 hit,
@@ -4364,7 +4378,7 @@ function _vRayHitSeg(cx, cy, maxD, ax, ay, bx, by) {
     const topY = Math.min(ay, by);
     if (cy >= topY) return null;                     // drip 이 이미 엣지 top 보다 아래면 hit 안 됨
     const d = topY - cy;
-    if (d < 0.05 || d > maxD) return null;
+    if (d < 0.001 || d > maxD) return null;
     return { x: ax, y: topY, d };                    // x 는 엣지에 snap
   }
   const minX = Math.min(ax, bx), maxX = Math.max(ax, bx);
@@ -4577,8 +4591,12 @@ function _extendDrip(d, dx) {
       }
     }
 
-    if (!best || best.d > moveMax) {
-      // hit 없음 또는 이번 프레임 reach 너머 → 자유낙하 moveMax (다음 프레임에 다시 탐색)
+    // SNAP_EPS = hit 가 moveMax 살짝 너머(~1px) 면 free fall 대신 snap-process →
+    //   "overshoot blind spot" 방지. (자유낙하로 overshoot 하면 다음 프레임에 d 가
+    //   filter 임계 안으로 들어와 stroke 통과되는 버그 차단.)
+    const SNAP_EPS = 1;
+    if (!best || best.d > moveMax + SNAP_EPS) {
+      // hit 없음 또는 이번 프레임 reach 너무 너머 → 자유낙하 moveMax (다음 프레임에 다시 탐색)
       _pushSeg(d, d.curAnchorBI, d.curAnchorNI, d.curAnchorChar, d.curAnchorOcc,
                head.x, head.y, head.x, head.y + moveMax);
       d.curOffY += moveMax;
@@ -4634,8 +4652,10 @@ function _syncDripsToWorld(w) {
       const k = Math.floor(Math.random() * pool.length);
       const c = pool.splice(k, 1)[0];
       const body = w.bodies[c.b];
-      const connected = _countConnectedNodes(body, c.n);
-      const initialTarget = Math.max(0, connected * FLOW_LEN_PER_NODE);
+      // initialTarget = random(0, 자모노드수 × 15). drip 생성 시 한 번만 결정,
+      //   중간에 점프해도 재계산 안 함, remaining 0 되면 drip 종료.
+      const jamoNodes = _nodesInJamoOf(body, c.n);
+      const initialTarget = Math.random() * jamoNodes * FLOW_LEN_PER_NODE;
       _drips.push({
         srcBody: c.b, srcIdx: c.n,
         srcChar: c.ch, srcOccurrence: c.occ,
