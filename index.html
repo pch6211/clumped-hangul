@@ -709,7 +709,7 @@ const MH_CFG = {
     lineW: 4,            // 획 굵기
     shape: 0,            // 점 모양: 0=원, 50=라운드, 100=사각
     borderWidth: 0,      // [E3] 테두리 — 글자를 채우지 않고 윤곽선(두께=이 값)으로 감쌈 (0=없음 ~ 30)
-    flow: 1,             // 흘리기 — 현재 노드 중 N 개(고정값) 골라 아래로 흘러내리는 선 (획 만나면 따라감, 100 px/sec 애니메이션, 종착지 변경 시 잔상 보존)
+    flow: 0,             // 흘리기 — 현재 노드 중 N 개(고정값) 골라 아래로 흘러내리는 선. localStorage('mh_flow') 영속. 0 = 비활성.
     cornerR: 0,          // 부드럽게 — 픽셀 마스크 + blur 기반 모서리 부드러움
     // 원시 물리 (튜닝값 — UI 슬라이더는 숨김 상태)
     repulse: 20,         // 반발 — 노드끼리 밀어내는 힘
@@ -779,6 +779,18 @@ function _trackTextOnBlur() {
   }
   _tag('text_kind', total === 0 ? 'empty' : han === total ? 'hangul' : han === 0 ? 'non-hangul' : 'mixed');
 }
+
+// 흘리기 슬라이더 값 영속화 — localStorage 'mh_flow' 로 새로고침 사이 유지.
+//   기본값 0 (테두리·부드럽게와 동일). 사용자가 한 번이라도 조절하면 그 값이 유지.
+(function _loadFlowPersisted() {
+  try {
+    const s = localStorage.getItem('mh_flow');
+    if (s != null) {
+      const v = parseInt(s, 10);
+      if (Number.isFinite(v) && v >= 0 && v <= 10) MH_CFG.params.flow = v;
+    }
+  } catch (_) {}
+})();
 
 // 세션 시작 메타 — 1회. 디바이스(세로>가로=mobile) 와 터치 여부.
 (function _initClarityTags() {
@@ -2292,6 +2304,8 @@ function setParamValue(key, v, opts) {
     return;
   }
   PARAMS[key] = v;
+  // 흘리기 슬라이더 값은 새로고침 사이 유지 — 사용자 조작 시점에 저장.
+  if (key === 'flow') { try { localStorage.setItem('mh_flow', String(v)); } catch (_) {} }
 }
 
 function vowelType(v) { if (HORIZONTAL_VOWELS.includes(v)) return 'horizontal'; if (MIXED_VOWELS.includes(v)) return 'mixed'; return 'vertical'; }
@@ -4282,10 +4296,11 @@ function step(dt) {
 //   직전 프레임의 꼬리 세그먼트를 잔상(residue)으로 옛 종착지 노드에 매달아 보존.
 let _drips = [];                // { srcBody, srcIdx, srcChar, srcOccurrence, targetLen, currentLen, lastTermKey, residues, _lastPath }
 let _dripsLastT = 0;            // 애니메이션 dt 계산용 — performance.now()
-const FLOW_SPEED = 50;          // px / sec — 자라는 속도
+const FLOW_SPEED = 50;          // px / sec — 시작 속도 (이징 곱해서 실제 속도 산출)
 const FLOW_MAX_ITER = 6;        // 다단 (떨어짐 → 따라감) 반복 한도 — 무한루프 방지
-const FLOW_MAX_RES = 3;         // 흘리기 1 개당 잔상 최대 보존 개수
+const FLOW_MAX_RES = 50;        // 흘리기 1 개당 잔상 최대 보존 개수 (선이 사라지지 않도록 크게)
 const FLOW_LEN_BIAS = 1.7;      // 거리 분포 멱지수 (>1 → 길수록 확률 감소; 작을수록 평균 길이 ↑)
+const FLOW_SNAP_PX = 0.5;       // 남은 거리가 이 값 미만이면 즉시 targetLen 으로 스냅 (이징 종료)
 
 // body 의 occurrence (같은 글자 중 몇 번째 등장인지) — 잔상 anchor 영속 식별용.
 //   world 재구성 시 잔상도 같은 글자·같은 순번 body 로 재바인딩 가능.
@@ -4558,9 +4573,12 @@ function _redrawDrips() {
   if (world) _syncDripsToWorld(world);
 }
 
-// 매 프레임 1 회: dt 만큼 currentLen 전진 + 경로 재계산 + 종착지 변경 시 잔상 보존.
+// 매 프레임 1 회: 이징 적용 dt 전진 + 경로 재계산 + 종착지 변경 시 잔상 보존.
 //   draw() 전반부에서 호출. _lastPath 갱신 → _collectFlowPrimitives 가 읽음.
-//   종착지 변경 시: 시작점→새 만난점까지는 즉시 표시(currentLen 점프), 그 너머만 새로 자라남.
+//   [단조 증가] currentLen 은 절대 감소하지 않음 — 회수/삭제 없음. 종착지 변경 시
+//     max(현재값, lenToRestart) 로 점프(상향)만 가능. 옛 꼬리는 잔상으로 보존.
+//   [이징] 속도 = FLOW_SPEED × √(remaining / targetLen). remaining=0 이면 속도=0.
+//     targetLen=0 인 drip 은 정지 상태(애니메이션 없음).
 function _advanceFlow() {
   const now = performance.now();
   const dt = _dripsLastT > 0 ? Math.min(0.1, (now - _dripsLastT) / 1000) : 0;
@@ -4570,7 +4588,6 @@ function _advanceFlow() {
     const full = _computeDripPath(d, d.targetLen);
     if (full.termKey !== d.lastTermKey) {
       // 1) 직전 꼬리(옛 재시작 점 너머) 를 잔상으로 보존 — 옛 종착지 노드에 매달림.
-      //    anchorChar/anchorOcc 도 같이 저장 → world 재구성 시 재바인딩 유지.
       if (d.lastTermKey !== '') {
         const prev = d._lastPath;
         if (prev && prev.anchorBI >= 0 && prev.tailStartIdx < prev.segs.length) {
@@ -4592,19 +4609,27 @@ function _advanceFlow() {
           }
         }
       }
-      // 2) 새 경로에 재시작 점 있으면 currentLen 을 그 점까지로 점프 (시작점 그대로,
-      //    만난 점부터 다시 자라남). 없으면(free fall) 그대로 유지.
+      // 2) 새 경로 재시작 점까지의 거리만큼 currentLen 단조 상향만(감소 X).
       if (full.termKey !== '') {
         let lenToRestart = 0;
         for (let i = 0; i < full.tailStartIdx; i++) {
           const s = full.segs[i];
           lenToRestart += Math.hypot(s.x1 - s.x0, s.y1 - s.y0);
         }
-        d.currentLen = Math.min(d.targetLen, lenToRestart);
+        d.currentLen = Math.min(d.targetLen, Math.max(d.currentLen, lenToRestart));
       }
     }
     d.lastTermKey = full.termKey;
-    d.currentLen = Math.min(d.targetLen, d.currentLen + dt * FLOW_SPEED);
+    // [이징] remaining 작아질수록 속도 ↓. remaining < FLOW_SNAP_PX 면 즉시 완성.
+    const remaining = Math.max(0, d.targetLen - d.currentLen);
+    if (d.targetLen <= 0 || remaining <= 0) {
+      // 이미 끝남 — 진행 없음
+    } else if (remaining < FLOW_SNAP_PX) {
+      d.currentLen = d.targetLen;
+    } else {
+      const eased = FLOW_SPEED * Math.sqrt(remaining / d.targetLen);
+      d.currentLen = Math.min(d.targetLen, d.currentLen + dt * eased);
+    }
     d._lastPath = _computeDripPath(d, d.currentLen);
   });
 }
