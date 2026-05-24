@@ -4297,9 +4297,15 @@ function step(dt) {
 //     매 프레임 dx = FLOW_SPEED × √(remaining/initialTarget) × dt 만큼 head 전진,
 //     그 사이를 drawnSegs 에 append. 진행한 만큼 remaining 차감 → 0 도달 시 정지.
 //   [시작 지연] 글자 탄생 후 1~5 초 사이 랜덤 시점에 활성화.
-//   [시작점 변화] 활성 후 매 프레임 소스 body 의 chain-low 재계산. 직전 frame 의
-//     chain-low 와 다르면 head 가 새 chain-low 위치로 점프 — 이미 그려진 세그먼트는
-//     자기 anchor 노드에 매달려 그대로 보존, 새 chain-low 에서 새로 그리기 시작.
+//   [시작점] 활성화 시점에 source body 의 chain-low 위치를 head 로 잡고 시작.
+//     이후 head 는 자기 anchor 따라 움직이고, source chain-low 변화로 자동 점프하지 않음
+//     (이미 진행한 거리·세그먼트를 보존). anchor 가 사라진 경우에만 재초기화.
+//   [hit 처리] 수직 ray cast 가 stroke 에 hit → hit point 까지만 seg 그리고 head 를
+//     hit edge 위에 "주차"(onEdge) 후 이번 프레임 종료. 다음 프레임의 _extendDrip 가
+//     onEdge 따라 target endpoint 까지 walking (속도 동일, 한 프레임당 dx 만큼).
+//     endpoint 도달 시 onEdge 해제 + banned 처리 → 새 ray cast 로 다음 hit 탐색.
+//   [방해물 사라짐] onEdge 가 가리키는 엣지가 invalid 가 되면 onEdge 자동 해제 →
+//     현재 head 위치에서 새로 ray cast (자유낙하 또는 다음 hit 진행).
 //   [평행선] 마주친 엣지의 |dy| ≤ max(3, |dx|·0.3) 이면 평행으로 간주 → drip 별
 //     고정 horizDir(±1) 로 좌/우 끝점 선택.
 //   [영속 식별자] srcChar + srcOccurrence + srcIdx → world 재구성 시 동일 글자 있으면
@@ -4422,15 +4428,65 @@ function _pushSeg(d, anchorBI, anchorNI, anchorChar, anchorOcc, wx0, wy0, wx1, w
   });
 }
 
+// onEdge 가 가리키는 엣지·target node 가 현재 world 에서 유효한지 검사.
+function _isOnEdgeValid(d) {
+  if (!d.onEdge) return false;
+  const e = d.onEdge;
+  const bd = world && world.bodies[e.bi];
+  if (!bd) return false;
+  const eObj = bd.edges[e.ei];
+  if (!eObj || eObj.transparent) return false;
+  const tN = bd.nodes[e.targetIdx];
+  if (!tN || tN.inv) return false;
+  // 주차된 엣지의 양 끝이 expected 와 일치하는지 (엣지 인덱스 재사용 방지)
+  if (eObj.a !== e.aIdx && eObj.b !== e.aIdx) return false;
+  if (eObj.a !== e.bIdx && eObj.b !== e.bIdx) return false;
+  return true;
+}
+
 // drip 한 개를 dx 만큼 전진 — drawnSegs 에 새 세그먼트 append, head 갱신, remaining 감소.
 //   매 frame 의 새 dx 만큼만 처리. 이미 push 된 세그먼트는 절대 수정 X.
+//   [모델] hit point 에서 정지(한 프레임에 1회 hit) → head 를 hit edge 위 주차(onEdge).
+//   다음 프레임 호출 시 onEdge 따라 target endpoint 까지 walking. endpoint 도달 시
+//   onEdge 해제 + banned 처리하고 같은 프레임 안에서 다음 ray cast 진행.
 function _extendDrip(d, dx) {
+  // 주차된 엣지가 무효화됐으면 (방해물 사라짐) 자동 해제 — head 는 마지막 위치 유지.
+  if (d.onEdge && !_isOnEdgeValid(d)) d.onEdge = null;
   let bannedEdge = null;
   let iter = 0;
+  let didHitThisFrame = false;
   while (dx > 0 && d.remaining > 0 && iter++ < FLOW_MAX_ITER) {
+    // 이번 프레임에 새 hit 발생 → 즉시 종료 (다음 프레임에 onEdge 따라 walking)
+    if (didHitThisFrame) break;
     const head = _headWorld(d);
     const castMax = Math.min(dx, d.remaining);
-    // 1) 수직 ray cast — 가장 가까운 hit
+
+    // [A] head 가 엣지 위에 주차되어 있음 → target endpoint 방향으로 walking
+    if (d.onEdge) {
+      const bd = world.bodies[d.onEdge.bi];
+      const tN = bd.nodes[d.onEdge.targetIdx];
+      const dxSeg = tN.x - head.x, dySeg = tN.y - head.y;
+      const segLen = Math.hypot(dxSeg, dySeg);
+      if (segLen < 0.5) {
+        // 이미 endpoint 도달 — 해당 엣지 ban 하고 다음 ray cast 로
+        bannedEdge = { bi: d.onEdge.bi, ei: d.onEdge.ei };
+        d.onEdge = null;
+        continue;
+      }
+      const moveLen = Math.min(segLen, castMax);
+      const ratio = moveLen / segLen;
+      const nx = head.x + dxSeg * ratio, ny = head.y + dySeg * ratio;
+      _pushSeg(d, d.curAnchorBI, d.curAnchorNI, d.curAnchorChar, d.curAnchorOcc,
+               head.x, head.y, nx, ny);
+      _setHead(d, d.curAnchorBI, d.curAnchorNI, nx, ny);
+      dx -= moveLen; d.remaining -= moveLen;
+      if (moveLen < segLen - 0.001) break;          // endpoint 미도달 — 다음 프레임에 계속
+      bannedEdge = { bi: d.onEdge.bi, ei: d.onEdge.ei };
+      d.onEdge = null;
+      continue;
+    }
+
+    // [B] 수직 ray cast — 가장 가까운 hit
     let best = null;
     for (let bi = 0; bi < world.bodies.length; bi++) {
       const bd = world.bodies[bi];
@@ -4454,41 +4510,41 @@ function _extendDrip(d, dx) {
       dx -= castMax; d.remaining -= castMax;
       break;
     }
-    // 2) hit 까지 떨어짐 — 현재 head 의 anchor 에 매달림 (떨어지는 트레일은 출발 body 와 함께 이동)
+
+    // [C] hit point 까지 seg 푸시
     if (best.d > 0.5) {
       _pushSeg(d, d.curAnchorBI, d.curAnchorNI, d.curAnchorChar, d.curAnchorOcc,
                head.x, head.y, best.x, best.y);
     }
-    // 3) 마주친 엣지 따라가기 — 평행선이면 horizDir 끝점, 아니면 lower endpoint
+
+    // [D] hit edge 의 target endpoint 계산 — 평행선이면 horizDir 끝점, 아니면 lower endpoint
     const bd = world.bodies[best.bi];
     const aN = bd.nodes[best.aIdx], bN = bd.nodes[best.bIdx];
     const eDy = Math.abs(aN.y - bN.y), eDx = Math.abs(aN.x - bN.x);
     const isParallel = eDy <= Math.max(3, eDx * 0.3);
-    let targetIdx, targetX, targetY;
+    let targetIdx, targetY;
     if (isParallel) {
       const goRight = (d.horizDir || 1) > 0;
       const aIsRight = aN.x > bN.x;
-      if (goRight === aIsRight) { targetIdx = best.aIdx; targetX = aN.x; targetY = aN.y; }
-      else                      { targetIdx = best.bIdx; targetX = bN.x; targetY = bN.y; }
-    } else if (aN.y > bN.y) { targetIdx = best.aIdx; targetX = aN.x; targetY = aN.y; }
-    else                    { targetIdx = best.bIdx; targetX = bN.x; targetY = bN.y; }
-    // hit 점에서 head 를 마주친 body 의 target 노드로 재anchor (이후 세그먼트는 그 body 따라 이동)
+      if (goRight === aIsRight) { targetIdx = best.aIdx; targetY = aN.y; }
+      else                      { targetIdx = best.bIdx; targetY = bN.y; }
+    } else if (aN.y > bN.y) { targetIdx = best.aIdx; targetY = aN.y; }
+    else                    { targetIdx = best.bIdx; targetY = bN.y; }
+
+    // head 를 hit point 로 재anchor (anchor 는 hit edge 의 target 노드 — 이후 세그먼트는 그 body 따라 이동)
     _setHead(d, best.bi, targetIdx, best.x, best.y);
     dx -= best.d; d.remaining -= best.d;
-    if (dx <= 0 || d.remaining <= 0) break;
-    if (!isParallel && targetY <= best.y + 0.5) break;
-    const eDxSeg = targetX - best.x, eDySeg = targetY - best.y;
-    const segLen = Math.hypot(eDxSeg, eDySeg);
-    if (segLen < 0.5) break;
-    const moveLen = Math.min(segLen, dx, d.remaining);
-    const ratio = moveLen / segLen;
-    const nx = best.x + eDxSeg * ratio, ny = best.y + eDySeg * ratio;
-    _pushSeg(d, d.curAnchorBI, d.curAnchorNI, d.curAnchorChar, d.curAnchorOcc,
-             best.x, best.y, nx, ny);
-    _setHead(d, d.curAnchorBI, d.curAnchorNI, nx, ny);
-    dx -= moveLen; d.remaining -= moveLen;
-    if (moveLen < segLen) break;
-    bannedEdge = { bi: best.bi, ei: best.ei };
+
+    // target endpoint 가 hit 보다 위쪽이면 (위로 walking 불가) 그 엣지 ban 하고 다음 ray cast 로
+    if (!isParallel && targetY <= best.y + 0.5) {
+      bannedEdge = { bi: best.bi, ei: best.ei };
+      continue;
+    }
+
+    // [E] hit edge 위에 head 주차 → 이번 프레임 종료 (다음 프레임에 walking)
+    d.onEdge = { bi: best.bi, ei: best.ei, aIdx: best.aIdx, bIdx: best.bIdx, targetIdx };
+    didHitThisFrame = true;
+    break;
   }
 }
 
@@ -4528,7 +4584,7 @@ function _syncDripsToWorld(w) {
         curAnchorBI: -1, curAnchorNI: -1,
         curAnchorChar: '', curAnchorOcc: 0,
         curOffX: 0, curOffY: 0,
-        curStartBI: -1, curStartNI: -1,  // 직전 frame 의 active start (변경 감지용)
+        onEdge: null,                    // hit 후 주차된 엣지 { bi, ei, aIdx, bIdx, targetIdx }
         active: false,
         bornT: performance.now(),
         startDelay: 1000 + Math.random() * 4000,
@@ -4571,7 +4627,7 @@ function _resetDripsForNewWorld(w) {
       s.anchorBI = nbi;
       return true;
     });
-    // head anchor 재바인딩 — 못 찾으면 head 리셋(다음 frame 에서 새 chain-low 로 점프됨)
+    // head anchor 재바인딩 — 못 찾으면 head 리셋(다음 frame 에서 source chain-low 로 재초기화)
     if (d.active && d.curAnchorBI >= 0) {
       const cbi = _lookup(d.curAnchorChar, d.curAnchorOcc);
       if (cbi != null && w.bodies[cbi] && w.bodies[cbi].nodes[d.curAnchorNI]
@@ -4579,9 +4635,11 @@ function _resetDripsForNewWorld(w) {
         d.curAnchorBI = cbi;
       } else {
         d.curAnchorBI = -1;     // 다음 frame 에서 새로 잡힘
-        d.curStartBI = -1; d.curStartNI = -1;
       }
     }
+    // world 재구성 시 edge/node 인덱스가 바뀔 수 있으니 onEdge 는 항상 클리어
+    // (다음 frame _extendDrip 가 현재 head 위치에서 새 ray cast).
+    d.onEdge = null;
     return true;
   });
   _syncDripsToWorld(w);
@@ -4593,51 +4651,16 @@ function _redrawDrips() {
   if (world) _syncDripsToWorld(world);
 }
 
-// 매 프레임 1 회: 활성화 + chain-low 변화 감지(head 점프) + dx 전진.
-// 매 프레임 drip 의 "active start" 결정:
-//   1) source body 의 chain-low 위치 P_a 계산.
-//   2) P_a 부터 수직 아래 ray cast — 가장 가까운 차단 stroke 찾기 (자기 자신 엣지 제외).
-//   3) 차단 stroke 있음 → active = stroke 의 exit endpoint (lower 또는 horizDir 끝점).
-//      없음 → active = source 의 chain-low.
-//   반환 { bi, ni, worldX, worldY } 또는 null.
+// drip 의 "active start" 결정 — source body 의 chain-low 위치.
+//   활성화·anchor 분실 시점에만 호출. 차단 stroke 텔레포트는 하지 않음 (drip 이 source 부터
+//   주행하면서 hit 시점에 _extendDrip 가 hit point 에서 정지·다음 프레임에 재계산).
 function _computeActiveStart(d) {
   const sb = world.bodies[d.srcBody];
   if (!sb) return null;
   const startIdx = _findChainLow(sb, d.srcIdx);
   const startN = sb.nodes[startIdx];
   if (!startN || startN.inv) return null;
-  // 차단 stroke 탐색 — chain-low 근접 노드(엣지 양끝이 chain-low) 는 자기 자신이므로 제외
-  let best = null;
-  const castMax = Math.max(100, d.initialTarget || 100);
-  for (let bi = 0; bi < world.bodies.length; bi++) {
-    const bd = world.bodies[bi];
-    for (let ei = 0; ei < bd.edges.length; ei++) {
-      const e = bd.edges[ei];
-      if (e.transparent) continue;
-      if (bi === d.srcBody && (e.a === startIdx || e.b === startIdx)) continue;
-      const a = bd.nodes[e.a], b = bd.nodes[e.b];
-      if (!a || !b) continue;
-      const hit = _vRayHitSeg(startN.x, startN.y, castMax, a.x, a.y, b.x, b.y);
-      if (hit && (!best || hit.d < best.d)) {
-        best = { d: hit.d, x: hit.x, y: hit.y, bi, ei, aIdx: e.a, bIdx: e.b };
-      }
-    }
-  }
-  if (!best) return { bi: d.srcBody, ni: startIdx, worldX: startN.x, worldY: startN.y };
-  // 차단 stroke 의 exit endpoint
-  const bd = world.bodies[best.bi];
-  const aN = bd.nodes[best.aIdx], bN = bd.nodes[best.bIdx];
-  const eDy = Math.abs(aN.y - bN.y), eDx = Math.abs(aN.x - bN.x);
-  const isParallel = eDy <= Math.max(3, eDx * 0.3);
-  let targetIdx, targetX, targetY;
-  if (isParallel) {
-    const goRight = (d.horizDir || 1) > 0;
-    const aIsRight = aN.x > bN.x;
-    if (goRight === aIsRight) { targetIdx = best.aIdx; targetX = aN.x; targetY = aN.y; }
-    else                      { targetIdx = best.bIdx; targetX = bN.x; targetY = bN.y; }
-  } else if (aN.y > bN.y) { targetIdx = best.aIdx; targetX = aN.x; targetY = aN.y; }
-  else                    { targetIdx = best.bIdx; targetX = bN.x; targetY = bN.y; }
-  return { bi: best.bi, ni: targetIdx, worldX: targetX, worldY: targetY };
+  return { bi: d.srcBody, ni: startIdx, worldX: startN.x, worldY: startN.y };
 }
 
 function _advanceFlow() {
@@ -4653,25 +4676,14 @@ function _advanceFlow() {
       const active = _computeActiveStart(d);
       if (!active) return;
       _setHead(d, active.bi, active.ni, active.worldX, active.worldY);
-      d.curStartBI = active.bi; d.curStartNI = active.ni;
       d.active = true;
     } else if (d.curAnchorBI < 0) {
-      // world 재구성으로 head anchor 잃음 — 새 active start 로 재설정
+      // world 재구성으로 head anchor 잃음 — source chain-low 로 재초기화
       const active = _computeActiveStart(d);
       if (!active) return;
       _setHead(d, active.bi, active.ni, active.worldX, active.worldY);
-      d.curStartBI = active.bi; d.curStartNI = active.ni;
-    } else {
-      // [Active 변경 감지] 매 프레임 active start 재계산.
-      //   변경 케이스: source chain-low 이동 / 차단 stroke 새로 생김(A→B) / 차단
-      //   stroke 사라짐(B→A) / 차단 stroke 자체가 바뀜(B→B'). 어느 경우든 head 만
-      //   새 active 로 점프. 이미 그려진 drawnSegs 는 자기 anchor 에 매달려 그대로.
-      const active = _computeActiveStart(d);
-      if (active && (d.curStartBI !== active.bi || d.curStartNI !== active.ni)) {
-        _setHead(d, active.bi, active.ni, active.worldX, active.worldY);
-        d.curStartBI = active.bi; d.curStartNI = active.ni;
-      }
     }
+    // active 상태에서는 head 를 매 프레임 점프시키지 않음. 진행은 _extendDrip 가 담당.
     if (d.remaining <= 0) return;
     if (d.initialTarget <= 0) { d.remaining = 0; return; }
     // [이징] 남은 거리 짧을수록 속도 ↓. 0.5 px 미만이면 한방에 마무리.
