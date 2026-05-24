@@ -4297,17 +4297,15 @@ function step(dt) {
 //     매 프레임 dx = FLOW_SPEED × √(remaining/initialTarget) × dt 만큼 head 전진,
 //     그 사이를 drawnSegs 에 append. 진행한 만큼 remaining 차감 → 0 도달 시 정지.
 //   [시작 지연] 글자 탄생 후 1~5 초 사이 랜덤 시점에 활성화.
-//   [시작점] 활성화 시점에 source body 의 chain-low 위치를 head 로 잡고 시작.
-//     이후 head 는 자기 anchor 따라 움직이고, source chain-low 변화로 자동 점프하지 않음
-//     (이미 진행한 거리·세그먼트를 보존). anchor 가 사라진 경우에만 재초기화.
-//   [hit 처리] 수직 ray cast 가 stroke 에 hit → hit point 까지만 seg 그리고 head 를
-//     hit edge 위에 "주차"(onEdge) 후 이번 프레임 종료. 다음 프레임의 _extendDrip 가
-//     onEdge 따라 target endpoint 까지 walking (속도 동일, 한 프레임당 dx 만큼).
-//     endpoint 도달 시 onEdge 해제 + banned 처리 → 새 ray cast 로 다음 hit 탐색.
-//   [방해물 사라짐] onEdge 가 가리키는 엣지가 invalid 가 되면 onEdge 자동 해제 →
-//     현재 head 위치에서 새로 ray cast (자유낙하 또는 다음 hit 진행).
-//   [평행선] 마주친 엣지의 |dy| ≤ max(3, |dx|·0.3) 이면 평행으로 간주 → drip 별
-//     고정 horizDir(±1) 로 좌/우 끝점 선택.
+//   [시작점] 활성화 시점에 source node 위치를 head 로 잡고 시작 (페인트 한 방울이
+//     벽 위 어느 점에 떨어진 상태). 거기서 자유낙하 시작.
+//   [JUMP 모델] 페인트가 떨어지다 stroke 만나면: (1) hit point 까지 자유낙하 선 push,
+//     (2) hit 한 stroke 내부에서 가장 아래쪽 terminal 까지 silent chain walk
+//     (visible seg 안 그림, remaining 차감 안 함, point-share 로 옆 component 도 이어감),
+//     (3) head 를 그 terminal(새 출발점)로 jump, (4) 이번 프레임 종료.
+//     다음 프레임에 새 출발점에서 다시 자유낙하 → 또 hit → 또 jump 반복.
+//     drip 자취 = 여러 개의 끊어진 자유낙하 선 (각 fall start ↔ end 만 보임).
+//   [방해물 사라짐] head 의 anchor 가 사라지면 다음 프레임에 source 로 재초기화.
 //   [영속 식별자] srcChar + srcOccurrence + srcIdx → world 재구성 시 동일 글자 있으면
 //     srcBody 재바인딩. drawnSegs 의 anchorChar/Occ 로 잔상도 재바인딩. 글자 사라진
 //     drip / 세그먼트만 드롭.
@@ -4359,14 +4357,14 @@ function _countConnectedNodes(body, startIdx) {
 //   tolerance 적용 — 수직 엣지(ray 와 평행)도 x 거리 ≤ TOL 이면 top y 에서 hit,
 //   비수직 엣지도 ray 가 엣지 x 범위 바깥이면 가장 가까운 endpoint 로 클램프.
 function _vRayHitSeg(cx, cy, maxD, ax, ay, bx, by) {
-  const TOL = Math.max(1, (PARAMS.lineW || 0) * 0.5);
+  const TOL = Math.max(2, (PARAMS.lineW || 0));
   // 수직 엣지: 일반 교차식 degenerate → drip 이 x 거리 TOL 이내로 접근하면 위쪽 endpoint 가 hit
   if (Math.abs(bx - ax) < 0.001) {
     if (Math.abs(cx - ax) > TOL) return null;
     const topY = Math.min(ay, by);
     if (cy >= topY) return null;                     // drip 이 이미 엣지 top 보다 아래면 hit 안 됨
     const d = topY - cy;
-    if (d < 0.5 || d > maxD) return null;
+    if (d < 0.05 || d > maxD) return null;
     return { x: ax, y: topY, d };                    // x 는 엣지에 snap
   }
   const minX = Math.min(ax, bx), maxX = Math.max(ax, bx);
@@ -4508,163 +4506,98 @@ function _findNearbyDownStart(currentBI, currentNI, x, y) {
   return best;
 }
 
-// 노드에서 chain walk(같은 component 안 down branch) 또는 점프(다른 component) 시도.
-//   성공 시 d.onEdge/head 갱신 후 true 반환. 둘 다 실패 시 false (호출자가 ray cast 또는 free fall).
-function _tryAdvanceFromNode(d, fromBI, fromNI, bannedEi, headX, headY) {
-  const branch = _pickDownBranch(fromBI, fromNI, bannedEi);
-  if (branch) {
-    d.onEdge = { bi: fromBI, ei: branch.ei,
-                 aIdx: fromNI, bIdx: branch.otherIdx, targetIdx: branch.otherIdx };
-    _setHead(d, fromBI, branch.otherIdx, headX, headY);
-    return true;
-  }
-  // 같은 component 의 down branch 없음 — 옆 connected stroke 점프
-  const jump = _findNearbyDownStart(fromBI, fromNI, headX, headY);
-  if (jump) {
-    const jBd = world.bodies[jump.bi];
-    const jN = jBd.nodes[jump.ni];
-    // 점프 연결선 push (현재 위치 → jump 노드, 떨어지는 페인트 자취)
-    _pushSeg(d, d.curAnchorBI, d.curAnchorNI, d.curAnchorChar, d.curAnchorOcc,
-             headX, headY, jN.x, jN.y);
-    const jDist = Math.hypot(jN.x - headX, jN.y - headY);
-    _setHead(d, jump.bi, jump.ni, jN.x, jN.y);
-    d.onEdge = null;                                  // 다음 iter 의 at-node chain walk 가 잡음
-    d.remaining -= jDist;                             // 점프 거리도 진행으로 카운트
-    return true;
-  }
-  return false;
-}
-
-// onEdge 가 가리키는 엣지·target node 가 현재 world 에서 유효한지 검사.
-function _isOnEdgeValid(d) {
-  if (!d.onEdge) return false;
-  const e = d.onEdge;
-  const bd = world && world.bodies[e.bi];
-  if (!bd) return false;
-  const eObj = bd.edges[e.ei];
-  if (!eObj || eObj.transparent) return false;
-  const tN = bd.nodes[e.targetIdx];
-  if (!tN || tN.inv) return false;
-  // 주차된 엣지의 양 끝이 expected 와 일치하는지 (엣지 인덱스 재사용 방지)
-  if (eObj.a !== e.aIdx && eObj.b !== e.aIdx) return false;
-  if (eObj.a !== e.bIdx && eObj.b !== e.bIdx) return false;
-  return true;
-}
-
-// drip 한 개를 dx 만큼 전진 — drawnSegs 에 새 세그먼트 append, head 갱신, remaining 감소.
-//   매 frame 의 새 dx 만큼만 처리. 이미 push 된 세그먼트는 절대 수정 X.
-//   [모델] hit point 에서 정지(한 프레임에 1회 hit) → head 를 hit edge 위 주차(onEdge).
-//   다음 프레임 호출 시 onEdge 따라 target endpoint 까지 walking. endpoint 도달 시
-//   onEdge 해제 + banned 처리하고 같은 프레임 안에서 다음 ray cast 진행.
-function _extendDrip(d, dx) {
-  // 주차된 엣지가 무효화됐으면 (방해물 사라짐) 자동 해제 — head 는 마지막 위치 유지.
-  if (d.onEdge && !_isOnEdgeValid(d)) d.onEdge = null;
-  let bannedEdge = null;
-  let iter = 0;
-  let didHitThisFrame = false;
-  while (dx > 0 && d.remaining > 0 && iter++ < FLOW_MAX_ITER) {
-    // 이번 프레임에 새 hit 발생 → 즉시 종료 (다음 프레임에 onEdge 따라 walking)
-    if (didHitThisFrame) break;
-    const head = _headWorld(d);
-    const castMax = Math.min(dx, d.remaining);
-
-    // [A] head 가 엣지 위에 주차되어 있음 → target endpoint 방향으로 walking
-    if (d.onEdge) {
-      const bd = world.bodies[d.onEdge.bi];
-      const tN = bd.nodes[d.onEdge.targetIdx];
-      const dxSeg = tN.x - head.x, dySeg = tN.y - head.y;
-      const segLen = Math.hypot(dxSeg, dySeg);
-      if (segLen < 0.5) {
-        // 이미 endpoint 도달 → chain walk(같은 component) 또는 jump(옆 component) 시도
-        const _curOe = d.onEdge;
-        bannedEdge = { bi: _curOe.bi, ei: _curOe.ei };
-        d.onEdge = null;
-        _tryAdvanceFromNode(d, _curOe.bi, _curOe.targetIdx, _curOe.ei, head.x, head.y);
-        continue;
-      }
-      const moveLen = Math.min(segLen, castMax);
-      const ratio = moveLen / segLen;
-      const nx = head.x + dxSeg * ratio, ny = head.y + dySeg * ratio;
-      _pushSeg(d, d.curAnchorBI, d.curAnchorNI, d.curAnchorChar, d.curAnchorOcc,
-               head.x, head.y, nx, ny);
-      _setHead(d, d.curAnchorBI, d.curAnchorNI, nx, ny);
-      dx -= moveLen; d.remaining -= moveLen;
-      if (moveLen < segLen - 0.001) break;          // endpoint 미도달 — 다음 프레임에 계속
-      // endpoint 도달 → chain walk 또는 jump
-      const _curOe = d.onEdge;
-      bannedEdge = { bi: _curOe.bi, ei: _curOe.ei };
-      d.onEdge = null;
-      _tryAdvanceFromNode(d, _curOe.bi, _curOe.targetIdx, _curOe.ei, nx, ny);
+// silent chain walk — hit edge 의 down endpoint 에서 시작해서 stroke 내부 chain 따라
+//   가장 아래쪽 terminal 까지 무성으로 이동. point-share 로 옆 component 도 이어감.
+//   "새로운 출발점" (다음 자유낙하 시작 지점) 을 반환. 거리 차감 없음(stop 중 silent walk).
+function _calculateChainExit(startBI, startNI, startBannedEi) {
+  let curBI = startBI, curNI = startNI, bannedEi = startBannedEi;
+  for (let iter = 0; iter < 20; iter++) {
+    const branch = _pickDownBranch(curBI, curNI, bannedEi);
+    if (branch) {
+      curNI = branch.otherIdx;
+      bannedEi = branch.ei;
       continue;
     }
-
-    // onEdge 없음 + head 가 노드에 정확히 있음 (초기 source 위치 또는 endpoint 후) → chain walk 시도
-    //   페인트가 벽 위 점에서 시작하면 표면 따라 흐르듯, source node 에서 같은 component
-    //   안의 down branch 따라 chain walk. 없으면 옆 component 점프, 그래도 없으면 ray cast.
-    if (Math.abs(d.curOffX) < 0.001 && Math.abs(d.curOffY) < 0.001) {
-      if (_tryAdvanceFromNode(d, d.curAnchorBI, d.curAnchorNI, -1, head.x, head.y)) {
-        continue;
-      }
+    // 같은 body 의 down branch 없음 — 점 공유 (옆 component) 시도
+    const bd = world.bodies[curBI];
+    const curN = bd && bd.nodes[curNI];
+    if (!curN) break;
+    const jump = _findNearbyDownStart(curBI, curNI, curN.x, curN.y);
+    if (jump) {
+      curBI = jump.bi;
+      curNI = jump.ni;
+      bannedEi = -1;
+      continue;
     }
+    break;
+  }
+  const bd = world.bodies[curBI];
+  const curN = bd && bd.nodes[curNI];
+  if (!curN) return null;
+  return { bi: curBI, ni: curNI, x: curN.x, y: curN.y };
+}
 
-    // [B] 수직 ray cast — 가장 가까운 hit
+// drip 한 개를 dx 만큼 전진 (JUMP 모델 — 페인트 한 방울이 떨어지다 stroke 만나면
+// 그 위에서 새 출발점 silent 으로 계산 후 거기서 다시 떨어지는 반복).
+//   각 iter 흐름:
+//     1) 현재 head 에서 수직 ray cast — scan 거리 길게 (멀리 있는 stroke 도 발견).
+//     2) hit 가 이번 프레임의 moveMax 안에 있음 → hit point 까지 떨어지는 선 push,
+//        _calculateChainExit 로 새 출발점 silent 계산, head 를 거기로 점프, 프레임 종료.
+//     3) hit 가 moveMax 너머 또는 없음 → moveMax 만큼 자유낙하 push, 프레임 종료.
+//   remaining 은 (1)→(2) 의 hit 거리만큼, (3) 의 자유낙하만큼만 차감 (chain walk silent).
+function _extendDrip(d, dx) {
+  let iter = 0;
+  while (dx > 0 && d.remaining > 0 && iter++ < FLOW_MAX_ITER) {
+    const head = _headWorld(d);
+    const moveMax = Math.min(dx, d.remaining);
+    const scanMax = Math.max(moveMax, 300);          // 멀리 있는 stroke 도 발견 (frame-window blind 회피)
+
+    // 수직 ray cast — 가장 가까운 hit
     let best = null;
     for (let bi = 0; bi < world.bodies.length; bi++) {
       const bd = world.bodies[bi];
       for (let ei = 0; ei < bd.edges.length; ei++) {
-        if (bannedEdge && bannedEdge.bi === bi && bannedEdge.ei === ei) continue;
         const e = bd.edges[ei];
         if (e.transparent) continue;
         const a = bd.nodes[e.a], b = bd.nodes[e.b];
         if (!a || !b) continue;
-        const hit = _vRayHitSeg(head.x, head.y, castMax, a.x, a.y, b.x, b.y);
+        const hit = _vRayHitSeg(head.x, head.y, scanMax, a.x, a.y, b.x, b.y);
         if (hit && (!best || hit.d < best.d)) {
           best = { d: hit.d, x: hit.x, y: hit.y, bi, ei, aIdx: e.a, bIdx: e.b };
         }
       }
     }
-    if (!best) {
-      // 자유낙하 — castMax 만큼. 현재 head 의 anchor 에 매달림.
+
+    if (!best || best.d > moveMax) {
+      // hit 없음 또는 이번 프레임 reach 너머 → 자유낙하 moveMax (다음 프레임에 다시 탐색)
       _pushSeg(d, d.curAnchorBI, d.curAnchorNI, d.curAnchorChar, d.curAnchorOcc,
-               head.x, head.y, head.x, head.y + castMax);
-      d.curOffY += castMax;                      // head 만 아래로 (anchor 그대로)
-      dx -= castMax; d.remaining -= castMax;
+               head.x, head.y, head.x, head.y + moveMax);
+      d.curOffY += moveMax;
+      dx -= moveMax; d.remaining -= moveMax;
       break;
     }
 
-    // [C] hit point 까지 seg 푸시
-    if (best.d > 0.5) {
-      _pushSeg(d, d.curAnchorBI, d.curAnchorNI, d.curAnchorChar, d.curAnchorOcc,
-               head.x, head.y, best.x, best.y);
-    }
-
-    // [D] hit edge 의 target endpoint 계산 — 평행선이면 horizDir 끝점, 아니면 lower endpoint
-    const bd = world.bodies[best.bi];
-    const aN = bd.nodes[best.aIdx], bN = bd.nodes[best.bIdx];
-    const eDy = Math.abs(aN.y - bN.y), eDx = Math.abs(aN.x - bN.x);
-    const isParallel = eDy <= Math.max(3, eDx * 0.3);
-    let targetIdx, targetY;
-    if (isParallel) {
-      const goRight = (d.horizDir || 1) > 0;
-      const aIsRight = aN.x > bN.x;
-      if (goRight === aIsRight) { targetIdx = best.aIdx; targetY = aN.y; }
-      else                      { targetIdx = best.bIdx; targetY = bN.y; }
-    } else if (aN.y > bN.y) { targetIdx = best.aIdx; targetY = aN.y; }
-    else                    { targetIdx = best.bIdx; targetY = bN.y; }
-
-    // head 를 hit point 로 재anchor (anchor 는 hit edge 의 target 노드 — 이후 세그먼트는 그 body 따라 이동)
-    _setHead(d, best.bi, targetIdx, best.x, best.y);
+    // hit 가 reach 안 — hit point 까지 떨어지는 선 push (어떤 기울기든 일단 멈춤)
+    _pushSeg(d, d.curAnchorBI, d.curAnchorNI, d.curAnchorChar, d.curAnchorOcc,
+             head.x, head.y, best.x, best.y);
     dx -= best.d; d.remaining -= best.d;
 
-    // target endpoint 가 hit 보다 위쪽이면 (위로 walking 불가) 그 엣지 ban 하고 다음 ray cast 로
-    if (!isParallel && targetY <= best.y + 0.5) {
-      bannedEdge = { bi: best.bi, ei: best.ei };
-      continue;
-    }
+    // hit edge 의 down endpoint (chain exit 출발점) 결정
+    const bd = world.bodies[best.bi];
+    const aN = bd.nodes[best.aIdx], bN = bd.nodes[best.bIdx];
+    const downIdx = (aN.y > bN.y) ? best.aIdx : best.bIdx;
 
-    // [E] hit edge 위에 head 주차 → 이번 프레임 종료 (다음 프레임에 walking)
-    d.onEdge = { bi: best.bi, ei: best.ei, aIdx: best.aIdx, bIdx: best.bIdx, targetIdx };
-    didHitThisFrame = true;
+    // silent chain walk — hit 한 stroke 내부 따라 가장 아래쪽 terminal 까지 이동 (거리 차감 X).
+    //   "새로운 출발점" = chain exit 위치. point-share 공유점으로 옆 component 도 이어감.
+    const exit = _calculateChainExit(best.bi, downIdx, best.ei);
+    if (exit) {
+      _setHead(d, exit.bi, exit.ni, exit.x, exit.y);
+    } else {
+      // exit 계산 실패 — hit edge 의 down endpoint 로 안전 fallback
+      const dN = bd.nodes[downIdx];
+      _setHead(d, best.bi, downIdx, dN.x, dN.y);
+    }
+    // 이번 프레임 종료 — 다음 프레임에 새 출발점에서 다시 자유낙하 시작
     break;
   }
 }
