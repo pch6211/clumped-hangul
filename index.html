@@ -4312,9 +4312,8 @@ function step(dt) {
 let _drips = [];
 let _dripsLastT = 0;
 const FLOW_SPEED = 50;
-const FLOW_SIZE_RATIO = 0.5;                  // 페인트 선 두께·끝점 반경 = 글자 lineW/nodeR × 이 비율
 const FLOW_MAX_ITER = 6;
-const FLOW_LEN_PER_NODE = 15;
+const FLOW_LEN_PER_NODE = 10;
 const FLOW_SNAP_PX = 0.5;
 
 function _flowSlider() { return Math.max(0, Math.min(10, Math.round(PARAMS.flow || 0))); }
@@ -4605,12 +4604,9 @@ function _extendDrip(d, dx) {
       break;
     }
 
-    // hit 가 reach 안 — hit point 까지 떨어지는 선 push (어떤 기울기든 일단 멈춤).
-    //   바로 멈추지 않고 drip 선 두께(lineW × FLOW_SIZE_RATIO)만큼 살짝 overshoot 해서 hit
-    //   한 stroke 안으로 파고들도록 (시각적으로 두 선이 자연스럽게 만나도록).
-    const overshoot = (PARAMS.lineW || 0) * FLOW_SIZE_RATIO;
+    // hit 가 reach 안 — hit point 까지 떨어지는 선 push (어떤 기울기든 일단 멈춤)
     _pushSeg(d, d.curAnchorBI, d.curAnchorNI, d.curAnchorChar, d.curAnchorOcc,
-             head.x, head.y, best.x, best.y + overshoot);
+             head.x, head.y, best.x, best.y);
     dx -= best.d; d.remaining -= best.d;
 
     // hit edge 의 down endpoint (chain exit 출발점) 결정
@@ -4649,7 +4645,19 @@ function _syncDripsToWorld(w) {
       const occ = occByChar.get(ch) || 0;
       occByChar.set(ch, occ + 1);
       b.nodes.forEach((n, ni) => {
-        if (!n.inv && !used.has(bi + '-' + ni)) pool.push({ b: bi, n: ni, ch, occ });
+        if (n.inv || used.has(bi + '-' + ni)) return;
+        // 획의 중간 노드만 선택 — 끝점(degree 1) 노드는 제외.
+        //   non-transparent 엣지로 연결된 다른 valid 노드가 2개 이상이어야 "중간".
+        let degree = 0;
+        for (const e of b.edges) {
+          if (e.transparent) continue;
+          const other = e.a === ni ? e.b : (e.b === ni ? e.a : -1);
+          if (other < 0) continue;
+          const on = b.nodes[other];
+          if (on && !on.inv) { degree++; if (degree >= 2) break; }
+        }
+        if (degree < 2) return;
+        pool.push({ b: bi, n: ni, ch, occ });
       });
     });
     while (_drips.length < target && pool.length > 0) {
@@ -4674,7 +4682,9 @@ function _syncDripsToWorld(w) {
         active: false,
         bornT: performance.now(),
         startDelay: 1000 + Math.random() * 4000,
-        horizDir: Math.random() < 0.5 ? -1 : 1
+        horizDir: Math.random() < 0.5 ? -1 : 1,
+        // 페인트 선·끝점 두께 비율 = 글자 lineW/nodeR × sizeRatio. drip 마다 random 50~100%.
+        sizeRatio: 0.5 + Math.random() * 0.5
       });
     }
   } else if (_drips.length > target) {
@@ -4792,79 +4802,46 @@ function _advanceFlow() {
   });
 }
 
-// 모든 drip 의 drawnSegs (anchor 의 현재 위치 + offset) + 현재 head 끝점.
-//   서로 다른 anchor 의 인접 세그먼트 사이는 body 가 따로 움직이면 시각적 갭이
-//   생기므로, 그 전환 지점 양쪽에 끝점 노드 캡을 추가해 갭을 시각적으로 메움.
+// 모든 drip 의 drawnSegs (anchor 의 현재 위치 + offset). 끝점 노드 캡 없음 — 선은
+//   lineCap='round' 로 자연스럽게 마감. 각 line 에 drip 의 sizeRatio (r) 포함 → 렌더 시
+//   per-drip 두께 적용.
 function _collectFlowPrimitives() {
   const out = { lines: [], ends: [] };
   if (!world || !world.bodies || !_drips.length) return out;
   _drips.forEach(d => {
     if (!d.active) return;
-    let pBI = -1, pNI = -1, pEX = 0, pEY = 0, hasPrev = false;
+    const r = (d.sizeRatio != null) ? d.sizeRatio : 1;
     for (const s of d.drawnSegs) {
       const ab = world.bodies[s.anchorBI];
       const an = ab && ab.nodes[s.anchorNI];
       if (!an || an.inv) continue;
-      const x0 = an.x + s.dx0, y0 = an.y + s.dy0;
-      const x1 = an.x + s.dx1, y1 = an.y + s.dy1;
-      out.lines.push({ x0, y0, x1, y1 });
-      if (hasPrev && (s.anchorBI !== pBI || s.anchorNI !== pNI)) {
-        // anchor 전환 — 이전 세그 끝과 현재 세그 시작 양쪽에 캡
-        out.ends.push({ x: pEX, y: pEY });
-        out.ends.push({ x: x0, y: y0 });
-      }
-      pBI = s.anchorBI; pNI = s.anchorNI; pEX = x1; pEY = y1; hasPrev = true;
-    }
-    if (d.curAnchorBI >= 0 && hasPrev) {
-      const head = _headWorld(d);
-      // head anchor 가 마지막 세그 anchor 와 다르면 마지막 세그 끝도 캡
-      if (d.curAnchorBI !== pBI || d.curAnchorNI !== pNI) {
-        out.ends.push({ x: pEX, y: pEY });
-      }
-      out.ends.push({ x: head.x, y: head.y });
+      out.lines.push({
+        x0: an.x + s.dx0, y0: an.y + s.dy0,
+        x1: an.x + s.dx1, y1: an.y + s.dy1,
+        r
+      });
     }
   });
   return out;
 }
 
 
-// 흘리기 라인·끝점 노드를 ctx 에 직접 렌더. 두께·끝점반경은 호출자가 결정(inflation 포함).
-//   끝점은 PARAMS.shape 반영(원/라운드/사각). fillStyle·strokeStyle 은 호출 전에 설정.
-function _drawFlowItemsCanvas(targetCtx, items, lineW, endR) {
-  if (!items || (!items.lines.length && !items.ends.length)) return;
-  if (lineW > 0 && items.lines.length > 0) {
-    targetCtx.lineCap = 'round';
-    targetCtx.lineWidth = lineW;
-    items.lines.forEach(l => {
-      targetCtx.beginPath();
-      targetCtx.moveTo(l.x0, l.y0);
-      targetCtx.lineTo(l.x1, l.y1);
-      targetCtx.stroke();
-    });
-  }
-  if (endR > 0 && items.ends.length > 0) {
-    const _shape = PARAMS.shape || 0;
-    const sCornerR = Math.max(0, Math.min(endR, endR * (100 - _shape) / 100));
-    items.ends.forEach(e => {
-      targetCtx.beginPath();
-      if (sCornerR >= endR - 0.5) {
-        targetCtx.arc(e.x, e.y, endR, 0, Math.PI * 2);
-      } else {
-        const x = e.x - endR, y = e.y - endR, w = 2 * endR, h = 2 * endR;
-        if (sCornerR <= 0.5) {
-          targetCtx.rect(x, y, w, h);
-        } else {
-          targetCtx.moveTo(x + sCornerR, y);
-          targetCtx.arcTo(x + w, y, x + w, y + h, sCornerR);
-          targetCtx.arcTo(x + w, y + h, x, y + h, sCornerR);
-          targetCtx.arcTo(x, y + h, x, y, sCornerR);
-          targetCtx.arcTo(x, y, x + w, y, sCornerR);
-          targetCtx.closePath();
-        }
-      }
-      targetCtx.fill();
-    });
-  }
+// 흘리기 라인을 ctx 에 직접 렌더. 각 line 의 r (drip sizeRatio) 로 두께 per-line 결정.
+//   baseLineW = 글자 lineW (caller 가 그대로 전달). extra = 테두리 inflation 등 추가 두께.
+//   끝점 노드 캡 없음 — lineCap='round' 가 자연스러운 마감. fillStyle/strokeStyle 호출 전에 설정.
+function _drawFlowItemsCanvas(targetCtx, items, baseLineW, _unusedEndR, extraLine) {
+  if (!items || !items.lines.length || baseLineW <= 0) return;
+  const _extra = extraLine || 0;
+  targetCtx.lineCap = 'round';
+  items.lines.forEach(l => {
+    const w = baseLineW * (l.r != null ? l.r : 1) + _extra;
+    if (w <= 0) return;
+    targetCtx.lineWidth = w;
+    targetCtx.beginPath();
+    targetCtx.moveTo(l.x0, l.y0);
+    targetCtx.lineTo(l.x1, l.y1);
+    targetCtx.stroke();
+  });
 }
 
 function drawNodeShape(n, r) {
@@ -5031,9 +5008,9 @@ function drawSmoothedBodies(targetCtx, bodies, fg, bg, viewport) {
     });
   });
   // 흘리기 (flow) 도 마스크에 포함 — 부드럽게가 글자+흘리기 통째로 처리.
-  //   페인트 선·끝점은 글자 lineW/nodeR 의 절반 두께로 렌더 (FLOW_SIZE_RATIO).
+  //   페인트 선 두께는 per-drip sizeRatio (50~100%) 로 line 별 결정 — baseLineW 만 전달.
   const _flowItemsSm = _collectFlowPrimitives();
-  _drawFlowItemsCanvas(mctx, _flowItemsSm, lineW * FLOW_SIZE_RATIO, nodeR * FLOW_SIZE_RATIO);
+  _drawFlowItemsCanvas(mctx, _flowItemsSm, lineW, nodeR);
 
   // 모퉁이 둥글리기 — JS 박스블러 + 알파 임계값
   //   ctx.filter='blur' 네이티브 경로는 Safari 17.x 이하 미지원 → A/B 테스트 결과 JS 경로로 통합 (v1.12b).
@@ -5167,8 +5144,8 @@ function drawBorders(targetCtx, bodies, fg, viewport) {
     // 흘리기 (flow) 도 실루엣에 포함 — 테두리가 글자+흘리기 모두 감쌈.
     //   라인 두께 = lineW + 2·infl, 끝점 반경 = nodeR/2 + infl. fill·stroke = '#000' 유지.
     const _flowItems = _collectFlowPrimitives();
-    // 페인트는 lineW/nodeR 의 절반(FLOW_SIZE_RATIO) 기반 + 테두리 infl 적용.
-    _drawFlowItemsCanvas(mctx, _flowItems, Math.max(0, lineW * FLOW_SIZE_RATIO + 2 * infl), Math.max(0, nodeR * FLOW_SIZE_RATIO + infl));
+    // 페인트 두께는 per-drip sizeRatio 로 line 별 결정 + 테두리 inflation 추가 (extraLine=2·infl).
+    _drawFlowItemsCanvas(mctx, _flowItems, lineW, nodeR, 2 * infl);
     mctx.restore();
   };
   // 단일 윤곽 밴드 = 글자+흘리기 실루엣(infl 0) 바로 밖, 두께 bW
@@ -5258,8 +5235,8 @@ function draw() {
     });
   });
   // 흘리기 — 일반 모드에서는 글자 위에 솔리드로 그려짐 (테두리/부드럽게 OFF 일 때만 이 경로).
-  //   페인트 선·끝점은 글자 lineW/nodeR 의 절반 두께 (FLOW_SIZE_RATIO).
-  _drawFlowItemsCanvas(ctx, _collectFlowPrimitives(), lineW * FLOW_SIZE_RATIO, nodeR * FLOW_SIZE_RATIO);
+  //   페인트 두께는 per-drip sizeRatio (50~100%) 로 line 별 결정.
+  _drawFlowItemsCanvas(ctx, _collectFlowPrimitives(), lineW, nodeR);
   drawInteractionOverlay();
 }
 
@@ -8948,20 +8925,13 @@ function saveSVG() {
   // SVG: 일반 획·노드 (부드럽게는 _useSmooth 시 SVG <filter> 로 적용)
   //   파이프라인 순서대로: 흘리기 → 글자 (정상모드는 함께 fill; 부드럽게는 동일 마스크에 합쳐짐).
   const _flowSvg = _collectFlowPrimitives();
-  const _flowLW = lineW * FLOW_SIZE_RATIO;
-  const _flowNR = nodeR * FLOW_SIZE_RATIO;
+  // 페인트 선: per-drip sizeRatio (line.r) 로 stroke-width 결정. 끝점 노드 캡 없음 (linecap=round).
   _flowSvg.lines.forEach(l => {
-    if (_flowLW <= 0) return;
+    const w = lineW * (l.r != null ? l.r : 1);
+    if (w <= 0) return;
     parts.push('<line x1="' + l.x0.toFixed(2) + '" y1="' + l.y0.toFixed(2) +
                '" x2="' + l.x1.toFixed(2) + '" y2="' + l.y1.toFixed(2) +
-               '" stroke-width="' + _flowLW + '"/>');
-  });
-  _flowSvg.ends.forEach(e => {
-    if (_flowNR <= 0) return;
-    const cornerR = Math.max(0, Math.min(_flowNR, _flowNR * (100 - (PARAMS.shape || 0)) / 100));
-    parts.push('<rect x="' + (e.x - _flowNR).toFixed(2) + '" y="' + (e.y - _flowNR).toFixed(2) +
-               '" width="' + (_flowNR * 2) + '" height="' + (_flowNR * 2) +
-               '" rx="' + cornerR.toFixed(2) + '" stroke="none"/>');
+               '" stroke-width="' + w.toFixed(2) + '"/>');
   });
   world.bodies.forEach(body => {
     body.edges.forEach(e => {
@@ -9070,8 +9040,8 @@ function savePNG() {
       octx.restore();
     });
   });
-  // 일반 모드: 흘리기 라인·끝점을 글자 위에 추가로 솔리드 렌더 (절반 두께).
-  _drawFlowItemsCanvas(octx, _collectFlowPrimitives(), lineW * FLOW_SIZE_RATIO, nodeR * FLOW_SIZE_RATIO);
+  // 일반 모드: 흘리기 라인을 글자 위에 추가로 솔리드 렌더 (per-drip sizeRatio 적용).
+  _drawFlowItemsCanvas(octx, _collectFlowPrimitives(), lineW, nodeR);
   }
   off.toBlob(blob => {
     if (!blob) return;
