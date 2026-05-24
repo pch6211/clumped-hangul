@@ -4528,7 +4528,7 @@ function _syncDripsToWorld(w) {
         curAnchorBI: -1, curAnchorNI: -1,
         curAnchorChar: '', curAnchorOcc: 0,
         curOffX: 0, curOffY: 0,
-        curStartIdx: -1,                 // 직전 frame 의 chain-low (시작점 변경 감지용)
+        curStartBI: -1, curStartNI: -1,  // 직전 frame 의 active start (변경 감지용)
         active: false,
         bornT: performance.now(),
         startDelay: 1000 + Math.random() * 4000,
@@ -4579,7 +4579,7 @@ function _resetDripsForNewWorld(w) {
         d.curAnchorBI = cbi;
       } else {
         d.curAnchorBI = -1;     // 다음 frame 에서 새로 잡힘
-        d.curStartIdx = -1;
+        d.curStartBI = -1; d.curStartNI = -1;
       }
     }
     return true;
@@ -4594,6 +4594,52 @@ function _redrawDrips() {
 }
 
 // 매 프레임 1 회: 활성화 + chain-low 변화 감지(head 점프) + dx 전진.
+// 매 프레임 drip 의 "active start" 결정:
+//   1) source body 의 chain-low 위치 P_a 계산.
+//   2) P_a 부터 수직 아래 ray cast — 가장 가까운 차단 stroke 찾기 (자기 자신 엣지 제외).
+//   3) 차단 stroke 있음 → active = stroke 의 exit endpoint (lower 또는 horizDir 끝점).
+//      없음 → active = source 의 chain-low.
+//   반환 { bi, ni, worldX, worldY } 또는 null.
+function _computeActiveStart(d) {
+  const sb = world.bodies[d.srcBody];
+  if (!sb) return null;
+  const startIdx = _findChainLow(sb, d.srcIdx);
+  const startN = sb.nodes[startIdx];
+  if (!startN || startN.inv) return null;
+  // 차단 stroke 탐색 — chain-low 근접 노드(엣지 양끝이 chain-low) 는 자기 자신이므로 제외
+  let best = null;
+  const castMax = Math.max(100, d.initialTarget || 100);
+  for (let bi = 0; bi < world.bodies.length; bi++) {
+    const bd = world.bodies[bi];
+    for (let ei = 0; ei < bd.edges.length; ei++) {
+      const e = bd.edges[ei];
+      if (e.transparent) continue;
+      if (bi === d.srcBody && (e.a === startIdx || e.b === startIdx)) continue;
+      const a = bd.nodes[e.a], b = bd.nodes[e.b];
+      if (!a || !b) continue;
+      const hit = _vRayHitSeg(startN.x, startN.y, castMax, a.x, a.y, b.x, b.y);
+      if (hit && (!best || hit.d < best.d)) {
+        best = { d: hit.d, x: hit.x, y: hit.y, bi, ei, aIdx: e.a, bIdx: e.b };
+      }
+    }
+  }
+  if (!best) return { bi: d.srcBody, ni: startIdx, worldX: startN.x, worldY: startN.y };
+  // 차단 stroke 의 exit endpoint
+  const bd = world.bodies[best.bi];
+  const aN = bd.nodes[best.aIdx], bN = bd.nodes[best.bIdx];
+  const eDy = Math.abs(aN.y - bN.y), eDx = Math.abs(aN.x - bN.x);
+  const isParallel = eDy <= Math.max(3, eDx * 0.3);
+  let targetIdx, targetX, targetY;
+  if (isParallel) {
+    const goRight = (d.horizDir || 1) > 0;
+    const aIsRight = aN.x > bN.x;
+    if (goRight === aIsRight) { targetIdx = best.aIdx; targetX = aN.x; targetY = aN.y; }
+    else                      { targetIdx = best.bIdx; targetX = bN.x; targetY = bN.y; }
+  } else if (aN.y > bN.y) { targetIdx = best.aIdx; targetX = aN.x; targetY = aN.y; }
+  else                    { targetIdx = best.bIdx; targetX = bN.x; targetY = bN.y; }
+  return { bi: best.bi, ni: targetIdx, worldX: targetX, worldY: targetY };
+}
+
 function _advanceFlow() {
   const now = performance.now();
   const dt = _dripsLastT > 0 ? Math.min(0.1, (now - _dripsLastT) / 1000) : 0;
@@ -4604,30 +4650,26 @@ function _advanceFlow() {
     if (!sb) return;
     if (!d.active) {
       if ((now - (d.bornT || 0)) < (d.startDelay || 0)) return;       // 대기 중
-      const startIdx = _findChainLow(sb, d.srcIdx);
-      const startN = sb.nodes[startIdx];
-      if (!startN || startN.inv) return;
-      _setHead(d, d.srcBody, startIdx, startN.x, startN.y);
-      d.curStartIdx = startIdx;
+      const active = _computeActiveStart(d);
+      if (!active) return;
+      _setHead(d, active.bi, active.ni, active.worldX, active.worldY);
+      d.curStartBI = active.bi; d.curStartNI = active.ni;
       d.active = true;
     } else if (d.curAnchorBI < 0) {
-      // world 재구성으로 head anchor 잃음 → 새 chain-low 로 재설정
-      const startIdx = _findChainLow(sb, d.srcIdx);
-      const startN = sb.nodes[startIdx];
-      if (!startN || startN.inv) return;
-      _setHead(d, d.srcBody, startIdx, startN.x, startN.y);
-      d.curStartIdx = startIdx;
+      // world 재구성으로 head anchor 잃음 — 새 active start 로 재설정
+      const active = _computeActiveStart(d);
+      if (!active) return;
+      _setHead(d, active.bi, active.ni, active.worldX, active.worldY);
+      d.curStartBI = active.bi; d.curStartNI = active.ni;
     } else {
-      // 시작점(chain-low) 변경 감지 — 변했으면 head 만 새 chain-low 로 점프.
-      //   이미 그려진 drawnSegs 는 자기 anchor 에 매달려 그대로. 새 chain-low 에서
-      //   남은 거리만큼 계속 흐름. (거리 차감은 _extendDrip 내부에서)
-      const newStartIdx = _findChainLow(sb, d.srcIdx);
-      if (newStartIdx !== d.curStartIdx) {
-        const sn = sb.nodes[newStartIdx];
-        if (sn && !sn.inv) {
-          _setHead(d, d.srcBody, newStartIdx, sn.x, sn.y);
-          d.curStartIdx = newStartIdx;
-        }
+      // [Active 변경 감지] 매 프레임 active start 재계산.
+      //   변경 케이스: source chain-low 이동 / 차단 stroke 새로 생김(A→B) / 차단
+      //   stroke 사라짐(B→A) / 차단 stroke 자체가 바뀜(B→B'). 어느 경우든 head 만
+      //   새 active 로 점프. 이미 그려진 drawnSegs 는 자기 anchor 에 매달려 그대로.
+      const active = _computeActiveStart(d);
+      if (active && (d.curStartBI !== active.bi || d.curStartNI !== active.ni)) {
+        _setHead(d, active.bi, active.ni, active.worldX, active.worldY);
+        d.curStartBI = active.bi; d.curStartNI = active.ni;
       }
     }
     if (d.remaining <= 0) return;
