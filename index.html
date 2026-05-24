@@ -703,7 +703,7 @@ const MH_CFG = {
     lineW: 4,            // 획 굵기
     shape: 0,            // 점 모양: 0=원, 50=라운드, 100=사각
     borderWidth: 0,      // [E3] 테두리 — 글자를 채우지 않고 윤곽선(두께=이 값)으로 감쌈 (0=없음 ~ 30)
-    flow: 1,             // 흐름 — 각 노드를 확률(%)로 골라 아래로 떨어지는 선(획 굵기) + 끝점 노드
+    flow: 1,             // 흘리기 — 현재 노드 중 N 개(고정값) 골라 아래로 흘러내리는 선 (획 만나면 따라감, 100 px/sec 애니메이션, 종착지 변경 시 잔상 보존)
     cornerR: 0,          // 부드럽게 — 픽셀 마스크 + blur 기반 모서리 부드러움
     // 원시 물리 (튜닝값 — UI 슬라이더는 숨김 상태)
     repulse: 20,         // 반발 — 노드끼리 밀어내는 힘
@@ -2165,7 +2165,7 @@ const PANEL_GROUPS = [
     ['nodeR',       '점 크기',   0,  30, 1],
     ['lineW',       '획 굵기',   0,  30, 1],
     ['borderWidth', '테두리', 0, 30, 1],
-    ['flow',        '흐름',   0, 10, 1],
+    ['flow',        '흘리기', 0, 10, 1],
     ['cornerR',     '부드럽게',  0,  20, 1]
   ]},
   { id: 'bg', title: '배경 색', items: [
@@ -3952,7 +3952,7 @@ function buildWorld(str) {
   });
 
   const _w = { bodies, lines: lines.length };
-  _resampleFlowLines(_w);
+  _resetDripsForNewWorld(_w);
   return _w;
 }
 
@@ -4223,44 +4223,236 @@ function step(dt) {
   }
 }
 
-// 노드 모양 그리기 — shape 0=원, 50=라운드, 100=사각
-// 흐름 — 각 노드에 확률(%) 굴려, 당첨 노드의 현재 y 부터 화면아래+50 까지 랜덤 길이의
-//   세로선을 부여(_flowLen). 길이는 한 번 정해지면 노드와 함께 이동(고정 픽셀).
-//   슬라이더 값 변경/world 재구성 시마다 재샘플링.
-function _resampleFlowLines(w) {
-  if (!w || !w.bodies) return;
-  const p = Math.max(0, Math.min(100, PARAMS.flow || 0)) / 100;
-  const H = cssH + 50;
-  w.bodies.forEach(b => b.nodes.forEach(n => {
-    if (n.inv || p <= 0 || Math.random() >= p) { n._flowLen = 0; return; }
-    const maxLen = Math.max(0, H - n.y);
-    n._flowLen = Math.random() * maxLen;
-  }));
+// ── 흘리기 (flow) ────────────────────────────────────────────────────────────
+//   슬라이더 값 = 흘리기 개수(고정값). 1→2: 새 노드 1 개만 추가(기존 유지). 2→1: 뒤에서 제거.
+//   world 재구성 시 노드 인덱스 무효 → 전체 리셋 후 슬라이더 수만큼 재샘플.
+//   주사위(랜덤) 전체에서 제외 (테두리·부드럽게와 동일).
+//   소스 노드는 글자와 함께 움직이며, 매 프레임 경로(다단)를 재계산.
+//   100 px/sec 로 0 → 목표길이 애니메이션. 종착지(마지막 재시작 노드 식별자) 변경 시
+//   직전 프레임의 꼬리 세그먼트를 잔상(residue)으로 옛 종착지 노드에 매달아 보존.
+let _drips = [];                // { srcBody, srcIdx, targetLen, currentLen, lastTermKey, residues, _lastPath }
+let _dripsLastT = 0;            // 애니메이션 dt 계산용 — performance.now()
+const FLOW_SPEED = 100;         // px / sec — 자라는 속도
+const FLOW_MAX_ITER = 6;        // 다단 (떨어짐 → 따라감) 반복 한도 — 무한루프 방지
+const FLOW_MAX_RES = 3;         // 흘리기 1 개당 잔상 최대 보존 개수
+
+function _flowSlider() { return Math.max(0, Math.min(10, Math.round(PARAMS.flow || 0))); }
+
+// 수직 ray (cx, cy → cx, cy+maxD) 와 선분 (ax,ay)-(bx,by) 교차. 가장 가까운 hit 반환.
+//   d < 0.5 (시작점 근접) 면 무효 — 직전 따라간 엣지 끝점 재교차 방지.
+function _vRayHitSeg(cx, cy, maxD, ax, ay, bx, by) {
+  if (Math.abs(bx - ax) < 0.001) return null;            // 수직 엣지는 ray 와 면접촉만 → 스킵
+  const minX = Math.min(ax, bx), maxX = Math.max(ax, bx);
+  if (cx < minX - 0.001 || cx > maxX + 0.001) return null;
+  const t = (cx - ax) / (bx - ax);
+  const hy = ay + t * (by - ay);
+  const d = hy - cy;
+  if (d < 0.5 || d > maxD) return null;
+  return { x: cx, y: hy, d };
 }
 
-// 흐름 선·끝점 노드 렌더 — 메인 ctx 사용. lineW=획 굵기, 끝점은 점 크기(드물게 0이면 생략).
-function drawFlowLines() {
-  if (!world || !world.bodies) return;
-  const lineW = PARAMS.lineW || 0;
-  const endR = (PARAMS.nodeR || 0) / 2;
-  if (lineW <= 0 && endR <= 0) return;
-  ctx.save();
-  ctx.fillStyle = currentFgColor();
-  ctx.strokeStyle = currentFgColor();
-  ctx.lineCap = 'round';
-  ctx.lineWidth = Math.max(0, lineW);
-  world.bodies.forEach(body => body.nodes.forEach(n => {
-    if (n.inv || !n._flowLen || n._flowLen <= 0) return;
-    const endY = n.y + n._flowLen;
-    if (lineW > 0) {
-      ctx.beginPath();
-      ctx.moveTo(n.x, n.y);
-      ctx.lineTo(n.x, endY);
-      ctx.stroke();
+// drip 한 개의 경로 계산 — maxLen 만큼 소비. 다단 (떨어짐 → 따라감 → 떨어짐 …) 반복.
+//   반환 { segs: [{x0,y0,x1,y1,type:'down'|'edge'}], termKey, anchorBI, anchorNI, tailStartIdx }
+//   termKey = 마지막 재시작 노드 식별자 (bi-nodeIdx). 재시작 점 미도달이면 ''.
+//   tailStartIdx = 마지막 재시작 노드 이후의 첫 세그먼트 인덱스(= 잔상으로 떼낼 시작점).
+function _computeDripPath(drip, maxLen) {
+  if (!world || !world.bodies) return { segs: [], termKey: '', anchorBI: -1, anchorNI: -1, tailStartIdx: 0 };
+  const sb = world.bodies[drip.srcBody];
+  const sn = sb && sb.nodes[drip.srcIdx];
+  if (!sb || !sn || sn.inv) return { segs: [], termKey: '', anchorBI: -1, anchorNI: -1, tailStartIdx: 0 };
+  let cx = sn.x, cy = sn.y;
+  let remain = Math.max(0, maxLen);
+  const segs = [];
+  let termKey = '', anchorBI = -1, anchorNI = -1, tailStartIdx = 0;
+  let bannedEdge = null;
+  let iter = 0;
+  while (remain > 0 && iter < FLOW_MAX_ITER) {
+    iter++;
+    let best = null;
+    for (let bi = 0; bi < world.bodies.length; bi++) {
+      const bd = world.bodies[bi];
+      for (let ei = 0; ei < bd.edges.length; ei++) {
+        if (bannedEdge && bannedEdge.bi === bi && bannedEdge.ei === ei) continue;
+        const e = bd.edges[ei];
+        if (e.transparent) continue;
+        const a = bd.nodes[e.a], b = bd.nodes[e.b];
+        if (!a || !b) continue;
+        const hit = _vRayHitSeg(cx, cy, remain, a.x, a.y, b.x, b.y);
+        if (hit && (!best || hit.d < best.d)) {
+          best = { d: hit.d, x: hit.x, y: hit.y, bi, ei, aIdx: e.a, bIdx: e.b };
+        }
+      }
     }
-    if (endR > 0) drawNodeShape({ x: n.x, y: endY }, endR);
-  }));
-  ctx.restore();
+    if (!best) {
+      segs.push({ x0: cx, y0: cy, x1: cx, y1: cy + remain, type: 'down' });
+      remain = 0; break;
+    }
+    if (best.d > 0.5) segs.push({ x0: cx, y0: cy, x1: best.x, y1: best.y, type: 'down' });
+    cx = best.x; cy = best.y; remain -= best.d;
+    if (remain <= 0) break;
+    // 따라감 — 양 끝점 중 y 가 큰(낮은) 쪽으로
+    const bd = world.bodies[best.bi];
+    const aN = bd.nodes[best.aIdx], bN = bd.nodes[best.bIdx];
+    let lowIdx, lowX, lowY;
+    if (aN.y > bN.y) { lowIdx = best.aIdx; lowX = aN.x; lowY = aN.y; }
+    else             { lowIdx = best.bIdx; lowX = bN.x; lowY = bN.y; }
+    if (lowY <= cy + 0.5) break;                        // 위로/평평 — 정지(물 흐름)
+    const dx = lowX - cx, dy = lowY - cy;
+    const segLen = Math.hypot(dx, dy);
+    if (segLen < 0.5) break;
+    const moveLen = Math.min(segLen, remain);
+    const nx = cx + dx * moveLen / segLen, ny = cy + dy * moveLen / segLen;
+    segs.push({ x0: cx, y0: cy, x1: nx, y1: ny, type: 'edge' });
+    cx = nx; cy = ny; remain -= moveLen;
+    if (moveLen < segLen) break;                        // 엣지 도중 끝남
+    // 엣지 끝점 도달 → 재시작 노드 갱신
+    termKey = best.bi + '-' + lowIdx;
+    anchorBI = best.bi; anchorNI = lowIdx;
+    tailStartIdx = segs.length;
+    bannedEdge = { bi: best.bi, ei: best.ei };
+  }
+  return { segs, termKey, anchorBI, anchorNI, tailStartIdx };
+}
+
+// 현재 슬라이더 값에 맞춰 _drips 개수 동기화. 기존 drip 은 유지(시각 안정성).
+function _syncDripsToWorld(w) {
+  if (!w || !w.bodies) { _drips = []; return; }
+  const target = _flowSlider();
+  _drips = _drips.filter(d => {
+    const b = w.bodies[d.srcBody];
+    return b && b.nodes[d.srcIdx] && !b.nodes[d.srcIdx].inv;
+  });
+  if (_drips.length < target) {
+    const used = new Set(_drips.map(d => d.srcBody + '-' + d.srcIdx));
+    const pool = [];
+    w.bodies.forEach((b, bi) => b.nodes.forEach((n, ni) => {
+      if (!n.inv && !used.has(bi + '-' + ni)) pool.push({ b: bi, n: ni });
+    }));
+    while (_drips.length < target && pool.length > 0) {
+      const k = Math.floor(Math.random() * pool.length);
+      const c = pool.splice(k, 1)[0];
+      const node = w.bodies[c.b].nodes[c.n];
+      const maxLen = Math.max(0, cssH + 50 - node.y);
+      _drips.push({
+        srcBody: c.b, srcIdx: c.n,
+        targetLen: Math.max(0, Math.random() * maxLen),
+        currentLen: 0,
+        lastTermKey: '',
+        residues: [],
+        _lastPath: null
+      });
+    }
+  } else if (_drips.length > target) {
+    _drips.length = target;
+  }
+}
+
+// world 재구성 시 — 인덱스 전부 무효이므로 drips·잔상 모두 리셋 후 재샘플.
+function _resetDripsForNewWorld(w) {
+  _drips = [];
+  _dripsLastT = 0;
+  _syncDripsToWorld(w);
+}
+
+// 매 프레임 1 회: dt 만큼 currentLen 전진 + 경로 재계산 + 종착지 변경 시 잔상 보존.
+//   draw() 전반부에서 호출. _lastPath 갱신 → _collectFlowPrimitives 가 읽음.
+function _advanceFlow() {
+  const now = performance.now();
+  const dt = _dripsLastT > 0 ? Math.min(0.1, (now - _dripsLastT) / 1000) : 0;
+  _dripsLastT = now;
+  if (!world || !world.bodies) return;
+  _drips.forEach(d => {
+    const full = _computeDripPath(d, d.targetLen);
+    // 종착지(termKey) 변경 + 직전 잔상 보존
+    if (full.termKey !== d.lastTermKey && d.lastTermKey !== '') {
+      const prev = d._lastPath;
+      if (prev && prev.anchorBI >= 0 && prev.tailStartIdx < prev.segs.length) {
+        const an = world.bodies[prev.anchorBI] && world.bodies[prev.anchorBI].nodes[prev.anchorNI];
+        if (an) {
+          const tailSegs = prev.segs.slice(prev.tailStartIdx).map(s => ({
+            dx0: s.x0 - an.x, dy0: s.y0 - an.y,
+            dx1: s.x1 - an.x, dy1: s.y1 - an.y
+          }));
+          if (tailSegs.length > 0) {
+            d.residues.push({ anchorBI: prev.anchorBI, anchorNI: prev.anchorNI, segs: tailSegs });
+            while (d.residues.length > FLOW_MAX_RES) d.residues.shift();
+          }
+        }
+      }
+      d.currentLen = 0;
+    }
+    d.lastTermKey = full.termKey;
+    d.currentLen = Math.min(d.targetLen, d.currentLen + dt * FLOW_SPEED);
+    d._lastPath = _computeDripPath(d, d.currentLen);
+  });
+}
+
+// 현재 _drips 의 라인·끝점 노드를 플랫 리스트로 수집. 모든 렌더 타깃에서 공유.
+//   잔상은 anchor 노드의 현재 위치 기준 절대좌표로 변환되어 합쳐짐.
+function _collectFlowPrimitives() {
+  const out = { lines: [], ends: [] };
+  if (!world || !world.bodies || !_drips.length) return out;
+  _drips.forEach(d => {
+    if (d._lastPath) {
+      const p = d._lastPath;
+      p.segs.forEach(s => out.lines.push({ x0: s.x0, y0: s.y0, x1: s.x1, y1: s.y1 }));
+      if (p.segs.length > 0) {
+        const last = p.segs[p.segs.length - 1];
+        out.ends.push({ x: last.x1, y: last.y1 });
+      }
+    }
+    d.residues.forEach(res => {
+      const an = world.bodies[res.anchorBI] && world.bodies[res.anchorBI].nodes[res.anchorNI];
+      if (!an || an.inv) return;
+      res.segs.forEach((s, i) => {
+        out.lines.push({
+          x0: an.x + s.dx0, y0: an.y + s.dy0,
+          x1: an.x + s.dx1, y1: an.y + s.dy1
+        });
+        if (i === res.segs.length - 1) out.ends.push({ x: an.x + s.dx1, y: an.y + s.dy1 });
+      });
+    });
+  });
+  return out;
+}
+
+// 흘리기 라인·끝점 노드를 ctx 에 직접 렌더. 두께·끝점반경은 호출자가 결정(inflation 포함).
+//   끝점은 PARAMS.shape 반영(원/라운드/사각). fillStyle·strokeStyle 은 호출 전에 설정.
+function _drawFlowItemsCanvas(targetCtx, items, lineW, endR) {
+  if (!items || (!items.lines.length && !items.ends.length)) return;
+  if (lineW > 0 && items.lines.length > 0) {
+    targetCtx.lineCap = 'round';
+    targetCtx.lineWidth = lineW;
+    items.lines.forEach(l => {
+      targetCtx.beginPath();
+      targetCtx.moveTo(l.x0, l.y0);
+      targetCtx.lineTo(l.x1, l.y1);
+      targetCtx.stroke();
+    });
+  }
+  if (endR > 0 && items.ends.length > 0) {
+    const _shape = PARAMS.shape || 0;
+    const sCornerR = Math.max(0, Math.min(endR, endR * (100 - _shape) / 100));
+    items.ends.forEach(e => {
+      targetCtx.beginPath();
+      if (sCornerR >= endR - 0.5) {
+        targetCtx.arc(e.x, e.y, endR, 0, Math.PI * 2);
+      } else {
+        const x = e.x - endR, y = e.y - endR, w = 2 * endR, h = 2 * endR;
+        if (sCornerR <= 0.5) {
+          targetCtx.rect(x, y, w, h);
+        } else {
+          targetCtx.moveTo(x + sCornerR, y);
+          targetCtx.arcTo(x + w, y, x + w, y + h, sCornerR);
+          targetCtx.arcTo(x + w, y + h, x, y + h, sCornerR);
+          targetCtx.arcTo(x, y + h, x, y, sCornerR);
+          targetCtx.arcTo(x, y, x + w, y, sCornerR);
+          targetCtx.closePath();
+        }
+      }
+      targetCtx.fill();
+    });
+  }
 }
 
 function drawNodeShape(n, r) {
@@ -4348,10 +4540,14 @@ function smoothedTotalWidth() { return Math.max(0, PARAMS.lineW || 0); }
 let _smMask = null, _smTmp = null;
 // [E3] 테두리 작업 캔버스 (정확한 도형 팽창 = 프리미티브 인플레이션) — 캐시 재사용
 let _bdOuter = null, _bdInner = null, _bdRing = null;
-function drawSmoothedBodies(targetCtx, bodies, fg, bg) {
+function drawSmoothedBodies(targetCtx, bodies, fg, bg, viewport) {
   const cornerR = Math.max(0, PARAMS.cornerR || 0);
   if (cornerR <= 0) return;
-  const W = cssW, H = cssH;
+  // viewport = { x, y, w, h } — 내보내기에서 bbox 전달 시 사용. 미지정이면 화면 전체.
+  const VX = (viewport && viewport.x) || 0;
+  const VY = (viewport && viewport.y) || 0;
+  const W = (viewport && viewport.w) || cssW;
+  const H = (viewport && viewport.h) || cssH;
   const lineW = PARAMS.lineW;
   const nodeR = PARAMS.nodeR / 2;
   if (lineW <= 0 && nodeR <= 0) return;
@@ -4371,6 +4567,7 @@ function drawSmoothedBodies(targetCtx, bodies, fg, bg) {
   mctx.globalCompositeOperation = 'source-over';
   mctx.clearRect(0, 0, W * SCALE, H * SCALE);
   if (SCALE !== 1) mctx.scale(SCALE, SCALE);
+  if (VX !== 0 || VY !== 0) mctx.translate(-VX, -VY);
   mctx.fillStyle = '#000';
   mctx.strokeStyle = '#000';
   if (lineW > 0) {
@@ -4421,6 +4618,9 @@ function drawSmoothedBodies(targetCtx, bodies, fg, bg) {
       mctx.fill();
     });
   });
+  // 흘리기 (flow) 도 마스크에 포함 — 부드럽게가 글자+흘리기 통째로 처리.
+  const _flowItemsSm = _collectFlowPrimitives();
+  _drawFlowItemsCanvas(mctx, _flowItemsSm, lineW, nodeR);
 
   // 모퉁이 둥글리기 — JS 박스블러 + 알파 임계값
   //   ctx.filter='blur' 네이티브 경로는 Safari 17.x 이하 미지원 → A/B 테스트 결과 JS 경로로 통합 (v1.12b).
@@ -4452,11 +4652,11 @@ function drawSmoothedBodies(targetCtx, bodies, fg, bg) {
   tctx.globalCompositeOperation = 'source-in';
   tctx.fillStyle = fg;
   tctx.fillRect(0, 0, W * SCALE, H * SCALE);
-  // 다운스케일 — 안티앨리어싱
+  // 다운스케일 — 안티앨리어싱. viewport 모드: 결과를 (VX,VY) 위치에 W×H 로 배치.
   targetCtx.save();
   targetCtx.imageSmoothingEnabled = true;
   if ('imageSmoothingQuality' in targetCtx) targetCtx.imageSmoothingQuality = 'high';
-  targetCtx.drawImage(tmp, 0, 0, W, H);
+  targetCtx.drawImage(tmp, VX, VY, W, H);
   targetCtx.restore();
 }
 
@@ -4468,12 +4668,17 @@ function _bordersOn() {
 //   실루엣은 현재 점 모양(shape)·획 굵기를 그대로 반영(부드럽게 마스크와 동일 공식).
 //   부드럽게(cornerR>0) 같이 켜면 이 윤곽 밴드에 동일 blur+threshold 를 적용(테두리에 부드럽게).
 //   래스터 효과(SVG 벡터로 표현 불가 — 부드럽게와 동일) → 화면·PNG 전용.
-function drawBorders(targetCtx, bodies, fg) {
+function drawBorders(targetCtx, bodies, fg, viewport) {
   if (!_bordersOn() || !bodies) return;
   const bW = Math.max(0, PARAMS.borderWidth || 0);
   if (bW <= 0) return;
   const _borderColor = fg;
-  const W = cssW, H = cssH, S = 2;          // S = 슈퍼샘플(크리스프 다운스케일)
+  // viewport = { x, y, w, h } — 내보내기에서 bbox 전달 시 사용. 미지정이면 화면 전체.
+  const VX = (viewport && viewport.x) || 0;
+  const VY = (viewport && viewport.y) || 0;
+  const W = (viewport && viewport.w) || cssW;
+  const H = (viewport && viewport.h) || cssH;
+  const S = 2;                                // 슈퍼샘플(크리스프 다운스케일)
   const MW = W * S, MH = H * S;
   const lineW = PARAMS.lineW;
   const nodeR = PARAMS.nodeR / 2;
@@ -4486,12 +4691,14 @@ function drawBorders(targetCtx, bodies, fg) {
   const ictx = _bdInner.getContext('2d');
   const rctx = _bdRing.getContext('2d');
   // 실루엣을 infl(px)만큼 팽창해 흑색으로 칠함. 획=lineW+2·infl, 점=(r+infl) + 점모양(shape).
+  //   viewport 모드: world 좌표를 (-VX, -VY) 만큼 평행이동해 mask 안에 들어오게 함.
   const paintSil = (mctx, infl) => {
     mctx.setTransform(1, 0, 0, 1, 0, 0);
     mctx.globalCompositeOperation = 'source-over';
     mctx.clearRect(0, 0, MW, MH);
     mctx.save();
     mctx.scale(S, S);
+    if (VX !== 0 || VY !== 0) mctx.translate(-VX, -VY);
     mctx.fillStyle = '#000';
     mctx.strokeStyle = '#000';
     mctx.lineCap = 'round';
@@ -4544,9 +4751,13 @@ function drawBorders(targetCtx, bodies, fg) {
         mctx.fill();
       });
     });
+    // 흘리기 (flow) 도 실루엣에 포함 — 테두리가 글자+흘리기 모두 감쌈.
+    //   라인 두께 = lineW + 2·infl, 끝점 반경 = nodeR/2 + infl. fill·stroke = '#000' 유지.
+    const _flowItems = _collectFlowPrimitives();
+    _drawFlowItemsCanvas(mctx, _flowItems, Math.max(0, lineW + 2 * infl), Math.max(0, nodeR + infl));
     mctx.restore();
   };
-  // 단일 윤곽 밴드 = 글자 실루엣(infl 0) 바로 밖, 두께 bW
+  // 단일 윤곽 밴드 = 글자+흘리기 실루엣(infl 0) 바로 밖, 두께 bW
   paintSil(octx, bW);
   paintSil(ictx, 0);
   rctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -4576,12 +4787,15 @@ function drawBorders(targetCtx, bodies, fg) {
   targetCtx.save();
   targetCtx.imageSmoothingEnabled = true;
   if ('imageSmoothingQuality' in targetCtx) targetCtx.imageSmoothingQuality = 'high';
-  targetCtx.drawImage(_bdRing, 0, 0, W, H);
+  targetCtx.drawImage(_bdRing, VX, VY, W, H);
   targetCtx.restore();
 }
 
 function draw() {
   if (!world) return;
+  // 매 프레임 흘리기 애니메이션 1회 전진 + 경로 재계산 (모든 렌더 모드 공통).
+  //   파이프라인 순서: 흘리기 → 테두리 → 부드럽게 (뒤 단계가 앞을 항상 포함).
+  _advanceFlow();
   const dpr = window.devicePixelRatio || 1;
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   const bg = currentBgColor();
@@ -4590,10 +4804,10 @@ function draw() {
   ctx.fillRect(0, 0, cssW, cssH);
   document.body.style.background = bg;
 
-  // [E3] 테두리 ON (borderWidth > 0): 글자를 채우지 않고 윤곽선만 표시 — 그린 뒤 인터랙션 오버레이 후 종료.
-  if (_bordersOn()) { drawBorders(ctx, world.bodies, fg); drawFlowLines(); drawInteractionOverlay(); return; }
+  // [E3] 테두리 ON: 글자+흘리기 실루엣을 윤곽선으로 감쌈 (drawBorders 안에서 흘리기 포함).
+  if (_bordersOn()) { drawBorders(ctx, world.bodies, fg); drawInteractionOverlay(); return; }
 
-  // 부드럽게 활성 시 픽셀 마스크 모드
+  // 부드럽게 활성 시 픽셀 마스크 모드 — 글자+흘리기 통째로 마스크 → blur (drawSmoothedBodies 안에서 흘리기 포함).
   const useOutline = (PARAMS.cornerR > 0);
 
   const nodeR = PARAMS.nodeR / 2;  // nodeR 슬라이더 값 = 노드 지름 (선굵기와 통일)
@@ -4602,9 +4816,7 @@ function draw() {
   ctx.strokeStyle = fg;
 
   if (useOutline) {
-    // 부드럽게 모드 — 픽셀 마스크 + blur로 부드러운 외곽
     drawSmoothedBodies(ctx, world.bodies, fg, bg);
-    drawFlowLines();
     drawInteractionOverlay();
     return;
   }
@@ -4631,7 +4843,8 @@ function draw() {
       if (r > 0) drawNodeShape(n, r);
     });
   });
-  drawFlowLines();
+  // 흘리기 — 일반 모드에서는 글자 위에 솔리드로 그려짐 (테두리/부드럽게 OFF 일 때만 이 경로).
+  _drawFlowItemsCanvas(ctx, _collectFlowPrimitives(), lineW, nodeR);
   drawInteractionOverlay();
 }
 
@@ -6250,7 +6463,7 @@ function buildPanel() {
         v => {
           setParamValue(key, v);
           if (STRUCTURAL_KEYS.has(key) && world) world = buildWorld(currentText());
-          else if (key === 'flow' && world) _resampleFlowLines(world);
+          else if (key === 'flow' && world) _syncDripsToWorld(world);
         },
         { dataKey: key }));
     });
@@ -6925,7 +7138,7 @@ function visibleCharCount() {
 // 자동 도출되는 키 — 랜덤 시 PANEL_GROUPS 루프에서 건너뜀
 const DERIVED_KEYS = new Set([
   'pointDist','choHoriz','choVert','jungHoriz','jungVert','jongHoriz','jongVert','randomExtra',
-  'letterSpacing','lineHeight','nodeR','lineW','shape','cornerR','borderWidth','repulse','shapeBoost','damping','speed','lsHorizFactor','lhVertFactor','fitsThreshold','idealAreaRatio','shrinkFactor','maxFitsIter','subdivTierLimit','tierMaxBase','tierMaxSlope','tierActiveSlope','looseBoost','smoothScale','blurFactor','alphaThreshold','wallOn',
+  'letterSpacing','lineHeight','nodeR','lineW','shape','cornerR','borderWidth','flow','repulse','shapeBoost','damping','speed','lsHorizFactor','lhVertFactor','fitsThreshold','idealAreaRatio','shrinkFactor','maxFitsIter','subdivTierLimit','tierMaxBase','tierMaxSlope','tierActiveSlope','looseBoost','smoothScale','blurFactor','alphaThreshold','wallOn',
   'nonHangulSpread','spaceShrink','magnetForce','magnetMergeFactor','bondPickFactor','detachMagnetForce','detachThreshold','springBoost',
   '_invK_ANGLE','_invK_ROT','_invK_SPRING',
   '_bgR','_bgG','_bgB','_fgR','_fgG','_fgB'
@@ -8242,39 +8455,79 @@ function _makePersistentDraggablePopup(el, opts) {
   return { place, save, clamp };
 }
 
+// 내보내기(SVG/PNG) 캔버스 크기 = 표시 컨텐츠(글자 + 흘리기) 경계상자 + 사방 50px 여백.
+//   화면 크기와 무관하게, 글자가 화면 바깥까지 흘러나가도 그대로 포함.
+//   pad = 시각 두께 (lineW/2, nodeR/2, borderWidth, cornerR) 의 안전 합.
+function _computeExportBBox() {
+  if (!world || !world.bodies || world.bodies.length === 0) return null;
+  const lineH = (PARAMS.lineW || 0) / 2;
+  const nR = (PARAMS.nodeR || 0) / 2;
+  const bW = (PARAMS.borderWidth || 0);
+  const sm = (PARAMS.cornerR || 0);
+  const pad = Math.max(lineH, nR) + bW + sm;
+  let xmin = Infinity, ymin = Infinity, xmax = -Infinity, ymax = -Infinity;
+  world.bodies.forEach(body => body.nodes.forEach(n => {
+    if (n.inv) return;
+    if (n.x - pad < xmin) xmin = n.x - pad;
+    if (n.y - pad < ymin) ymin = n.y - pad;
+    if (n.x + pad > xmax) xmax = n.x + pad;
+    if (n.y + pad > ymax) ymax = n.y + pad;
+  }));
+  const items = _collectFlowPrimitives();
+  items.lines.forEach(l => {
+    const lx0 = Math.min(l.x0, l.x1) - pad, ly0 = Math.min(l.y0, l.y1) - pad;
+    const lx1 = Math.max(l.x0, l.x1) + pad, ly1 = Math.max(l.y0, l.y1) + pad;
+    if (lx0 < xmin) xmin = lx0;
+    if (ly0 < ymin) ymin = ly0;
+    if (lx1 > xmax) xmax = lx1;
+    if (ly1 > ymax) ymax = ly1;
+  });
+  items.ends.forEach(e => {
+    if (e.x - pad < xmin) xmin = e.x - pad;
+    if (e.y - pad < ymin) ymin = e.y - pad;
+    if (e.x + pad > xmax) xmax = e.x + pad;
+    if (e.y + pad > ymax) ymax = e.y + pad;
+  });
+  if (!isFinite(xmin)) return null;
+  return {
+    x: Math.floor(xmin - 50),
+    y: Math.floor(ymin - 50),
+    w: Math.ceil((xmax + 50) - Math.floor(xmin - 50)),
+    h: Math.ceil((ymax + 50) - Math.floor(ymin - 50))
+  };
+}
+
 function saveSVG() {
   if (!world) return;
   try { if (typeof umami !== 'undefined' && umami && typeof umami.track === 'function') umami.track('SVG 다운로드'); } catch(_) {}
   // 에디터·자모 선택창이 열려있으면 닫기
   const _ed = document.getElementById('editor');
   if (_ed && _ed.classList.contains('open')) closeEditor();
-  // 설정창 너비만큼 좌측 잘라냄 — viewBox 시작 X = panelOffsetX
-  const X = panelOffsetX || 0;
-  const W = Math.max(1, cssW - X);
-  const H = cssH;
+  // viewBox = 글자+흘리기 경계상자 + 사방 50px (화면 크기 무시)
+  const bbox = _computeExportBBox() || { x: 0, y: 0, w: cssW, h: cssH };
+  const X = bbox.x, Y = bbox.y, W = bbox.w, H = bbox.h;
   const fg = currentFgColor();
   const bg = currentBgColor();
   const lineW = PARAMS.lineW;
   const nodeR = PARAMS.nodeR / 2;
   // [v1.12b] SVG 부드럽게 — 캔버스의 JS 박스블러 + 알파 임계값 파이프라인을
   //   SVG feGaussianBlur + feComponentTransfer(linear, steep slope) + feFlood + feComposite 로 근사.
-  //   캔버스 픽셀 라이드의 SCALE 슈퍼샘플은 SVG 벡터에서는 불필요 → 표시 픽셀 단위 그대로.
   const _smR = Math.max(0, PARAMS.cornerR || 0);
   const _BLUR_F = Math.max(0, PARAMS.blurFactor || 0.5);
   const _A_THR = Math.max(0, Math.min(255, Math.round(PARAMS.alphaThreshold ?? 128)));
   const _useSmooth = _smR > 0;
   const parts = [];
   parts.push('<?xml version="1.0" encoding="UTF-8"?>');
-  parts.push('<svg xmlns="http://www.w3.org/2000/svg" viewBox="' + X + ' 0 ' + W + ' ' + H + '" width="' + W + '" height="' + H + '">');
-  parts.push('<rect x="' + X + '" y="0" width="' + W + '" height="' + H + '" fill="' + bg + '"/>');
+  parts.push('<svg xmlns="http://www.w3.org/2000/svg" viewBox="' + X + ' ' + Y + ' ' + W + ' ' + H + '" width="' + W + '" height="' + H + '">');
+  parts.push('<rect x="' + X + '" y="' + Y + '" width="' + W + '" height="' + H + '" fill="' + bg + '"/>');
   if (_useSmooth) {
     const _stdDev = _smR * _BLUR_F;
     const _T = _A_THR / 255;
-    const _slope = 50;                    // 가파른 기울기 → 임계값 근방에서 사실상 step
-    const _intercept = 0.5 - _slope * _T; // y = slope·x + intercept, x=T 에서 y=0.5
-    const _pad = Math.ceil(_stdDev * 4 + 4);  // 블러 확산 여유 (가우시안 꼬리 ≈ 3σ)
+    const _slope = 50;
+    const _intercept = 0.5 - _slope * _T;
+    const _pad = Math.ceil(_stdDev * 4 + 4);
     parts.push('<defs>');
-    parts.push('<filter id="mhSmooth" filterUnits="userSpaceOnUse" x="' + (X - _pad) + '" y="' + (-_pad) + '" width="' + (W + 2 * _pad) + '" height="' + (H + 2 * _pad) + '" color-interpolation-filters="sRGB">');
+    parts.push('<filter id="mhSmooth" filterUnits="userSpaceOnUse" x="' + (X - _pad) + '" y="' + (Y - _pad) + '" width="' + (W + 2 * _pad) + '" height="' + (H + 2 * _pad) + '" color-interpolation-filters="sRGB">');
     parts.push('<feGaussianBlur in="SourceAlpha" stdDeviation="' + _stdDev.toFixed(3) + '" result="b"/>');
     parts.push('<feComponentTransfer in="b" result="m"><feFuncA type="linear" slope="' + _slope + '" intercept="' + _intercept.toFixed(4) + '"/></feComponentTransfer>');
     parts.push('<feFlood flood-color="' + fg + '" result="c"/>');
@@ -8284,6 +8537,21 @@ function saveSVG() {
   }
   parts.push('<g fill="' + fg + '" stroke="' + fg + '" stroke-linecap="round"' + (_useSmooth ? ' filter="url(#mhSmooth)"' : '') + '>');
   // SVG: 일반 획·노드 (부드럽게는 _useSmooth 시 SVG <filter> 로 적용)
+  //   파이프라인 순서대로: 흘리기 → 글자 (정상모드는 함께 fill; 부드럽게는 동일 마스크에 합쳐짐).
+  const _flowSvg = _collectFlowPrimitives();
+  _flowSvg.lines.forEach(l => {
+    if (lineW <= 0) return;
+    parts.push('<line x1="' + l.x0.toFixed(2) + '" y1="' + l.y0.toFixed(2) +
+               '" x2="' + l.x1.toFixed(2) + '" y2="' + l.y1.toFixed(2) +
+               '" stroke-width="' + lineW + '"/>');
+  });
+  _flowSvg.ends.forEach(e => {
+    if (nodeR <= 0) return;
+    const cornerR = Math.max(0, Math.min(nodeR, nodeR * (100 - (PARAMS.shape || 0)) / 100));
+    parts.push('<rect x="' + (e.x - nodeR).toFixed(2) + '" y="' + (e.y - nodeR).toFixed(2) +
+               '" width="' + (nodeR * 2) + '" height="' + (nodeR * 2) +
+               '" rx="' + cornerR.toFixed(2) + '" stroke="none"/>');
+  });
   world.bodies.forEach(body => {
     body.edges.forEach(e => {
       if (e.transparent) return;  // 투명 획 비표시
@@ -8319,7 +8587,8 @@ function saveSVG() {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-// PNG 저장 — 배경 투명, 글자만 / 설정창 너비만큼 좌측 잘라냄 / 해상도 2배
+// PNG 저장 — 배경 투명. 캔버스 크기 = 글자+흘리기 경계상자 + 사방 50px (화면 크기 무시).
+//   파이프라인: 흘리기 → 테두리 → 부드럽게 (drawBorders/drawSmoothedBodies 내부에 흘리기 포함됨).
 function savePNG() {
   if (!world) return;
   try { if (typeof umami !== 'undefined' && umami && typeof umami.track === 'function') umami.track('PNG 다운로드'); } catch(_) {}
@@ -8327,26 +8596,23 @@ function savePNG() {
   const _ed = document.getElementById('editor');
   if (_ed && _ed.classList.contains('open')) closeEditor();
   const dpr = (window.devicePixelRatio || 1) * 2;  // 해상도 2배
-  const X = panelOffsetX || 0;
-  const W = Math.max(1, cssW - X);
-  const H = cssH;
+  const bbox = _computeExportBBox() || { x: 0, y: 0, w: cssW, h: cssH };
+  const X = bbox.x, Y = bbox.y, W = bbox.w, H = bbox.h;
   const off = document.createElement('canvas');
   off.width = W * dpr;
   off.height = H * dpr;
   const octx = off.getContext('2d');
   octx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  // 좌측 panelOffsetX 만큼 시프트 — 글자 좌표는 그대로, 캔버스에는 잘린 영역만 그려짐
-  octx.translate(-X, 0);
+  // bbox 시작점만큼 시프트 — world 좌표를 그대로 그리면 (X,Y)→(0,0) 정렬됨.
+  octx.translate(-X, -Y);
   // 배경 채우지 않음 → 투명
   const fg = currentFgColor();
-  // [E3] 테두리 ON 이면 글자 채움 없이 동심 윤곽만(화면과 동일). PNG 에도 동일 반영.
-  drawBorders(octx, world.bodies, fg);
+  drawBorders(octx, world.bodies, fg, bbox);
   if (_bordersOn()) {
-    // 윤곽선만 — 글자 솔리드/부드럽게 렌더 건너뜀
+    // 윤곽선만 — 글자 솔리드/부드럽게 렌더 건너뜀 (테두리 안에 흘리기 이미 포함됨)
   } else if (PARAMS.cornerR > 0) {
-    // [E1] 화면(draw)의 useOutline 분기와 동일 — '부드럽게' 픽셀 마스크 경로를 PNG 에도 반영.
-    //   drawSmoothedBodies 는 targetCtx 에 cssW×cssH 로 그리므로 octx(translate -X, scale dpr) 와 정합.
-    drawSmoothedBodies(octx, world.bodies, fg, currentBgColor());
+    // 부드럽게 모드 — 마스크에 흘리기 이미 포함됨
+    drawSmoothedBodies(octx, world.bodies, fg, currentBgColor(), bbox);
   } else {
   const lineW = PARAMS.lineW;
   const nodeR = PARAMS.nodeR / 2;
@@ -8393,6 +8659,8 @@ function savePNG() {
       octx.restore();
     });
   });
+  // 일반 모드: 흘리기 라인·끝점을 글자 위에 추가로 솔리드 렌더.
+  _drawFlowItemsCanvas(octx, _collectFlowPrimitives(), lineW, nodeR);
   }
   off.toBlob(blob => {
     if (!blob) return;
