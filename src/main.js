@@ -4,6 +4,9 @@
 //   type="module"로 로드되어 DOM 파싱 후 실행되며, 내부 DOMContentLoaded/
 //   readyState 가드가 그대로 동작한다. 이후 단계에서 기능별 모듈로 분리 예정.
 
+// [P0-4] 기능별 모듈 분리 시작 — 애널리틱스(_track/_tag)를 src/analytics.js 로 추출.
+import { _track, _tag } from "./analytics.js";
+
 /* ╔══════════════════════════════════════════════════════════════════════════╗
    ║  ⚙  설정 대시보드 (MH_CFG)  —  여기만 고치면 됩니다                          ║
    ║                                                                            ║
@@ -120,16 +123,7 @@ const MH_CFG = {
 //   _track(name)        : 커스텀 이벤트 (window.clarity('event', name)) — 대시보드 Filters/Funnels.
 //   _tag(key, val)      : 커스텀 태그 (window.clarity('set', key, val)) — 세션 메타데이터(255자 한도).
 //   광고 차단·미로드 시 무해(queue 보장). 트래커 미로드여도 사이트 정상 동작.
-function _clarity() {
-  try {
-    if (typeof window.clarity === 'function') window.clarity.apply(null, arguments);
-  } catch (_) {}
-}
-function _track(name) { if (name) _clarity('event', String(name)); }
-function _tag(key, val) {
-  if (key == null || val == null) return;
-  _clarity('set', String(key), String(val).slice(0, 255));
-}
+// _clarity/_track/_tag → src/analytics.js 로 이동(상단 import). _trackTextOnBlur 는 TEXT 의존이라 여기 유지.
 
 // 글자 입력 — 입력창에서 blur 되는 순간(입력 종료) 1회 기록. 직전 값과 동일하면 스킵.
 let _trackTextLastSnapshot = null;
