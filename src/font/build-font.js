@@ -62,8 +62,8 @@ function roundedRectPolygon(cx, cy, r, cr, K = 6) {
 }
 
 // 한 글자 기하 → opentype.Glyph
-function buildGlyph(g, opt) {
-  const { unitsPerEm, glyphHeight, sideBearing, capSegs, rrSegs } = opt;
+function buildGlyph(g, ctx) {
+  const { unitsPerEm, sideBearing, capSegs, rrSegs, globalScale, gMaxY } = ctx;
   const polys = [];
   for (const s of g.segments) polys.push([capsulePolygon(s.x0, s.y0, s.x1, s.y1, s.w, capSegs)]);
   for (const d of g.dots) {
@@ -82,9 +82,11 @@ function buildGlyph(g, opt) {
   }
 
   const bb = g.bbox;
-  const scale = bb.h > 0 ? glyphHeight / bb.h : unitsPerEm / 1000;
-  const tx = (x) => (x - bb.x) * scale + sideBearing;
-  const ty = (y) => (bb.y + bb.h - y) * scale; // 화면 y↓ → 폰트 y↑, 글자 하단을 베이스라인(0)에
+  // 모든 글자가 동일 배율(globalScale) + 동일 세로 기준(gMaxY=전체 하단=공통 베이스라인)을 써서
+  // 글자 간 상대 크기·정렬을 보존한다 (앱 화면의 배치를 그대로 폰트로 옮김).
+  const scale = globalScale;
+  const tx = (x) => (x - bb.x) * scale + sideBearing; // 글자 좌측을 사이드베어링 위치에
+  const ty = (y) => (gMaxY - y) * scale; // 화면 y↓ → 폰트 y↑, 공통 베이스라인
 
   const path = new opentype.Path();
   for (const polygon of merged) {
@@ -134,9 +136,9 @@ export function buildFont(glyphs, options = {}) {
     path: new opentype.Path(),
   });
 
-  // 문자 중복 제거 (먼저 나온 것 사용), 빈/공백 제외
+  // 문자 중복 제거 (먼저 나온 것 사용), 빈/공백 제외 → 빌드 대상 선별
   const seen = new Set();
-  const built = [notdef];
+  const targets = [];
   const skipped = [];
   for (const g of glyphs) {
     const ch = g.ch || "";
@@ -146,8 +148,23 @@ export function buildFont(glyphs, options = {}) {
       continue;
     }
     seen.add(ch);
-    built.push(buildGlyph(g, opt));
+    targets.push(g);
   }
+
+  // 글로벌 메트릭: 모든 대상 글자를 한 배율·한 베이스라인으로 (글자별 독립 스케일 대신).
+  //   가장 큰 글자 높이가 glyphHeight 가 되도록 배율을 잡고, 전체 하단을 공통 베이스라인으로.
+  let maxH = 0;
+  let gMaxY = -Infinity;
+  for (const g of targets) {
+    maxH = Math.max(maxH, g.bbox.h);
+    gMaxY = Math.max(gMaxY, g.bbox.y + g.bbox.h);
+  }
+  const globalScale = maxH > 0 ? opt.glyphHeight / maxH : 1;
+  if (!isFinite(gMaxY)) gMaxY = 0;
+  const ctx = { ...opt, globalScale, gMaxY };
+
+  const built = [notdef];
+  for (const g of targets) built.push(buildGlyph(g, ctx));
 
   const font = new opentype.Font({
     familyName: opt.familyName,

@@ -16,6 +16,7 @@
 - **폰트 익스포트 (정적 OTF)**: `src/font/build-font.js`(순수 빌더) + `src/font-export.js`
   (Ctrl/Cmd+Shift+F). 획→캡슐·노드→둥근사각 합집합 → opentype.js OTF. 라이브 4글리프
   생성 검증(OTTO). docs/FONT_EXPORT.md. 가변 TTF는 설계만(미구현).
+  글자별 독립 스케일 → **글로벌 메트릭(공통 배율·공통 베이스라인)** 으로 개선(일관된 폰트).
 - 의존성: opentype.js, polygon-clipping (폰트 빌드는 지연 import 로 별도 청크 분리).
 
 ### 변경
