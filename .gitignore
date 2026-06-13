@@ -5,3 +5,6 @@ release/
 *.local
 .DS_Store
 *.log
+
+# Claude Code 개인/로컬 설정 (launch.json 은 공유 가능하므로 추적)
+.claude/settings.local.json
