@@ -20,11 +20,23 @@
   "build": {
     "appId": "com.clumpedhangul.app",
     "productName": "뭉친 한글",
-    "files": ["dist/**/*", "electron/**/*"],
-    "directories": { "output": "release" },
-    "mac": { "target": "dmg", "category": "public.app-category.graphics-design" },
-    "win": { "target": "nsis" },
-    "linux": { "target": "AppImage" }
+    "files": [
+      "dist/**/*",
+      "electron/**/*"
+    ],
+    "directories": {
+      "output": "release"
+    },
+    "mac": {
+      "target": "dmg",
+      "category": "public.app-category.graphics-design"
+    },
+    "win": {
+      "target": "nsis"
+    },
+    "linux": {
+      "target": "AppImage"
+    }
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",
@@ -35,5 +47,9 @@
     "typescript": "^5.7.2",
     "vite": "^6.0.7",
     "wait-on": "^9.0.10"
+  },
+  "dependencies": {
+    "opentype.js": "^2.0.0",
+    "polygon-clipping": "^0.15.7"
   }
 }

@@ -8289,6 +8289,54 @@ function _computeExportBBox() {
   };
 }
 
+// [P3] 폰트 익스포트용 글자 기하 추출 — saveSVG 의 글자(획+노드) 모델을 글자별로 묶어 반환.
+//   흘리기(장식)는 제외. src/font-export.js 가 이를 받아 윤곽 합집합→OTF 로 변환한다.
+//   window.__chFontGeometry() 로 노출 (모듈 경계를 넘는 최소 훅).
+function _collectGlyphGeometryForFont() {
+  if (!world || !world.bodies) return null;
+  const lineW = PARAMS.lineW;
+  const nodeR = PARAMS.nodeR / 2;
+  const shape = PARAMS.shape || 0;
+  const lineHalf = lineW / 2;
+  const glyphs = [];
+  world.bodies.forEach(body => {
+    const segments = [];
+    body.edges.forEach(e => {
+      if (e.transparent) return;
+      const a = body.nodes[e.a], b = body.nodes[e.b];
+      segments.push({ x0: a.x, y0: a.y, x1: b.x, y1: b.y, w: lineW });
+    });
+    const conn = new Set();
+    body.edges.forEach(e => { if (!e.transparent) { conn.add(e.a); conn.add(e.b); } });
+    const dots = [];
+    body.nodes.forEach((n, ni) => {
+      if (n.inv) return;
+      const r = conn.has(ni) ? nodeR : (nodeR > 0 ? nodeR : lineHalf);
+      if (r <= 0) return;
+      const cornerR = Math.max(0, Math.min(r, r * (100 - shape) / 100));
+      dots.push({ x: n.x, y: n.y, r, cornerR });
+    });
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    segments.forEach(s => {
+      const hw = s.w / 2;
+      minX = Math.min(minX, s.x0 - hw, s.x1 - hw); maxX = Math.max(maxX, s.x0 + hw, s.x1 + hw);
+      minY = Math.min(minY, s.y0 - hw, s.y1 - hw); maxY = Math.max(maxY, s.y0 + hw, s.y1 + hw);
+    });
+    dots.forEach(d => {
+      minX = Math.min(minX, d.x - d.r); maxX = Math.max(maxX, d.x + d.r);
+      minY = Math.min(minY, d.y - d.r); maxY = Math.max(maxY, d.y + d.r);
+    });
+    if (!isFinite(minX) || (segments.length === 0 && dots.length === 0)) return;
+    glyphs.push({
+      ch: body.ch || '',
+      segments, dots,
+      bbox: { x: minX, y: minY, w: maxX - minX, h: maxY - minY },
+    });
+  });
+  return { glyphs, params: { lineW, nodeR, shape } };
+}
+if (typeof window !== 'undefined') window.__chFontGeometry = _collectGlyphGeometryForFont;
+
 function saveSVG() {
   if (!world) return;
   _track('SVG 다운로드');

@@ -12,6 +12,11 @@
 - `.claude/launch.json` (로컬 dev 서버 프리뷰 설정), `.gitignore`, `.editorconfig`.
 - **Electron 데스크탑 듀얼 빌드**: `electron/main.cjs` + `dev:desktop`/`start:desktop`/`build:desktop`
   스크립트. 같은 Vite 번들을 웹·데스크탑이 공유. 오프스크린 capturePage로 렌더 검증 완료.
+- **직접 타이핑 모드 프로토타입**: `src/typing-mode.js` (백틱 진입/Esc 종료). docs/TYPING_MODE.md.
+- **폰트 익스포트 (정적 OTF)**: `src/font/build-font.js`(순수 빌더) + `src/font-export.js`
+  (Ctrl/Cmd+Shift+F). 획→캡슐·노드→둥근사각 합집합 → opentype.js OTF. 라이브 4글리프
+  생성 검증(OTTO). docs/FONT_EXPORT.md. 가변 TTF는 설계만(미구현).
+- 의존성: opentype.js, polygon-clipping (폰트 빌드는 지연 import 로 별도 청크 분리).
 
 ### 변경
 - **모노리식 `index.html`(13,096줄) → 모듈 분리**: 인라인 `<script>` 3블록을
