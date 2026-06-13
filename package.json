@@ -1,0 +1,21 @@
+{
+  "name": "clumped-hangul",
+  "private": true,
+  "version": "1.11.0",
+  "description": "뭉친 한글 (Clumped Hangul) — 한글 모아쓰기 물리 시뮬레이션",
+  "type": "module",
+  "homepage": "https://clumped-hangul.com",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check src",
+    "format": "biome format --write src"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^1.9.4",
+    "typescript": "^5.7.2",
+    "vite": "^6.0.7"
+  }
+}
