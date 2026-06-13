@@ -36,8 +36,21 @@
   → Bash `npm run dev`(run_in_background) + **Chrome MCP**로 검증하는 워크플로우 확립. CLAUDE.md에 기록.
 - `pkill -f vite` 금지(다른 관리 서버까지 죽임) — PID 지정 kill만.
 
-### 다음 / 미해결
-- P0-4: 기능 클러스터를 main.js에서 하나씩 분리 (analytics·data부터). 깊이 얽힌 건 문서화 후 보류.
-- P0-6: GitHub Pages 빌드-배포 Action.
-- P1: Electron 듀얼 빌드 → P2: 타이핑 UI → P3: 폰트 익스포트 → P4: Figma 재현.
-- 확인 필요(낮은 우선순위): 빈 입력 첫 로드 시 기본 문구 렌더 타이밍이 원본과 동일한지 A/B 비교.
+### 한 일 / 결과 (이어서 — 야간 자율 진행 전체)
+- **P0-6** ✅ GitHub Pages 빌드-배포 Action(휴면). (커밋 `72f93b8`)
+- **P1** ✅ Electron 듀얼 빌드. electron/main.cjs + dev/start/build:desktop. 오프스크린
+  capturePage로 dist 렌더 검증(한글·HUD·푸터 정상). (커밋 `0aa017f`)
+- **P2** 🟡 타이핑 UI — 타당성 확인(앱이 이미 라이브 렌더) + 비파괴 프로토타입(src/typing-mode.js,
+  백틱/Esc) + docs/TYPING_MODE.md(설계 옵션 3). 최종 UX는 사용자와 확정 예정. (커밋 `d93d7d3`)
+- **P3** ✅ 폰트 익스포트(정적 OTF). src/font/build-font.js(순수)+src/font-export.js(Ctrl/Cmd+Shift+F).
+  node 단위테스트 + 라이브 "뭉친 한글"→4글리프 OTF(OTTO) 검증. 가변 TTF는 설계만(docs/FONT_EXPORT.md).
+  (커밋 `c115bf7`)
+- **P4** 🟡 Figma 연동 — 연결·권한·파일구조(빈 "UI" 페이지) 확인, 디자인 토큰 추출, 워크플로우+재현
+  계획 문서화(docs/FIGMA_WORKFLOW.md). 실제 Figma 빌드는 디자이너 방향 확인 후 협업으로.
+
+### 다음 / 미해결 (아침 리뷰 후)
+- **P4 Figma 빌드**: 어느 장면부터·어느 충실도로 만들지 정하고 use_figma 로 시작 (figma-use 스킬 필요).
+- **P2 타이핑 UI 최종 UX**: 옵션 1(모드 토글)/2(상시+보조키)/3(풀스크린) 중 선택.
+- **P3 가변 TTF**: 토폴로지-안정 기하(합집합 off) + fontTools(varLib) 파이프라인.
+- **P0-4 추가 파일분할**: main.js 기능 클러스터 분리 (typeof 전역패턴 179곳 주의 — 협업 권장).
+- 낮은 우선순위: 폰트 글로벌 메트릭 통일, TTF(쿼드라틱) 출력, 빈입력 첫로드 기본문구 타이밍(원본과 동일·회귀 아님 확인됨).
