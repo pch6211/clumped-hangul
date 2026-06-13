@@ -4,6 +4,7 @@
   "version": "1.11.0",
   "description": "뭉친 한글 (Clumped Hangul) — 한글 모아쓰기 물리 시뮬레이션",
   "type": "module",
+  "main": "electron/main.cjs",
   "homepage": "https://clumped-hangul.com",
   "scripts": {
     "dev": "vite",
@@ -11,11 +12,28 @@
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "lint": "biome check src",
-    "format": "biome format --write src"
+    "format": "biome format --write src",
+    "dev:desktop": "concurrently -k -n vite,electron \"vite\" \"wait-on tcp:127.0.0.1:5173 && cross-env ELECTRON_START_URL=http://localhost:5173 electron electron/main.cjs\"",
+    "start:desktop": "electron electron/main.cjs",
+    "build:desktop": "vite build && electron-builder"
+  },
+  "build": {
+    "appId": "com.clumpedhangul.app",
+    "productName": "뭉친 한글",
+    "files": ["dist/**/*", "electron/**/*"],
+    "directories": { "output": "release" },
+    "mac": { "target": "dmg", "category": "public.app-category.graphics-design" },
+    "win": { "target": "nsis" },
+    "linux": { "target": "AppImage" }
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",
+    "concurrently": "^10.0.3",
+    "cross-env": "^10.1.0",
+    "electron": "^42.4.0",
+    "electron-builder": "^26.15.3",
     "typescript": "^5.7.2",
-    "vite": "^6.0.7"
+    "vite": "^6.0.7",
+    "wait-on": "^9.0.10"
   }
 }

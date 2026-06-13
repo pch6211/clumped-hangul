@@ -10,6 +10,8 @@
   `tsconfig.json`, `biome.json`).
 - 개발 지침·기록 문서: `CLAUDE.md`, `CHANGELOG.md`, `docs/DECISIONS.md`, `docs/PROJECT_NOTES.md`.
 - `.claude/launch.json` (로컬 dev 서버 프리뷰 설정), `.gitignore`, `.editorconfig`.
+- **Electron 데스크탑 듀얼 빌드**: `electron/main.cjs` + `dev:desktop`/`start:desktop`/`build:desktop`
+  스크립트. 같은 Vite 번들을 웹·데스크탑이 공유. 오프스크린 capturePage로 렌더 검증 완료.
 
 ### 변경
 - **모노리식 `index.html`(13,096줄) → 모듈 분리**: 인라인 `<script>` 3블록을

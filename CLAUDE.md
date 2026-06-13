@@ -48,6 +48,11 @@ npm run preview    # 빌드 결과 미리보기
 npm run typecheck  # tsc --noEmit (점진적 TS 전환용)
 npm run lint       # biome check src
 npm run format     # biome format --write src
+
+# 데스크탑 (Electron) — 같은 Vite 번들을 웹/데스크탑이 공유 (진입점 electron/main.cjs)
+npm run dev:desktop    # Vite dev + Electron 창 (HMR). ELECTRON_START_URL 로 localhost:5173 로드
+npm run start:desktop  # 빌드된 dist/ 를 Electron 창으로 (vite build 선행 필요)
+npm run build:desktop  # vite build + electron-builder → release/ 에 dmg/nsis/AppImage
 ```
 
 ### ⚠️ 앱 동작 검증 방법 (중요)
