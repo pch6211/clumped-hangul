@@ -1,0 +1,50 @@
+# 뭉친 한글 — Vite 빌드 후 GitHub Pages 배포
+#
+# 활성화 조건(둘 다 필요):
+#   1) 이 워크플로우가 main 에 머지될 것
+#   2) 저장소 Settings → Pages → Source 를 "GitHub Actions" 로 변경
+# 그 전까지는 휴면 상태 — 현재 라이브(branch 루트 index.html 서빙)에 영향 없음.
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: # 수동 실행 허용
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# 동시 배포 1건만 (중복 실행 취소)
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - name: 커스텀 도메인(CNAME) 유지
+        run: cp CNAME dist/CNAME
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
