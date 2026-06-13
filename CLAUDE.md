@@ -77,6 +77,11 @@ npm run build:desktop  # vite build + electron-builder → release/ 에 dmg/nsis
 - **TypeScript**: `allowJs`로 느슨하게 시작. 모듈을 하나씩 `.ts`로 전환하며 타입 부여.
   React는 도입하지 않음(canvas/렌더 루프 앱이라 부적합).
 - **브랜치**: 기능 브랜치 → PR → `main`. `main`은 라이브 사이트라 직접 커밋 금지.
+- **소통(설명) 규칙**: 개발/전문 용어는 **처음 나올 때 항상 쉽게 풀어 설명**한다(초보·바이브코딩
+  사용자 기준). 한 번 설명한 건 반복할 필요 없음. 새 개념은 [docs/CONCEPTS.md](docs/CONCEPTS.md)에 한 줄 추가.
+- **세션 기록**: 매 세션(또는 주요 진척)마다 [docs/SESSION_LOG.md](docs/SESSION_LOG.md)(대화 핵심)·
+  [docs/PROJECT_NOTES.md](docs/PROJECT_NOTES.md)(작업 로그)·[docs/CONCEPTS.md](docs/CONCEPTS.md)(용어)를 갱신한다.
+  각 기록 끝엔 "NEXT(재개 시 바로 할 것)"를 남겨 크레딧 소진/세션 전환 후에도 즉시 이어갈 수 있게 한다.
 
 ## 배포
 - 현재: `main`의 루트 `index.html`을 GitHub Pages가 서빙 (CNAME=clumped-hangul.com).
