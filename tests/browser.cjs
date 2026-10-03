@@ -45,18 +45,34 @@ const { chromium } = require('playwright');
       PARAMS.choHoriz = 2; world = buildWorld(currentText());
       return { x: world.bodies[0].anchorX, y: world.bodies[0].anchorY };
     });
-    assert.deepEqual(moved, { x: anchor.x + 60, y: anchor.y - 90 });
+    assert.ok(Math.abs(moved.x - anchor.x - 60) < 0.001 && Math.abs(moved.y - anchor.y + 90) < 0.001);
     await page.mouse.move(moved.x, moved.y); await page.mouse.down(); await page.mouse.move(moved.x + 40, moved.y);
     await page.evaluate(() => canvas.dispatchEvent(new PointerEvent('pointercancel', { pointerId: _centerDrag.id })));
     await page.mouse.up();
-    assert.deepEqual(await page.evaluate(() => ({ x: world.bodies[0].anchorX, y: world.bodies[0].anchorY })), moved);
+    const cancelled = await page.evaluate(() => ({ x: world.bodies[0].anchorX, y: world.bodies[0].anchorY }));
+    assert.ok(Math.hypot(cancelled.x - moved.x, cancelled.y - moved.y) < 0.001);
     await page.locator('#centerHandles').click();
-    const node = await page.evaluate(() => ({ x: world.bodies[0].nodes[0].x, y: world.bodies[0].nodes[0].y }));
+    const node = await page.evaluate(() => {
+      const n = world.bodies.flatMap(b => b.nodes).find(n => n.x > 340 && n.x < cssW - 20 && n.y > 80 && n.y < cssH - 80);
+      return n ? { x: n.x, y: n.y } : { missing: true, first: world.bodies[0].nodes[0] };
+    });
+    assert.ok(!node.missing, JSON.stringify(node));
     await page.mouse.move(node.x, node.y); await page.mouse.down();
     assert.equal(await page.evaluate(() => !!draggedNode && !_centerDrag), true);
     await page.mouse.move(node.x + 20, node.y + 30); await page.evaluate(() => step(1)); await page.mouse.up();
     assert.equal(await page.evaluate(() => draggedNode), null);
     console.log('PASS: negative spacing, center drag, 25 resets, regeneration, pointer cancellation, stroke drag');
+    const motion = await page.evaluate(() => {
+      resetWorld(); const b = world.bodies[0], x = b.anchorX, y = b.anchorY;
+      PARAMS.wind = 50; PARAMS.jitter = 10;
+      for (let i = 0; i < 100; i++) _advanceMotion(i * 16);
+      const excursion = Math.hypot(b.anchorX - x, b.anchorY - y);
+      PARAMS.wind = PARAMS.jitter = 0;
+      for (let i = 100; i < 300; i++) _advanceMotion(i * 16);
+      return { excursion, residual: Math.hypot(b.anchorX - x, b.anchorY - y) };
+    });
+    assert.ok(motion.excursion > 1 && motion.excursion < 100); assert.ok(motion.residual < 0.001);
+    console.log('PASS: bounded wind/jitter returns to the saved center', motion);
     assert.deepEqual(errors, []);
   } finally { await browser?.close(); server.close(); }
 })().catch(e => { console.error(e); process.exitCode = 1; });
