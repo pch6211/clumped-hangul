@@ -710,6 +710,8 @@ const MH_CFG = {
     shape: 0,            // 점 모양: 0=원, 50=라운드, 100=사각
     borderWidth: 0,      // [E3] 테두리 — 글자를 채우지 않고 윤곽선(두께=이 값)으로 감쌈 (0=없음 ~ 30)
     flow: 0,             // 흘리기 — 현재 노드 중 N 개(고정값) 골라 아래로 흘러내리는 선. localStorage('mh_flow') 영속. 0 = 비활성.
+    jitter: 0,
+    jitterSpeed: 30,
     cornerR: 0,          // 부드럽게 — 픽셀 마스크 + blur 기반 모서리 부드러움
     // 원시 물리 (튜닝값 — UI 슬라이더는 숨김 상태)
     repulse: 20,         // 반발 — 노드끼리 밀어내는 힘
@@ -2231,7 +2233,9 @@ const PANEL_GROUPS = [
     ['lineW',       '획 굵기',   0,  30, 1],
     ['borderWidth', '테두리', 0, 30, 1],
     ['flow',        '페인트', 0, 10, 1],
-    ['cornerR',     '부드럽게',  0,  20, 1]
+    ['cornerR',     '부드럽게',  0,  20, 1],
+    ['jitter', '떨림 강도', 0, 100, 1],
+    ['jitterSpeed', '떨림 속도', 0, 100, 1]
   ]},
   { id: 'bg', title: '배경 색', items: [
     ['_bgR', '빨강', 0, 255, 1],
@@ -4212,6 +4216,7 @@ function _buildWorldInternal(str, options = {}) {
 }
 
 function step(dt, simulation = world, predicting = false) {
+  if (!predicting) _stripNodeJitter();
   const G = PARAMS.gravity / 100;
   const R = PARAMS.repulse;
   // [F6] 획 유연성 → 스프링 강도 + 스프링 추가값(관리자) — 당기거나 구부린 상태를
@@ -5658,8 +5663,70 @@ document.addEventListener('pointerup',     _endPxMeasure, false);
 document.addEventListener('pointercancel', _endPxMeasure, false);
 window.addEventListener('resize', () => { if (_pxMeasure) _renderPxMeasure(); });
 
-function tick() {
+let _motionTime = 0, _motionLast = null, _jitterDt = 1 / 60, _jitterPhase = 0;
+function _jitterFrequency(speed=PARAMS.jitterSpeed){const v=Math.max(0,Math.min(100,speed||0));return v===0?0:.03*Math.pow(400,v/100);}
+function _advanceMotion(now) {
+  _jitterDt = _motionLast === null ? 1/60 : Math.max(0, Math.min(0.05, (now-_motionLast)/1000));
+  _motionLast = now; _motionTime += _jitterDt;
+  _jitterPhase=(_jitterPhase+2*Math.PI*_jitterFrequency()*_jitterDt)%(Math.PI*2000);
+}
+// A damped spring per node. Strip its displacement before the base solver, then
+// integrate rapid, zero-mean acceleration and apply it to that node only.
+// Rest displacement is zero; glyph anchors and the original physics remain intact.
+function _stripNodeJitter() {
+  if (!world) return;
+  world.bodies.forEach(b => b.nodes.forEach(n => {
+    if (!n.jitterState) return;
+    if (n.jitterState.applied) { n.x -= n.jitterState.x; n.y -= n.jitterState.y; n.jitterState.applied = false; }
+  }));
+}
+function _applyNodeJitter() {
+  if (!world) return;
+  const strength = Math.max(0,Math.min(100,PARAMS.jitter || 0));
+  const substeps = Math.max(1,Math.ceil(_jitterDt*240)), dt = _jitterDt/substeps;
+  world.bodies.forEach((b,bi) => b.nodes.forEach((n,ni) => {
+    if (!strength && !n.jitterState) return;
+    const w = n.jitterState || (n.jitterState = { x:0,y:0,vx:0,vy:0 });
+    if (n === draggedNode) { delete n.jitterState; return; }
+    if (_centerDrag || draggedNode) { n.x += w.x; n.y += w.y; w.applied = true; return; }
+    const phase = ni*2.39996+bi*1.7;
+    const amplitude = 12*Math.pow(strength/100,1.35)/1.3,omega=2*Math.PI*_jitterFrequency();
+    // Feed-forward compensation preserves displacement amplitude across speed.
+    // At speed zero the phase holds; strength zero still restores the rest pose.
+    const force=(p,w)=>(1900-w*w)*Math.sin(p)+55*w*Math.cos(p);
+    for (let k=0;k<substeps;k++) {
+      const t=_jitterPhase-omega*(_jitterDt-(k+1)*dt);
+      const fx=amplitude*(force(t+phase,omega)+.3*force(t*1.55+phase*1.7,omega*1.55));
+      const fy=amplitude*(force(t*1.2+phase*1.3,omega*1.2)+.3*force(t*1.64+phase,omega*1.64));
+      w.vx += (fx-1900*w.x-55*w.vx)*dt;
+      w.vy += (fy-1900*w.y-55*w.vy)*dt;
+      w.x += w.vx*dt; w.y += w.vy*dt;
+    }
+    if (!strength && Math.hypot(w.x,w.y,w.vx,w.vy)<0.001) { delete n.jitterState; return; }
+    n.x += w.x; n.y += w.y; w.applied = true;
+  }));
+  // Preserve welded junctions when applying the per-node force layer.
+  world.bodies.forEach(b => {
+    if (!b.magnetPairs?.length) return;
+    const parent = b.nodes.map((_,i)=>i);
+    const root = i => { while (parent[i]!==i) i=parent[i]; return i; };
+    (b.magnetPairs || []).forEach(([i,j]) => {
+      const a=b.nodes[i], c=b.nodes[j], aw=a.jitterState, cw=c.jitterState;
+      if (!aw || !cw || a===draggedNode || c===draggedNode) return;
+      if (Math.hypot(a.x-aw.x-c.x+cw.x,a.y-aw.y-c.y+cw.y)<0.001) parent[root(j)]=root(i);
+    });
+    b.nodes.forEach((n,i)=>{
+      const source=b.nodes[root(i)].jitterState, w=n.jitterState;
+      if (root(i)===i || !source || !w) return;
+      n.x += source.x-w.x; n.y += source.y-w.y; Object.assign(w,source);
+    });
+  });
+}
+
+function tick(now = performance.now()) {
+  _advanceMotion(now);
   step(1);
+  _applyNodeJitter();
   draw();
   updateHUD();
   rafId = requestAnimationFrame(tick);
@@ -7807,7 +7874,7 @@ function randomizeAll() {
   if (_layoutState.mode==='optical-v2') {_layoutState.seed=(_layoutState.seed+1)>>>0;_persistLayoutState();}
   // 0) 자유 슬라이더 (gravity 등): 그대로 풀 범위 — DERIVED_KEYS는 아래에서 별도 처리
   PANEL_GROUPS.forEach(group => group.items.forEach(([key, label, mn, mx, step]) => {
-    if (DERIVED_KEYS.has(key)) return;
+    if (DERIVED_KEYS.has(key) || ['jitter','jitterSpeed'].includes(key)) return;
     setParamValue(key, randInt(mn, mx), { silent: true });
   }));
   // 흘리기 — 랜덤 트리거 시 노드+길이 재추첨 (슬라이더 개수는 유지). 잔상도 비움.
@@ -11209,8 +11276,15 @@ function triggerSettingsLoad() {
             if (_mta) _mta.value = _show;
           }
           if (data.params && typeof data.params === 'object') {
-            Object.keys(data.params).forEach(k => { if (k in PARAMS) PARAMS[k] = data.params[k]; });
+            Object.keys(data.params).forEach(k => {
+              if (Object.hasOwn(PARAMS,k) && (typeof PARAMS[k]==='boolean' ? typeof data.params[k]==='boolean' : Number.isFinite(data.params[k]))) PARAMS[k]=data.params[k];
+            });
           }
+          // Old experimental fields (recording/motion) are ignored; known artwork values remain.
+          if (!data.params || !Object.hasOwn(data.params,'jitter')) PARAMS.jitter=Number.isFinite(data.params?.wind)?Math.max(0,Math.min(100,data.params.wind)):0;
+          if (!data.params || !Object.hasOwn(data.params,'jitterSpeed')) PARAMS.jitterSpeed=PARAMS.jitter>0?100:30;
+          PARAMS.jitter=Math.max(0,Math.min(100,PARAMS.jitter));
+          PARAMS.jitterSpeed=Math.max(0,Math.min(100,PARAMS.jitterSpeed));
           if (data.elasticity) {
             if (typeof data.elasticity.K_ANGLE  === 'number') K_ANGLE  = data.elasticity.K_ANGLE;
             if (typeof data.elasticity.K_ROT    === 'number') K_ROT    = data.elasticity.K_ROT;
