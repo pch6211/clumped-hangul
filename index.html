@@ -1559,6 +1559,9 @@ var _viewFocused = true;
 document.addEventListener('pointerdown', (e) => {
   _viewFocused = !!(e.target && e.target.id === 'universe');
 }, true);
+document.addEventListener('focusin', e => {
+  if (e.target !== canvas) _viewFocused = false;
+});
 let _moimkkolChar = null;         // 현재 시각화 중인 음절
 let _moimkkolBoxes = [];          // [{kind, x, y, w, h, jamo, design, selected}]
 let _moimkkolSelected = -1;       // 주(主) 선택 박스 인덱스 (리사이즈·커서 기준; 단일)
@@ -3631,13 +3634,34 @@ function _finishCenterDrag(e, cancel = false) {
   const drag = _centerDrag;
   if (cancel) {
     _translateBody(drag.body, drag.startX - drag.body.anchorX, drag.startY - drag.body.anchorY);
-  } else {
-    _centerLayout.points[drag.body.centerKey] = { x: drag.body.anchorX, y: drag.body.anchorY };
+  } else if (Math.hypot(drag.body.anchorX-drag.startX, drag.body.anchorY-drag.startY) > 0.01) {
+    const pin = { x: drag.body.anchorX, y: drag.body.anchorY };
+    _centerLayout.points[drag.body.centerKey] = pin;
     _persistCenters();
+    _bondUndo.push({ kind:'center', text:_centerLayout.text, key:drag.body.centerKey,
+      before:{ pin:drag.beforePin, x:drag.startX, y:drag.startY },
+      after:{ pin:{...pin}, ...pin } });
+    if (_bondUndo.length > 50) _bondUndo.shift();
+    _bondRedo.length = 0;
   }
   _centerDrag = null;
   canvas.classList.remove('dragging');
   try { canvas.releasePointerCapture(drag.id); } catch (_) {}
+}
+function _clearCenterHistory() {
+  for (const stack of [_bondUndo, _bondRedo]) {
+    if (!stack) continue;
+    for (let i=stack.length-1;i>=0;i--) if (stack[i].kind==='center') stack.splice(i,1);
+  }
+}
+function _restoreCenterHistory(entry, side) {
+  if (entry.text !== _centerLayout.text) return;
+  const state=entry[side];
+  if (state.pin) _centerLayout.points[entry.key]={...state.pin};
+  else delete _centerLayout.points[entry.key];
+  const body=world?.bodies.find(b=>b.centerKey===entry.key);
+  if (body) _translateBody(body,state.x-body.anchorX,state.y-body.anchorY);
+  _persistCenters();
 }
 function _centerRadius() { return 1.5*Math.max((PARAMS.nodeR || 0)/2, 3); }
 function _hoverCenterBody(p = _centerPointer) {
@@ -4032,7 +4056,7 @@ function _buildWorldInternal(str, options = {}) {
   const locked = optical && _opticalLayoutLock?.text===str && !options.measureOnly;
   if (!options.measureOnly) {
   _finishCenterDrag(null, true);
-  if (_centerLayout.text !== str) { if (_modulation.running) _stopModulation(false); _centerLayout = { text: str, points: {} }; _persistCenters(); }
+  if (_centerLayout.text !== str) { _clearCenterHistory(); if (_modulation.running) _stopModulation(false); _centerLayout = { text: str, points: {} }; _persistCenters(); }
   // A rebuild must not leave pointer handlers referencing detached nodes.
   if (typeof draggedNode !== 'undefined') { draggedNode = null; _bond = null; _detach = null; }
   canvas.classList.remove('dragging');
@@ -5826,6 +5850,9 @@ function rebuild() {
 
 // ── 키보드 단축키 ──
 window.addEventListener('keydown', e => {
+  // Native text/IME undo belongs to its input, even while an editor is open.
+  if ((e.ctrlKey || e.metaKey) && e.code==='KeyZ' &&
+      (e.isComposing || e.keyCode===229 || e.target.isContentEditable || e.target.closest?.('input,textarea,select'))) return;
   // Ctrl/Cmd+S → SVG 저장, Ctrl/Cmd+P → PNG 저장 (브라우저 기본동작 차단, 전역)
   if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey) {
     // e.code 는 키보드 레이아웃·IME 무관 — 한글 IME 활성 상태에서도 동작
@@ -6259,16 +6286,18 @@ function _bondRestore(snap) {
   if (typeof renderEditorCanvas === 'function') renderEditorCanvas();
 }
 function _bondUndoApply() {
+  if (_centerDrag) { _finishCenterDrag(null, true); return true; }
   if (!_bondUndo.length) return false;
   const e = _bondUndo.pop();
-  _bondRestore(e.before);
+  if (e.kind==='center') _restoreCenterHistory(e,'before'); else _bondRestore(e.before);
   _bondRedo.push(e);
   return true;
 }
 function _bondRedoApply() {
+  if (_centerDrag) { _finishCenterDrag(null, true); return true; }
   if (!_bondRedo.length) return false;
   const e = _bondRedo.pop();
-  _bondRestore(e.after);
+  if (e.kind==='center') _restoreCenterHistory(e,'after'); else _bondRestore(e.after);
   _bondUndo.push(e);
   return true;
 }
@@ -6621,7 +6650,7 @@ canvas.addEventListener('pointerdown', e => {
     const b = hit && Math.abs(p.x-hit.anchorX) + Math.abs(p.y-hit.anchorY) <= _centerRadius() + 2 ? hit : null;
     if (b) {
       e.preventDefault(); e.stopPropagation();
-      _centerDrag = { body: b, id: e.pointerId, x: p.x, y: p.y, startX: b.anchorX, startY: b.anchorY };
+      _centerDrag = { body: b, id: e.pointerId, x: p.x, y: p.y, startX: b.anchorX, startY: b.anchorY, beforePin: _centerLayout.points[b.centerKey] ? {..._centerLayout.points[b.centerKey]} : null };
       canvas.classList.add('dragging'); canvas.setPointerCapture(e.pointerId); return;
     }
   }
@@ -7475,9 +7504,6 @@ function buildPanel() {
     _groupRandomizers[group.id] = makeGroupRandomizer(group);
   });
 
-  const clearCenters = document.createElement('button');
-  clearCenters.className = 'pillBtn'; clearCenters.textContent = '배치 초기화';
-  clearCenters.onclick = () => { _finishCenterDrag(null, true); _centerLayout.points = {}; _persistCenters(); resetWorld(); };
 
   // 액션 버튼 (SVG / PNG / SAVE / LOAD)  — 의견·커피는 좌하단 HUD로 이동
   const btnRow = document.createElement('div');
@@ -7509,7 +7535,6 @@ function buildPanel() {
   loadBtn.title = '저장된 설정값 JSON을 불러오기';
   loadBtn.addEventListener('click', () => triggerSettingsLoad());
   fileRow.appendChild(loadBtn);
-  fileRow.appendChild(clearCenters);
   body.append(btnRow,fileRow);
 
   // [G1] 의견 보내기 / 커피 사주기 = 속성 패널에서 제거 → 크레딧 바로 위 우하단 고정
@@ -11703,6 +11728,7 @@ function triggerSettingsLoad() {
             _moimkkolYShiftReplaceAll(data.moimkkolYShift);
             _moimkkolYShiftPersist();
           }
+          _finishCenterDrag(null, true); _clearCenterHistory();
           _loadCenterLayout(data.centers); _persistCenters();
           // [항목3] tagLabelOffsets 복원 제거 — 앞/뒤붙임 라벨 표시 폐기
           if (world) world = buildWorld(currentText());
