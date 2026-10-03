@@ -632,6 +632,7 @@
   </div>
   <div class="editorCtxMenu" id="editorCtxMenu"></div>
 </div>
+<script src="media-export.js"></script>
 <script>
 /* ╔══════════════════════════════════════════════════════════════════════════╗
    ║  ⚙  설정 대시보드 (MH_CFG)  —  여기만 고치면 됩니다                          ║
@@ -5728,6 +5729,7 @@ function tick(now = performance.now()) {
   step(1);
   _applyNodeJitter();
   draw();
+  _captureRecordingFrame(now);
   updateHUD();
   rafId = requestAnimationFrame(tick);
 }
@@ -7197,19 +7199,27 @@ function buildPanel() {
   pngBtn.textContent = 'PNG';
   pngBtn.addEventListener('click', () => savePNG());
   btnRow.appendChild(pngBtn);
+  const recordBtn=document.createElement('button');recordBtn.className='pillBtn';recordBtn.id='recordMov';
+  recordBtn.title='투명 MOV 녹화 · 최대 30초 / 64MiB · Esc 취소';
+  recordBtn.onclick=()=>{if(_recording)void _stopRecording();else _startRecording();};
+  btnRow.appendChild(recordBtn);
+  const fileRow=document.createElement('div');fileRow.className='btnRow';
   const saveBtn = document.createElement('button');
   saveBtn.className = 'pillBtn';
   saveBtn.textContent = 'SAVE';
   saveBtn.title = '현재 설정값(슬라이더·색·문구)을 JSON 파일로 저장';
   saveBtn.addEventListener('click', () => saveSettings());
-  btnRow.appendChild(saveBtn);
+  fileRow.appendChild(saveBtn);
   const loadBtn = document.createElement('button');
   loadBtn.className = 'pillBtn';
   loadBtn.textContent = 'LOAD';
   loadBtn.title = '저장된 설정값 JSON을 불러오기';
   loadBtn.addEventListener('click', () => triggerSettingsLoad());
-  btnRow.appendChild(loadBtn);
-  body.appendChild(btnRow);
+  fileRow.appendChild(loadBtn);
+  body.appendChild(btnRow);body.appendChild(fileRow);
+  const status=document.createElement('div');status.id='recordStatus';status.setAttribute('role','status');
+  status.style.cssText='font-size:11px;line-height:1.5;margin-top:6px';body.appendChild(status);
+  _recordButtons();_recordStatus(_recordMessage);
 
   // [G1] 의견 보내기 / 커피 사주기 = 속성 패널에서 제거 → 크레딧 바로 위 우하단 고정
   //   클러스터(#mhBottomBtns)로 이동. btnRow2 가 빠진 만큼 아래 가이드가 자연히 위로 올라감.
@@ -7271,6 +7281,7 @@ function _snapGuideBoxWidths() {
 function makeGroupRandomizer(group) {
   return () => {
     if (group.id === 'decor') {
+      _randomizeJitter();
       setParamValue('shape', randInt(0, 100), { silent: true });
       // 둘 다 0이면 글자 안 보임 — nodeR 최소 1 보장
       setParamValue('nodeR', randInt(1, 30), { silent: true });
@@ -7823,6 +7834,10 @@ function togglePanel() {
 }
 
 // ── 랜덤 (단발) — R 한 번 = 한 번 랜덤 도출 후 정지 ──
+function _randomizeJitter() {
+  setParamValue('jitter',randInt(0,30),{silent:true});
+  setParamValue('jitterSpeed',randInt(0,100),{silent:true});
+}
 function randInt(lo, hi) { return lo + Math.floor(Math.random() * (hi - lo + 1)); }
 
 // 글자 수 + 화면 크기 기반 점 간격 상한 추정
@@ -7877,6 +7892,7 @@ function randomizeAll() {
     if (DERIVED_KEYS.has(key) || ['jitter','jitterSpeed'].includes(key)) return;
     setParamValue(key, randInt(mn, mx), { silent: true });
   }));
+  _randomizeJitter();
   // 흘리기 — 랜덤 트리거 시 노드+길이 재추첨 (슬라이더 개수는 유지). 잔상도 비움.
   _redrawDrips();
   // 부드럽게는 0~30 자유 랜덤 (선택적 효과)
@@ -9313,23 +9329,88 @@ function saveSVG() {
 
 // PNG 저장 — 배경 투명. 캔버스 크기 = 글자+흘리기 경계상자 + 사방 50px (화면 크기 무시).
 //   파이프라인: 흘리기 → 테두리 → 부드럽게 (drawBorders/drawSmoothedBodies 내부에 흘리기 포함됨).
-function savePNG() {
-  if (!world) return;
-  _track('PNG 다운로드');
-  // 에디터·자모 선택창이 열려있으면 닫기
-  const _ed = document.getElementById('editor');
-  if (_ed && _ed.classList.contains('open')) closeEditor();
-  const dpr = (window.devicePixelRatio || 1) * 2;  // 해상도 2배
-  const bbox = _computeExportBBox() || { x: 0, y: 0, w: cssW, h: cssH };
-  const X = bbox.x, Y = bbox.y, W = bbox.w, H = bbox.h;
-  const off = document.createElement('canvas');
-  off.width = W * dpr;
-  off.height = H * dpr;
-  const octx = off.getContext('2d');
-  octx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  // bbox 시작점만큼 시프트 — world 좌표를 그대로 그리면 (X,Y)→(0,0) 정렬됨.
-  octx.translate(-X, -Y);
-  // 배경 채우지 않음 → 투명
+let _recording = null, _recordMessage = '';
+function _recordStatus(text) {
+  _recordMessage=text;
+  const el=document.getElementById('recordStatus');
+  if (el) { el.textContent=text; el.hidden=!text; }
+}
+function _recordButtons() {
+  const button=document.getElementById('recordMov');
+  if (!button) return;
+  button.textContent=_recording?.stopping?'저장 중…':_recording?'정지':'mov';
+  button.disabled=!!_recording?.stopping;
+  button.setAttribute('aria-pressed',String(!!_recording));
+}
+function _downloadRecording(blob) {
+  const url=URL.createObjectURL(blob),a=document.createElement('a');
+  a.href=url;a.download='뭉친한글_'+_tsName()+'.mov';
+  document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),30000);
+}
+function _startRecording() {
+  if (_recording || !world) return;
+  if (typeof MHMedia==='undefined') { _recordStatus('녹화 파일을 불러오지 못했습니다. 새로고침 후 다시 시도하세요.');return; }
+  const off=document.createElement('canvas'),scale=Math.min(1,1920/Math.max(cssW,cssH));
+  off.width=Math.max(2,Math.floor(cssW*scale/2)*2);off.height=Math.max(2,Math.floor(cssH*scale/2)*2);
+  const rec={canvas:off,ctx:off.getContext('2d'),viewport:{x:0,y:0,w:cssW,h:cssH},
+    started:performance.now(),duration:30000,frames:[],times:[],bytes:0,last:-Infinity,busy:null,stopping:false,cancelled:false};
+  _recording=rec;_recordButtons();_recordStatus('녹화 중 · Esc 취소');
+  rec.timer=setTimeout(()=>_stopRecording(false,'30초 한도에 도달해 저장했습니다.'),rec.duration);
+  _captureRecordingFrame(rec.started);
+}
+function _captureRecordingFrame(now) {
+  const rec=_recording;
+  if (!rec || rec.stopping || rec.busy || now-rec.last<1000/15) return;
+  if(now-rec.started>=rec.duration) {void _stopRecording(false,'30초 한도에 도달해 저장했습니다.');return;}
+  rec.last=now;
+  try {
+    const c=rec.ctx,v=rec.viewport,off=rec.canvas;
+    c.setTransform(1,0,0,1,0,0);c.clearRect(0,0,off.width,off.height);
+    c.setTransform(off.width/v.w,0,0,off.height/v.h,0,0);
+    _renderArtwork(c,v);
+    let timeout;
+    rec.busy=new Promise((resolve,reject)=>{
+      timeout=setTimeout(()=>reject(Error('PNG 프레임 생성 시간이 초과되었습니다.')),5000);
+      off.toBlob(resolve,'image/png');
+    }).then(blob=>{
+      if(rec.cancelled || _recording!==rec)return;
+      if(!blob || blob.type!=='image/png')throw Error('PNG 프레임 생성에 실패했습니다.');
+      if(rec.bytes+blob.size>64*1024*1024) {rec.limit=true;return;}
+      rec.frames.push(blob);rec.times.push(Math.max(0,Math.round(now-rec.started)));rec.bytes+=blob.size;
+    }).catch(error=>{rec.cancelled=true;rec.error=error.message;}).finally(()=>{
+      clearTimeout(timeout);rec.busy=null;
+      if(rec.error)void _stopRecording(true,rec.error);
+      else if(rec.limit)void _stopRecording(false,'64MiB 한도에 도달해 저장했습니다.');
+    });
+  }catch(error){void _stopRecording(true,'녹화 실패: '+error.message);}
+}
+async function _stopRecording(cancel=false,message='') {
+  const rec=_recording;if(!rec)return;
+  if(cancel)rec.cancelled=true;
+  if(rec.stopping)return;
+  rec.stopping=true;clearTimeout(rec.timer);_recordButtons();
+  const end=Math.min(rec.duration,Math.max(1,Math.round(performance.now()-rec.started)));
+  try {
+    if(rec.busy)await rec.busy;
+    if(!rec.cancelled && rec.frames.length){
+      const durations=rec.times.map((t,i)=>Math.max(1,(rec.times[i+1]??end)-t));
+      const blob=MHMedia.makePngMov(rec.frames,rec.canvas.width,rec.canvas.height,durations);
+      _downloadRecording(blob);_recordStatus(message||'투명 MOV를 저장했습니다.');
+    }else _recordStatus(rec.error||message||(rec.cancelled?'녹화를 취소했습니다.':'저장할 프레임이 없습니다.'));
+  }catch(error){_recordStatus('녹화 실패: '+error.message);}
+  finally{
+    rec.frames.length=0;rec.canvas.width=rec.canvas.height=1;
+    if(_recording===rec)_recording=null;_recordButtons();
+  }
+}
+document.addEventListener('keydown',e=>{
+  if(_recording && e.code==='Escape' && !e.isComposing){e.preventDefault();e.stopImmediatePropagation();void _stopRecording(true);}
+},true);
+document.addEventListener('visibilitychange',()=>{if(document.hidden)void _stopRecording(false,'탭이 숨겨져 녹화를 종료하고 저장했습니다.');});
+window.addEventListener('beforeunload',e=>{if(_recording){e.preventDefault();e.returnValue='';}});
+window.addEventListener('pagehide',()=>{void _stopRecording(true);});
+
+function _renderArtwork(octx, bbox) {
   const fg = currentFgColor();
   drawBorders(octx, world.bodies, fg, bbox);
   if (_bordersOn()) {
@@ -9386,6 +9467,25 @@ function savePNG() {
   // 일반 모드: 흘리기 라인을 글자 위에 추가로 솔리드 렌더 (_flowStyle() 사용).
   _drawFlowItemsCanvas(octx, _collectFlowPrimitives(), _flowStyle());
   }
+}
+function savePNG() {
+  if (!world) return;
+  _track('PNG 다운로드');
+  // 에디터·자모 선택창이 열려있으면 닫기
+  const _ed = document.getElementById('editor');
+  if (_ed && _ed.classList.contains('open')) closeEditor();
+  const dpr = (window.devicePixelRatio || 1) * 2;  // 해상도 2배
+  const bbox = _computeExportBBox() || { x: 0, y: 0, w: cssW, h: cssH };
+  const X = bbox.x, Y = bbox.y, W = bbox.w, H = bbox.h;
+  const off = document.createElement('canvas');
+  off.width = W * dpr;
+  off.height = H * dpr;
+  const octx = off.getContext('2d');
+  octx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  // bbox 시작점만큼 시프트 — world 좌표를 그대로 그리면 (X,Y)→(0,0) 정렬됨.
+  octx.translate(-X, -Y);
+  // 배경 채우지 않음 → 투명
+  _renderArtwork(octx, bbox);
   off.toBlob(blob => {
     if (!blob) return;
     const url = URL.createObjectURL(blob);
