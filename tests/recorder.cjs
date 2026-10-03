@@ -1,18 +1,18 @@
 const assert=require('node:assert/strict'),fs=require('node:fs');const {run,configure}=require('./helpers.cjs');
 run(async page=>{
   await page.setViewportSize({width:640,height:480});await page.waitForFunction(()=>cssW===640);await configure(page);await page.evaluate(()=>togglePanel());
-  const button=page.locator('#recordMov');assert.equal(await button.innerText(),'mov');assert.equal(await page.locator('#recordDialog,#easeGraph,[data-record-group]').count(),0);
+  const button=page.locator('#recordMov');assert.equal(await button.innerText(),'MOV');assert.equal(await page.locator('#recordDialog,#easeGraph,[data-record-group]').count(),0);
   let downloads=0;page.on('download',()=>downloads++);
   const start=async()=>{await button.click();await page.waitForFunction(()=>_recording?.frames.length>0&&!_recording.busy);assert.equal(await button.innerText(),'정지');};
   await page.evaluate(()=>document.getElementById('recordMov').addEventListener('click',()=>{
     if(!_recording || _recording.stopping)return;
-    const c=document.createElement('canvas');c.width=640;c.height=480;const x=c.getContext('2d');_renderArtwork(x,{x:0,y:0,w:640,h:480});window.reference=x.getImageData(0,0,640,480).data;
+    const c=document.createElement('canvas');c.width=640;c.height=480;const x=c.getContext('2d');x.fillStyle=currentBgColor();x.fillRect(0,0,640,480);_renderArtwork(x,{x:0,y:0,w:640,h:480});window.reference=x.getImageData(0,0,640,480).data;
   }));
   await start();
-  const alpha=await page.evaluate(async()=>{const bitmap=await createImageBitmap(_recording.frames[0]),c=document.createElement('canvas');c.width=640;c.height=480;const x=c.getContext('2d');x.drawImage(bitmap,0,0);bitmap.close();const d=x.getImageData(0,0,640,480).data;let transparent=0,visible=0,diff=0;for(let i=0;i<d.length;i++){if(d[i]!==reference[i])diff++;if(i%4===3){if(d[i]===0)transparent++;else visible++;}}return{transparent,visible,diff};});assert.equal(alpha.diff,0);assert.ok(alpha.transparent>1000&&alpha.visible>100);
+  const alpha=await page.evaluate(async()=>{const bitmap=await createImageBitmap(_recording.frames[0]),c=document.createElement('canvas');c.width=640;c.height=480;const x=c.getContext('2d');x.drawImage(bitmap,0,0);bitmap.close();const d=x.getImageData(0,0,640,480).data;let transparent=0,visible=0,diff=0;for(let i=0;i<d.length;i++){if(d[i]!==reference[i])diff++;if(i%4===3){if(d[i]!==255)transparent++;else visible++;}}return{transparent,visible,diff};});assert.equal(alpha.diff,0);assert.equal(alpha.transparent,0);assert.equal(alpha.visible,640*480);
   // Capture another frame after real artwork changes. Resolution stays locked.
   await page.evaluate(()=>{PARAMS.jitter=70;PARAMS.jitterSpeed=30;PARAMS.nodeR=18;_advanceMotion(performance.now());step(1);_applyNodeJitter();_captureRecordingFrame(performance.now()+70);});await page.waitForFunction(()=>_recording.frames.length>=2);
-  const mov=page.waitForEvent('download');await button.click();await(await mov).saveAs('test-results/transparent.mov');await page.waitForFunction(()=>!_recording);assert.equal(await button.innerText(),'mov');
+  const mov=page.waitForEvent('download');await button.click();await(await mov).saveAs('test-results/colored.mov');await page.waitForFunction(()=>!_recording);assert.equal(await button.innerText(),'MOV');
   // Pending encoding + duplicate stops finalize one file; cancellation wins.
   const pending=await page.evaluate(()=>{const original=HTMLCanvasElement.prototype.toBlob;window.realToBlob=original;HTMLCanvasElement.prototype.toBlob=function(cb,type){setTimeout(()=>original.call(this,cb,type),120);};_startRecording();const first=_recording;_startRecording();return first===_recording;});assert.ok(pending);
   const count=downloads,quick=page.waitForEvent('download');await page.evaluate(()=>{void _stopRecording();void _stopRecording();});await quick;await page.waitForFunction(()=>!_recording);assert.equal(downloads,count+1);
@@ -30,7 +30,7 @@ run(async page=>{
   for(const failure of ['encode','render','mux']){
     await page.evaluate(failure=>{window._savedRender=_renderArtwork;window._savedMux=MHMedia.makePngMov;if(failure==='encode')HTMLCanvasElement.prototype.toBlob=cb=>cb(null);if(failure==='render')_renderArtwork=()=>{throw Error('test-render');};if(failure==='mux')MHMedia.makePngMov=()=>{throw Error('test-mux');};_startRecording();},failure);
     if(failure==='mux'){await page.waitForFunction(()=>_recording?.frames.length);await page.evaluate(()=>_stopRecording());}
-    await page.waitForFunction(()=>!_recording);assert.equal(await button.isEnabled(),true);assert.equal(await button.innerText(),'mov');assert.equal(downloads,cancelled);
+    await page.waitForFunction(()=>!_recording);assert.equal(await button.isEnabled(),true);assert.equal(await button.innerText(),'MOV');assert.equal(downloads,cancelled);
     await page.evaluate(()=>{HTMLCanvasElement.prototype.toBlob=window.realToBlob;_renderArtwork=window._savedRender;MHMedia.makePngMov=window._savedMux;});
   }
   // Inject accounting boundaries without producing large files or waiting 30s.
