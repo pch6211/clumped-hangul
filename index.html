@@ -535,7 +535,7 @@
 <div class="hud" id="hud">
   <!-- [v1.10b 후속] 텍스트 교정 + 토글 라벨 + 툴팁(1초 공통). 단축키 재배치: E 제거, M=문자 창, G=가이드 끄기.
        획 수정 '획' 자리에 20px 직선 미리보기, 획 잇기 자리에 노드 모양 미리보기(글자 크기). -->
-  <div class="hudSection" id="hudMain"><span class="hudItem hudClickable" data-action="auto" title="텍스트와 설정값을 5초 마다 임의로 지정합니다."><b>자동 재생</b> A</span><span class="hudItem hudClickable" data-action="reset" title="글자를 다시 출력합니다."><b>글자 리셋</b> B</span><span class="hudItem hudClickable" data-action="panel"><b>설정 창 열기</b> S</span><span class="hudItem hudClickable" data-action="editor"><b>문자 창 열기</b> E</span><span class="hudItem hudClickable" data-action="random"><b>임의 설정 값</b> R</span><span class="hudItem hudClickable" data-action="text"><b>임의 텍스트</b> T</span><span class="hudItem"><b>자간·행간</b>&nbsp; Alt ⇆ ⇅</span><span class="hudItem" title="글자 모양을 임시로 수정합니다"><b>획 수정</b> <canvas id="hudLinePreview" class="hudLinePreview" aria-hidden="true"></canvas> 당기기</span><span class="hudItem" title="같은 모임꼴에서 해당 자모는 항상 붙어서 출력됩니다."><b>획 잇기</b> <canvas id="hudHlPreview" class="hudHlPreview" aria-hidden="true"></canvas> 끼리 붙이기</span><span class="hudItem" title="마지막 획 잇기를 되돌립니다."><b>획 잇기 취소</b>&nbsp; Ctrl Z</span><span class="hudItem" title="디자인 창을 열거나 붙은 획을 뗄 수 있습니다."><b>편집 메뉴</b>&nbsp; 글자 우클릭</span><span class="hudItem hudClickable" id="hudToggleBtn" title="가이드 표시 토글"><b>가이드 끄기</b> M</span></div>
+  <div class="hudSection" id="hudMain"><span class="hudItem hudClickable" data-action="auto" title="텍스트와 설정값을 5초 마다 임의로 지정합니다."><b>자동 재생</b> A</span><span class="hudItem hudClickable" data-action="reset" title="글자를 다시 출력합니다."><b>글자 리셋</b> B</span><span class="hudItem hudClickable" data-action="panel"><b>설정 창 열기</b> S</span><span class="hudItem hudClickable" data-action="editor"><b>문자 창 열기</b> E</span><span class="hudItem hudClickable" data-action="random"><b>임의 설정 값</b> R</span><span class="hudItem hudClickable" data-action="text"><b>임의 텍스트</b> T</span><span class="hudItem"><b>자간·행간</b>&nbsp; Alt ⇆ ⇅</span><span class="hudItem" title="글자에 마우스를 올리고 중심 마름모를 당깁니다. 리셋 후에도 위치가 유지됩니다."><b>글자 옮기기</b> <canvas id="hudCenterPreview" class="hudHlPreview" aria-hidden="true"></canvas> 당기기</span><span class="hudItem" title="글자 모양을 임시로 수정합니다"><b>획 수정</b> <canvas id="hudLinePreview" class="hudLinePreview" aria-hidden="true"></canvas> 당기기</span><span class="hudItem" title="같은 모임꼴에서 해당 자모는 항상 붙어서 출력됩니다."><b>획 잇기</b> <canvas id="hudHlPreview" class="hudHlPreview" aria-hidden="true"></canvas> 끼리 붙이기</span><span class="hudItem" title="마지막 글자 이동이나 획 잇기·떼기를 되돌립니다."><b>실행 취소</b>&nbsp; Ctrl Z</span><span class="hudItem" title="취소한 글자 이동이나 획 잇기·떼기를 다시 적용합니다."><b>다시 실행</b>&nbsp; Ctrl Shift Z</span><span class="hudItem" title="디자인 창을 열거나 붙은 획을 뗄 수 있습니다."><b>편집 메뉴</b>&nbsp; 글자 우클릭</span><span class="hudItem hudClickable" id="hudToggleBtn" title="가이드 표시 토글"><b>가이드 끄기</b> M</span></div>
 </div>
 <!-- [v1.09] 초기 인트로 팝업 삭제 (사용자 요청). -->
 <!-- PC 전용 외부 텍스트 입력 바 — 화면 왼쪽 하단. -->
@@ -7220,6 +7220,9 @@ function buildPanel() {
   const status=document.createElement('div');status.id='recordStatus';status.setAttribute('role','status');
   status.style.cssText='font-size:11px;line-height:1.5;margin-top:6px';body.appendChild(status);
   _recordButtons();_recordStatus(_recordMessage);
+  for(const [key,tip] of [['jitter','글자가 떨리는 폭입니다. 임의 설정은 0~30입니다.'],['jitterSpeed','떨리는 빠르기입니다. 0이면 현재 떨림을 멈춥니다.']]){
+    const row=body.querySelector('[data-key="'+key+'"]');if(row)row.title=tip;
+  }
 
   // [G1] 의견 보내기 / 커피 사주기 = 속성 패널에서 제거 → 크레딧 바로 위 우하단 고정
   //   클러스터(#mhBottomBtns)로 이동. btnRow2 가 빠진 만큼 아래 가이드가 자연히 위로 올라감.
@@ -7233,6 +7236,8 @@ function buildPanel() {
     ['변수 입력', '숫자 클릭'],
     ['SVG 저장', 'Ctrl S'],
     ['PNG 저장', 'Ctrl P'],
+    ['MOV 저장', 'mov → 정지'],
+    ['녹화 취소', 'Esc'],
   ]);
   _panelGuide.id = 'panelGuide';
   body.appendChild(_panelGuide);
@@ -7656,7 +7661,16 @@ function _drawHudLinePreview() {
 //   drawNodeShape 로직을 그대로 복제 (메인 ctx 가 아닌 별도 canvas 에 그리기 위함).
 //   shape = PARAMS.shape (0=원, 100=사각, 중간 = 라운드).
 //   nodeR 은 글자(10px) 안에 들어가도록 비례 축소 (실제 nodeR/2 × 화면대비 보정).
+function _drawHudCenterPreview() {
+  const c=document.getElementById('hudCenterPreview');if(!c)return;
+  const dpr=window.devicePixelRatio||1;
+  if(c.width!==15*dpr){c.width=15*dpr;c.height=12*dpr;}
+  const cc=c.getContext('2d'),r=Math.max(3,Math.min(5,_centerRadius()/3));
+  cc.setTransform(dpr,0,0,dpr,0,0);cc.clearRect(0,0,15,12);cc.fillStyle=_bondInvColor();
+  cc.beginPath();cc.moveTo(7.5,6-r);cc.lineTo(7.5+r,6);cc.lineTo(7.5,6+r);cc.lineTo(7.5-r,6);cc.closePath();cc.fill();
+}
 function _drawHudHlPreview() {
+  _drawHudCenterPreview();
   const c = document.getElementById('hudHlPreview');
   if (!c) return;
   // [v1.10b] 획 수정 미리보기와 동일한 15×12 캔버스로 통일.
