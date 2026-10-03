@@ -3566,6 +3566,51 @@ function buildToken(ch, consSub, vowSub, extras) {
 const canvas = document.getElementById('universe');
 const ctx = canvas.getContext('2d');
 let world = null;
+// Per-document, per-occurrence anchors. Repeated letters have independent positions.
+let _centerLayout = { text: '', points: {} };
+let _showCenters = false, _centerDrag = null;
+try { _loadCenterLayout(JSON.parse(localStorage.getItem('mh_centers') || 'null')); } catch (_) {}
+function _loadCenterLayout(value) {
+  const points = {};
+  if (value && typeof value.text === 'string' && value.points && typeof value.points === 'object') {
+    Object.entries(value.points).slice(0, 10000).forEach(([key, p]) => {
+      if (p && Number.isFinite(p.x) && Number.isFinite(p.y) && Math.abs(p.x) <= 100000 && Math.abs(p.y) <= 100000) points[key] = { x: p.x, y: p.y };
+    });
+    _centerLayout = { text: value.text, points };
+  } else _centerLayout = { text: '', points };
+}
+function _persistCenters() {
+  try { localStorage.setItem('mh_centers', JSON.stringify(_centerLayout)); } catch (_) {}
+}
+function _translateBody(body, dx, dy) {
+  body.anchorX += dx; body.anchorY += dy;
+  body.nodes.forEach(n => { n.x += dx; n.y += dy; });
+}
+function _finishCenterDrag(e, cancel = false) {
+  if (!_centerDrag || (e && e.pointerId !== _centerDrag.id)) return;
+  const drag = _centerDrag;
+  if (cancel) {
+    _translateBody(drag.body, drag.startX - drag.body.anchorX, drag.startY - drag.body.anchorY);
+  } else {
+    _centerLayout.points[drag.body.centerKey] = { x: drag.body.anchorX, y: drag.body.anchorY };
+    _persistCenters();
+  }
+  _centerDrag = null;
+  canvas.classList.remove('dragging');
+  try { canvas.releasePointerCapture(drag.id); } catch (_) {}
+}
+function _drawCenterHandles() {
+  if (!_showCenters || !world) return;
+  ctx.save(); ctx.lineWidth = 2;
+  world.bodies.forEach(b => {
+    const x = b.anchorX, y = b.anchorY;
+    ctx.beginPath(); ctx.moveTo(x, y - 7); ctx.lineTo(x + 7, y);
+    ctx.lineTo(x, y + 7); ctx.lineTo(x - 7, y); ctx.closePath();
+    ctx.fillStyle = '#ff8a24'; ctx.strokeStyle = '#fff'; ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#222'; ctx.fillRect(x - 1, y - 1, 2, 2);
+  });
+  ctx.restore();
+}
 // 픽셀 거리 측정 도구 상태 — 배경(빈 영역) 좌클릭 드래그 시 활성. 수직/수평만 그려짐.
 //   { sx, sy, cx, cy, axis: 'h'|'v'|null }  좌표는 client(viewport) px.
 let _pxMeasure = null;
@@ -3733,6 +3778,11 @@ function _computeMagnetPairs(nodes, nodeJamos, ch) {
 }
 
 function buildWorld(str) {
+  _finishCenterDrag(null, true);
+  if (_centerLayout.text !== str) { _centerLayout = { text: str, points: {} }; _persistCenters(); }
+  // A rebuild must not leave pointer handlers referencing detached nodes.
+  if (typeof draggedNode !== 'undefined') { draggedNode = null; _bond = null; _detach = null; }
+  canvas.classList.remove('dragging');
   // 통일된 점 간격을 글자 렌더링 SCALE 기준으로 사용
   const SCALE = Math.max(PARAMS.pointDist, 4);
   // 자간 — 슬라이더 값 × 0.5 (v1.12b A/B 테스트 결과 — 사용자 결정).
@@ -4015,6 +4065,11 @@ function buildWorld(str) {
     });
   });
 
+  bodies.forEach((b, i) => {
+    b.centerKey = i + ':' + b.ch;
+    const pin = _centerLayout.points[b.centerKey];
+    if (pin) _translateBody(b, pin.x - b.anchorX, pin.y - b.anchorY);
+  });
   const _w = { bodies, lines: lines.length };
   _resetDripsForNewWorld(_w);
   return _w;
@@ -5279,6 +5334,7 @@ function draw() {
 //   조기 return 직전에도 호출되어, 테두리/부드럽게 모드에서도 인터랙션 피드백 표시.
 //   ctx.save/restore 로 부드럽게 모드의 transform/filter 영향 격리.
 function drawInteractionOverlay() {
+  _drawCenterHandles();
   ctx.save();
   // 부드럽게 모드 등이 변경했을 가능성 있는 transform 을 다시 DPR 기본값으로 강제
   const dpr = window.devicePixelRatio || 1;
@@ -6294,6 +6350,16 @@ canvas.addEventListener('pointerdown', e => {
 
 canvas.addEventListener('pointerdown', e => {
   if (!world) return;
+  if (_centerDrag) return;
+  if (_showCenters && e.button === 0) {
+    const p = canvasCoords(e);
+    const b = [...world.bodies].reverse().find(b => Math.hypot(p.x - b.anchorX, p.y - b.anchorY) <= 10);
+    if (b) {
+      e.preventDefault(); e.stopPropagation();
+      _centerDrag = { body: b, id: e.pointerId, x: p.x, y: p.y, startX: b.anchorX, startY: b.anchorY };
+      canvas.classList.add('dragging'); canvas.setPointerCapture(e.pointerId); return;
+    }
+  }
   // [v1.10b] 드래그(붙이기/떼기/이동) 는 좌클릭 전용. 우클릭은 컨텍스트 메뉴(편집 메뉴) 만 띄움.
   //   button: 0=좌, 1=중, 2=우. 터치 입력은 button=0 으로 들어오므로 정상 동작.
   if (e.button !== 0) return;
@@ -6491,6 +6557,12 @@ canvas.addEventListener('contextmenu', e => {
 });
 canvas.addEventListener('pointermove', e => {
   const p = canvasCoords(e);
+  if (_centerDrag) {
+    if (e.pointerId !== _centerDrag.id) return;
+    const d = _centerDrag;
+    _translateBody(d.body, d.startX + p.x - d.x - d.body.anchorX, d.startY + p.y - d.y - d.body.anchorY);
+    e.stopPropagation(); return;
+  }
   if (draggedNode) {
     dragX = p.x; dragY = p.y;
     // [항목4] 떼기 모드에서 실제로 끌었는지 표시(클릭과 구분). 노드 크기 이상
@@ -6739,6 +6811,9 @@ function endDrag(e) {
   canvas.classList.remove('dragging');
   try { if (e && e.pointerId != null) canvas.releasePointerCapture(e.pointerId); } catch(_){}
 }
+canvas.addEventListener('pointerup', e => _finishCenterDrag(e));
+canvas.addEventListener('pointercancel', e => _finishCenterDrag(e, true));
+canvas.addEventListener('lostpointercapture', e => _finishCenterDrag(e, true));
 canvas.addEventListener('pointerup', endDrag);
 canvas.addEventListener('pointercancel', endDrag);
 canvas.addEventListener('pointerleave', endDrag);
@@ -6897,6 +6972,16 @@ function buildPanel() {
     });
     _groupRandomizers[group.id] = makeGroupRandomizer(group);
   });
+
+  const centers = document.createElement('button');
+  centers.className = 'pillBtn'; centers.id = 'centerHandles';
+  centers.textContent = '중심 핸들'; centers.setAttribute('aria-pressed', String(_showCenters));
+  centers.title = '주황 마름모로 글자 전체 이동. 끄면 기존 획 드래그. B 리셋에도 배치 유지.';
+  centers.onclick = () => { _finishCenterDrag(null, true); _showCenters = !_showCenters; centers.setAttribute('aria-pressed', String(_showCenters)); };
+  const clearCenters = document.createElement('button');
+  clearCenters.className = 'pillBtn'; clearCenters.textContent = '배치 초기화';
+  clearCenters.onclick = () => { _finishCenterDrag(null, true); _centerLayout.points = {}; _persistCenters(); resetWorld(); };
+  body.append(centers, clearCenters);
 
   // 액션 버튼 (SVG / PNG / SAVE / LOAD)  — 의견·커피는 좌하단 HUD로 이동
   const btnRow = document.createElement('div');
@@ -10939,6 +11024,7 @@ function saveSettings() {
   _track('설정 저장');
   const settings = {
     schema: 'mungchin-hangul-settings-v1',
+    centers: deepClone(_centerLayout),
     params: Object.assign({}, PARAMS),
     elasticity: { K_ANGLE: K_ANGLE, K_ROT: K_ROT, K_SPRING: K_SPRING, FLEX_MAX: FLEX_MAX },
     color: { bgR: bgR, bgG: bgG, bgB: bgB, fgR: fgR, fgG: fgG, fgB: fgB, fgAuto: _fgAuto },
@@ -11007,6 +11093,7 @@ function triggerSettingsLoad() {
             _moimkkolYShiftReplaceAll(data.moimkkolYShift);
             _moimkkolYShiftPersist();
           }
+          _loadCenterLayout(data.centers); _persistCenters();
           // [항목3] tagLabelOffsets 복원 제거 — 앞/뒤붙임 라벨 표시 폐기
           if (world) world = buildWorld(currentText());
           sliderUpdaters.forEach(u => u());
