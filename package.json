@@ -6,7 +6,7 @@
   "scripts": {
     "lint": "node tests/lint.cjs",
     "check": "node tests/syntax.cjs && node --check media-export.js",
-    "test": "node tests/media.cjs && node tests/browser.cjs"
+    "test": "node tests/media.cjs && node tests/browser.cjs && node tests/recorder.cjs"
   },
   "devDependencies": {
     "eslint": "^10.11.0",

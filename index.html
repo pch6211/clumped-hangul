@@ -528,20 +528,32 @@
     color: var(--editor-bg, transparent);
     border-color: var(--editor-fg, currentColor);
   }
-#motionPanel { margin-top: 16px; padding-top: 12px; border-top: 1px solid currentColor; font-size: inherit; }
-#motionPanel[hidden], .bar i[hidden] { display: none; }
-#motionPanel label { display: block; margin: 8px 0; }
-#motionPanel input[type=number] { width: 56px; font: inherit; color: inherit; background: transparent; border: 0; border-bottom: 1px solid currentColor; border-radius: 0; }
-#motionPanel input[type=checkbox] { accent-color: currentColor; }
-#modStatus, #recordStatus { display: block; margin: 6px 0; line-height: 1.4; }
-#modStatus:empty, #recordStatus:empty { display: none; }
 #recordModeBtn[aria-pressed=true] { text-decoration: underline; text-underline-offset: 4px; }
-.bar .sliderCurrent { position: absolute; width: 1px; top: -3px; bottom: -3px; pointer-events: none; }
-.bar .rangeStart, .bar .rangeEnd { position: absolute; width: 1px; height: 6px; top: -7px; background: currentColor; pointer-events: none; }
-.bar .rangeEnd { top: auto; bottom: -7px; }
-#easeGraph { display: block; width: 100%; height: auto; touch-action: none; overflow: visible; margin: 10px 0; }
+#recordDialog { max-width: calc(100vw - 16px); max-height: calc(100vh - 16px); overflow-y: auto; scrollbar-width: thin; scrollbar-color: currentColor transparent; }
+#recordDialog [hidden] { display: none; }
+#recordDialog .recordContent { background: var(--editor-bg,transparent); border: 1px solid currentColor; padding: 12px; }
+#recordDialog .closeX { background: transparent; color: inherit; border: 0; padding: 0; font: inherit; }
+#recordDialog label { display: block; margin: 8px 0; }
+#recordDialog input[type=number] { width: 44px; font: inherit; color: inherit; background: transparent; border: 0; border-bottom: 1px solid currentColor; border-radius: 0; }
+#recordDialog input[type=checkbox] { accent-color: currentColor; }
+#recordDialog .guideList { margin-top: 8px; }
+#recordDialog .guideLine { white-space: normal; }
+#recordDialog .mhActions { gap: 6px; margin-top: 10px; }
+#recordDialog .recordTransport { justify-content: flex-start; }
+#recordDialog .pillBtn { padding: 5px 12px; }
+.panel .lbvLabel[tabindex="0"] { cursor: pointer; }
+.recordRangeRow { margin: 0 0 14px; }
+.rangeCaption { display: flex; justify-content: space-between; }
+.rangeValue { border: 0; border-bottom: 1px dotted currentColor; background: transparent; font: inherit; color: inherit; padding: 0; cursor: pointer; }
+.recordBar { height: 16px; position: relative; margin: 2px 5px; touch-action: none; cursor: ew-resize; }
+.recordBar::before { content: ''; position: absolute; left: 0; right: 0; top: 8px; height: 1px; background: currentColor; opacity: .16; }
+.rangeFill { position: absolute; top: 8px; height: 1px; background: currentColor; pointer-events: none; }
+.rangeHandle { position: absolute; top: 8px; width: 7px; height: 7px; transform: translate(-50%,-50%) rotate(45deg); cursor: ew-resize; outline: none; }
+.rangeHandle:focus-visible { outline: 1px solid currentColor; outline-offset: 2px; }
+#easeGraph { display: block; width: 100%; height: auto; touch-action: none; overflow: visible; margin: 12px 0 4px; }
+#easeGraph path { stroke-width: 1px; vector-effect: non-scaling-stroke; }
 #easeGraph .easeHandle { cursor: grab; outline: none; }
-#easeGraph .easeHandle:focus { stroke-width: 3; }
+#easeGraph .easeHandle:focus-visible { stroke: currentColor; stroke-width: 1px; vector-effect: non-scaling-stroke; }
 #easeGraph text { fill: currentColor; font: 10px sans-serif; }
 
 </style>
@@ -727,7 +739,7 @@ const MH_CFG = {
     shape: 0,            // 점 모양: 0=원, 50=라운드, 100=사각
     borderWidth: 0,      // [E3] 테두리 — 글자를 채우지 않고 윤곽선(두께=이 값)으로 감쌈 (0=없음 ~ 30)
     flow: 0,             // 흘리기 — 현재 노드 중 N 개(고정값) 골라 아래로 흘러내리는 선. localStorage('mh_flow') 영속. 0 = 비활성.
-    wind: 0, windDirection: 0,
+    jitter: 0,
     cornerR: 0,          // 부드럽게 — 픽셀 마스크 + blur 기반 모서리 부드러움
     // 원시 물리 (튜닝값 — UI 슬라이더는 숨김 상태)
     repulse: 20,         // 반발 — 노드끼리 밀어내는 힘
@@ -2246,10 +2258,8 @@ const PANEL_GROUPS = [
     ['lineW',       '획 굵기',   0,  30, 1],
     ['borderWidth', '테두리', 0, 30, 1],
     ['flow',        '페인트', 0, 10, 1],
-    ['cornerR',     '부드럽게',  0,  20, 1]
-  ]},
-  { id: 'motion', title: '움직임', items: [
-    ['wind', '바람 세기', 0, 60, 1], ['windDirection', '바람 방향', 0, 360, 1]
+    ['cornerR',     '부드럽게',  0,  20, 1],
+    ['jitter', '떨림', 0, 100, 1],
   ]},
   { id: 'bg', title: '배경 색', items: [
     ['_bgR', '빨강', 0, 255, 1],
@@ -2307,7 +2317,7 @@ function getParamValue(key) {
 }
 function setParamValue(key, v, opts) {
   opts = opts || {};
-  if (!opts.modulated && typeof _modulation !== 'undefined' && _modulation.running && _modulation.key === key) _stopModulation(false);
+  if (!opts.modulated && typeof _modulation !== 'undefined' && _modulation.running && _modulation.tracks.some(track => track.key === key)) _stopModulation(false);
   if (key === '_invK_ANGLE')  { K_ANGLE = FLEX_MAX - v;  return; }
   if (key === '_invK_ROT')    { K_ROT = FLEX_MAX - v;    return; }
   if (key === '_invK_SPRING') { K_SPRING = FLEX_MAX - v; return; }
@@ -3621,7 +3631,7 @@ function _finishCenterDrag(e, cancel = false) {
   canvas.classList.remove('dragging');
   try { canvas.releasePointerCapture(drag.id); } catch (_) {}
 }
-function _centerRadius() { return Math.max((PARAMS.nodeR || 0) / 2, 3); }
+function _centerRadius() { return Math.max(PARAMS.nodeR || 0, 6); }
 function _hoverCenterBody(p = _centerPointer) {
   if (!p || !world) return null;
   let best = null, distance = Infinity;
@@ -4112,7 +4122,7 @@ function buildWorld(str) {
 }
 
 function step(dt) {
-  _stripNodeWind();
+  _stripNodeJitter();
   const G = PARAMS.gravity / 100;
   const R = PARAMS.repulse;
   // [F6] 획 유연성 → 스프링 강도 + 스프링 추가값(관리자) — 당기거나 구부린 상태를
@@ -5343,7 +5353,7 @@ function draw() {
   if (!world) return;
   // 매 프레임 흘리기 애니메이션 1회 전진 + 경로 재계산 (모든 렌더 모드 공통).
   //   파이프라인 순서: 흘리기 → 테두리 → 부드럽게 (뒤 단계가 앞을 항상 포함).
-  _advanceFlow();
+  if (!_previewPaused) _advanceFlow(); else _dripsLastT = performance.now();
   const dpr = window.devicePixelRatio || 1;
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   const bg = currentBgColor();
@@ -5589,43 +5599,40 @@ document.addEventListener('pointerup',     _endPxMeasure, false);
 document.addEventListener('pointercancel', _endPxMeasure, false);
 window.addEventListener('resize', () => { if (_pxMeasure) _renderPxMeasure(); });
 
-let _motionTime = 0, _motionLast = null, _windDt = 1 / 60;
+let _motionTime = 0, _motionLast = null, _jitterDt = 1 / 60;
 function _advanceMotion(now) {
-  _windDt = _motionLast === null ? 1/60 : Math.max(0, Math.min(0.05, (now-_motionLast)/1000));
-  _motionLast = now; _motionTime += _windDt;
+  _jitterDt = _motionLast === null ? 1/60 : Math.max(0, Math.min(0.05, (now-_motionLast)/1000));
+  _motionLast = now; _motionTime += _jitterDt;
 }
 // A damped spring per node. Strip its displacement before the base solver, then
-// integrate directional acceleration + turbulence and apply it to that node only.
+// integrate rapid, zero-mean acceleration and apply it to that node only.
 // Rest displacement is zero; glyph anchors and the original physics remain intact.
-function _stripNodeWind() {
+function _stripNodeJitter() {
   if (!world) return;
   world.bodies.forEach(b => b.nodes.forEach(n => {
-    if (!n.windState) return;
-    if (n.windState.applied) { n.x -= n.windState.x; n.y -= n.windState.y; n.windState.applied = false; }
+    if (!n.jitterState) return;
+    if (n.jitterState.applied) { n.x -= n.jitterState.x; n.y -= n.jitterState.y; n.jitterState.applied = false; }
   }));
 }
-function _applyNodeWind() {
+function _applyNodeJitter() {
   if (!world) return;
-  const strength = Math.max(0,Math.min(60,PARAMS.wind || 0));
-  const angle = (PARAMS.windDirection || 0)*Math.PI/180;
-  const dx = Math.cos(angle), dy = Math.sin(angle);
-  const substeps = Math.max(1,Math.ceil(_windDt*120)), dt = _windDt/substeps;
+  const strength = Math.max(0,Math.min(100,PARAMS.jitter || 0));
+  const substeps = Math.max(1,Math.ceil(_jitterDt*240)), dt = _jitterDt/substeps;
   world.bodies.forEach((b,bi) => b.nodes.forEach((n,ni) => {
-    if (!strength && !n.windState) return;
-    const w = n.windState || (n.windState = { x:0,y:0,vx:0,vy:0 });
-    if (n === draggedNode) { delete n.windState; return; }
+    if (!strength && !n.jitterState) return;
+    const w = n.jitterState || (n.jitterState = { x:0,y:0,vx:0,vy:0 });
+    if (n === draggedNode) { delete n.jitterState; return; }
     if (_centerDrag || draggedNode) { n.x += w.x; n.y += w.y; w.applied = true; return; }
     const phase = ni*2.39996+bi*1.7;
-    const gust = 1 + 0.2*Math.sin(_motionTime*2.1+phase);
-    const turbulence = strength*strength*0.12;
-    const cross = turbulence*(Math.sin(_motionTime*19+phase)+0.45*Math.sin(_motionTime*31+phase*1.3));
-    const force = strength*9*gust;
+    const amplitude = 12*Math.pow(strength/100,1.35);
+    const fx = amplitude*6500*(Math.sin(_motionTime*69+phase)+0.3*Math.sin(_motionTime*107+phase*1.7));
+    const fy = amplitude*6500*(Math.sin(_motionTime*83+phase*1.3)+0.3*Math.sin(_motionTime*113+phase));
     for (let k=0;k<substeps;k++) {
-      w.vx += (dx*force-dy*cross-26*w.x-9*w.vx)*dt;
-      w.vy += (dy*force+dx*cross-26*w.y-9*w.vy)*dt;
+      w.vx += (fx-1900*w.x-55*w.vx)*dt;
+      w.vy += (fy-1900*w.y-55*w.vy)*dt;
       w.x += w.vx*dt; w.y += w.vy*dt;
     }
-    if (!strength && Math.hypot(w.x,w.y,w.vx,w.vy)<0.001) { delete n.windState; return; }
+    if (!strength && Math.hypot(w.x,w.y,w.vx,w.vy)<0.001) { delete n.jitterState; return; }
     n.x += w.x; n.y += w.y; w.applied = true;
   }));
   // Preserve welded junctions when applying the per-node force layer.
@@ -5634,12 +5641,12 @@ function _applyNodeWind() {
     const parent = b.nodes.map((_,i)=>i);
     const root = i => { while (parent[i]!==i) i=parent[i]; return i; };
     (b.magnetPairs || []).forEach(([i,j]) => {
-      const a=b.nodes[i], c=b.nodes[j], aw=a.windState, cw=c.windState;
+      const a=b.nodes[i], c=b.nodes[j], aw=a.jitterState, cw=c.jitterState;
       if (!aw || !cw || a===draggedNode || c===draggedNode) return;
       if (Math.hypot(a.x-aw.x-c.x+cw.x,a.y-aw.y-c.y+cw.y)<0.001) parent[root(j)]=root(i);
     });
     b.nodes.forEach((n,i)=>{
-      const source=b.nodes[root(i)].windState, w=n.windState;
+      const source=b.nodes[root(i)].jitterState, w=n.jitterState;
       if (root(i)===i || !source || !w) return;
       n.x += source.x-w.x; n.y += source.y-w.y; Object.assign(w,source);
     });
@@ -5648,12 +5655,12 @@ function _applyNodeWind() {
 
 function tick(now = performance.now()) {
   _advanceModulation(now);
-  _advanceMotion(now);
-  step(1);
-  _applyNodeWind();
+  if (!_previewPaused) { _advanceMotion(now); step(1); _applyNodeJitter(); }
+  else _motionLast = now;
   _drawEaseGraph();
   draw();
   _captureRecordingFrame(now);
+  _finishPlayback();
   updateHUD();
   rafId = requestAnimationFrame(tick);
 }
@@ -5894,7 +5901,7 @@ function recalculateRestState(world) {
   world.bodies.forEach(body => {
     // 1) 노드 rest 위치 갱신 (회전 탄성 + shapeBoost 의 기준점)
     if (Array.isArray(body.nodes)) {
-      body.nodes.forEach(n => { n.restX = n.x; n.restY = n.y; delete n.windState; });
+      body.nodes.forEach(n => { n.restX = n.x; n.restY = n.y; delete n.jitterState; });
     }
     // 2) 자모 rest 중심 갱신 (회전 탄성의 자모 단위 회전 기준)
     if (Array.isArray(body.jamos)) {
@@ -7074,158 +7081,194 @@ function setupPcTextBar() {
   window.addEventListener('resize', _adjustTaHeight);
 }
 
-let _recordMode = false;
-const _rangeSelection = { key: '', from: 0, to: 0, count: 0 };
-let _easeCurve = [0.42, 0, 0.58, 1];
-const _modulation = { running: false, key: '', from: 0, to: 0, period: 4, elapsed: 0, last: null, base: 0, lastUI: 0 };
+let _recordMode = false, _recordOpener = null, _previewPaused = false, _transportPlaying = false;
+const _recordRanges = new Map();
+let _easeCurve = [0.42,0,0.58,1], _recordPeriod = 4, _recordRepeats = 1, _recordLinked = true;
+const _modulation = { running:false, tracks:[], period:4, repeats:1, elapsed:0, last:null, lastUI:0, lastStructural:-Infinity, complete:false };
 function _setRecordMode(on) {
-  _recordMode = on;
-  if (!on) { _stopRecording(true); _stopModulation(); }
-  if (_rangeSelection.count === 1) _rangeSelection.count = 0;
-  document.getElementById('motionPanel').hidden = !on;
-  document.getElementById('recordModeBtn').setAttribute('aria-pressed',String(on));
-  _syncRangeInputs(); sliderUpdaters.forEach(u=>u()); _drawEaseGraph();
+  if (on === _recordMode) return;
+  _recordMode=on;
+  document.getElementById('recordModeBtn')?.setAttribute('aria-pressed',String(on));
+  if (!on) {
+    _stopRecording(true); _stopModulation(); _previewPaused=false; _transportPlaying=false;
+    document.getElementById('recordDialog')?.remove(); _recordOpener?.focus();
+  } else { _recordOpener=document.activeElement; _buildRecordingPopup(); }
+  sliderUpdaters.forEach(u=>u());
 }
-function _selectModulationRange(key,value) {
+function _toggleRecordTrack(key) {
   _stopModulation();
-  if (_rangeSelection.key !== key || _rangeSelection.count !== 1) {
-    Object.assign(_rangeSelection,{key,from:value,to:value,count:1});
-  } else { _rangeSelection.to = value; _rangeSelection.count = 2; }
-  _syncRangeInputs(); sliderUpdaters.forEach(u=>u());
-}
-function _syncRangeInputs() {
-  const r = _rangeSelection, item = PANEL_GROUPS.flatMap(g=>g.items).find(i=>i[0]===r.key);
-  const name = document.getElementById('modKey'); if (!name) return;
-  name.textContent = item && r.count ? item[1] : '슬라이더에서 구간 선택';
-  for (const [id,value] of [['modFrom',r.from],['modTo',r.to]]) {
-    const input = document.getElementById(id); input.value = value; input.disabled = !r.count;
-    if (item) { input.min = item[2]; input.max = item[3]; input.step = item[4]; }
-  }
-  document.getElementById('modStatus').textContent = r.count === 1 ? '끝값을 클릭하세요.' : '';
+  if (_recordRanges.has(key)) _recordRanges.delete(key);
+  else _recordRanges.set(key,{key,from:null,to:null,count:0});
+  _renderRecordTracks(); sliderUpdaters.forEach(u=>u());
 }
 function _bezierEase(t,curve = _easeCurve) {
-  if (t <= 0) return 0; if (t >= 1) return 1;
-  const cubic = (u,a,b) => 3*(1-u)*(1-u)*u*a+3*(1-u)*u*u*b+u*u*u;
-  let lo = 0, hi = 1;
-  for (let i=0;i<24;i++) { const u=(lo+hi)/2; if(cubic(u,curve[0],curve[2])<t)lo=u; else hi=u; }
+  if(t<=1e-9)return 0;if(t>=1-1e-9)return 1;
+  const cubic=(u,a,b)=>3*(1-u)*(1-u)*u*a+3*(1-u)*u*u*b+u*u*u;
+  let lo=0,hi=1;
+  for(let i=0;i<24;i++){const u=(lo+hi)/2;if(cubic(u,curve[0],curve[2])<t)lo=u;else hi=u;}
   return cubic((lo+hi)/2,curve[1],curve[3]);
 }
 function _modulationValue(phase,from,to) {
-  const t = 1-Math.abs(2*((phase%1+1)%1)-1);
+  const t=1-Math.abs(2*((phase%1+1)%1)-1);
   return from+(to-from)*_bezierEase(t);
 }
-function _stopModulation(restore = true) {
-  if (!_modulation.running) return;
-  _modulation.running = false;
-  if (restore) {
-    setParamValue(_modulation.key,_modulation.base,{modulated:true,silent:true});
-    if (STRUCTURAL_KEYS.has(_modulation.key)) resetWorld();
+function _modStatus(text) { const el=document.getElementById('modStatus');if(el)el.textContent=text; }
+function _stopModulation(restore=true) {
+  const m=_modulation; if(!m.running)return;
+  m.running=false;m.complete=false;
+  let rebuild=false;
+  if(restore) for(const track of m.tracks) {
+    setParamValue(track.key,track.base,{modulated:true,silent:true});
+    rebuild ||= STRUCTURAL_KEYS.has(track.key);
   }
-  const button = document.getElementById('modToggle'); if (button) button.textContent = '재생';
-  sliderUpdaters.forEach(u=>u()); _drawEaseGraph();
+  if(rebuild)resetWorld();
+  _transportPlaying=false; _recordButtons(!!_recording); sliderUpdaters.forEach(u=>u());_drawEaseGraph();
 }
 function _startModulation() {
   _stopModulation();
-  const key = _rangeSelection.key, item = PANEL_GROUPS.flatMap(g=>g.items).find(i=>i[0]===key);
-  const a = document.getElementById('modFrom'), b = document.getElementById('modTo');
-  const from = Number(a.value), to = Number(b.value), period = Number(document.getElementById('modPeriod').value);
-  if (!_recordMode || _rangeSelection.count !== 2 || !item || !a.value || !b.value || ![from,to,period].every(Number.isFinite) || period<0.2 || period>60 || Math.min(from,to)<item[2] || Math.max(from,to)>item[3]) {
-    document.getElementById('modStatus').textContent = '구간 두 값과 왕복 시간(0.2~60초)을 확인하세요.'; return false;
+  if(!_recordRanges.size)return false;
+  const tracks=[];
+  for(const range of _recordRanges.values()) {
+    const item=PANEL_GROUPS.flatMap(g=>g.items).find(i=>i[0]===range.key);
+    if(!item || range.count!==2 || ![range.from,range.to].every(Number.isFinite) || Math.min(range.from,range.to)<item[2] || Math.max(range.from,range.to)>item[3]) {
+      _modStatus('선택한 슬라이더의 시작과 끝을 지정하세요.');return false;
+    }
+    tracks.push({...range,base:getParamValue(range.key),step:item[4]});
   }
-  Object.assign(_rangeSelection,{from,to});
-  Object.assign(_modulation,{running:true,key,from,to,period,base:getParamValue(key),elapsed:0,last:null,lastUI:-Infinity});
-  document.getElementById('modToggle').textContent = '정지'; document.getElementById('modStatus').textContent = '';
-  return true;
+  if(!Number.isFinite(_recordPeriod)||_recordPeriod<0.2||_recordPeriod>60||!Number.isInteger(_recordRepeats)||_recordRepeats<1||_recordRepeats>100) {
+    _modStatus('왕복 시간 0.2~60초, 반복 1~100회로 입력하세요.');return false;
+  }
+  Object.assign(_modulation,{running:true,tracks,period:_recordPeriod,repeats:_recordRepeats,elapsed:0,last:null,lastUI:-Infinity,lastStructural:-Infinity,complete:false});
+  _transportPlaying=true;_previewPaused=false;_modStatus('');_recordButtons(!!_recording);return true;
 }
 function _advanceModulation(now) {
-  const m = _modulation; if (!m.running) return;
-  const dt = m.last === null ? 0 : Math.max(0,(now-m.last)/1000); m.last = now;
-  if (_centerDrag || draggedNode) return;
-  m.elapsed += dt;
-  const structural = STRUCTURAL_KEYS.has(m.key), quantized = structural || m.key === 'flow';
-  if (quantized && now-m.lastUI<100) return;
-  const item = PANEL_GROUPS.flatMap(g=>g.items).find(i=>i[0]===m.key);
-  const raw = _modulationValue(m.elapsed/m.period,m.from,m.to);
-  const value = quantized ? Math.round(raw/item[4])*item[4] : raw;
-  if (Math.abs(getParamValue(m.key)-value)>0.0001) {
-    setParamValue(m.key,value,{modulated:true,silent:true});
-    if (structural) resetWorld();
-    else if (m.key === 'flow' && world) _syncDripsToWorld(world);
+  const m=_modulation;if(!m.running)return;
+  const dt=m.last===null?0:Math.max(0,(now-m.last)/1000);m.last=now;
+  if(_previewPaused||_centerDrag||draggedNode)return;
+  m.elapsed=Math.min(m.period*m.repeats,m.elapsed+dt);
+  const done=m.elapsed+1e-9>=m.period*m.repeats;
+  if(done)m.elapsed=m.period*m.repeats;
+  let rebuild=false;
+  for(const track of m.tracks) {
+    const structural=STRUCTURAL_KEYS.has(track.key), quantized=structural||track.key==='flow';
+    if(quantized&&!done&&now-m.lastStructural<100)continue;
+    const raw=done?track.from:_modulationValue(m.elapsed/m.period,track.from,track.to);
+    const value=quantized?Math.round(raw/track.step)*track.step:raw;
+    if(Math.abs(getParamValue(track.key)-value)>0.0001) {
+      setParamValue(track.key,value,{modulated:true,silent:true});
+      rebuild ||= structural;
+      if(track.key==='flow'&&world)_syncDripsToWorld(world);
+    }
   }
-  if (now-m.lastUI>=100) { m.lastUI = now; sliderUpdaters.forEach(u=>u()); }
+  if(rebuild)resetWorld();
+  if(now-m.lastStructural>=100)m.lastStructural=now;
+  if(now-m.lastUI>=100){m.lastUI=now;sliderUpdaters.forEach(u=>u());_renderRangePositions();}
+  m.complete=done;
+}
+function _finishPlayback() {
+  if(!_modulation.complete)return;
+  _previewPaused=true;_transportPlaying=false;
+  if(_recording?.linked)_stopRecording(false); else _stopModulation();
+  _recordButtons(!!_recording);
+}
+function _togglePlayback() {
+  if(_transportPlaying) {_previewPaused=!_previewPaused;_recordButtons(!!_recording);return;}
+  if(_recordRanges.size) {if(!_startModulation())return;}
+  else {_transportPlaying=true;_previewPaused=false;}
+  _recordButtons(!!_recording);
+}
+function _stopTransport() {
+  _previewPaused=true;_transportPlaying=false;
+  if(_recording)_stopRecording(false);else _stopModulation();
+  _recordButtons(!!_recording);
+}
+function _renderRangePositions() {
+  const dialog=document.getElementById('recordDialog');if(!dialog)return;
+  for(const range of _recordRanges.values()) {
+    const row=dialog.querySelector('[data-record-key="'+range.key+'"]');if(!row)continue;
+    const item=PANEL_GROUPS.flatMap(g=>g.items).find(i=>i[0]===range.key),pct=v=>Math.max(0,Math.min(100,100*(v-item[2])/(item[3]-item[2])));
+    const fill=row.querySelector('.rangeFill');fill.hidden=range.count!==2;fill.style.left=Math.min(pct(range.from),pct(range.to))+'%';fill.style.width=Math.abs(pct(range.from)-pct(range.to))+'%';
+    ['from','to'].forEach((side,i)=>{
+      const handle=row.querySelector('[data-side="'+side+'"]');handle.hidden=range.count<i+1;handle.style.left=pct(range[side])+'%';handle.style.background=_bondInvColor();
+      handle.setAttribute('aria-valuenow',String(range[side]??item[2]));
+      row.querySelector('[data-value="'+side+'"]').textContent=range.count>=i+1?Number(range[side].toFixed(2)):'—';
+    });
+  }
+}
+function _renderRecordTracks() {
+  const dialog=document.getElementById('recordDialog');if(!dialog)return;
+  const list=dialog.querySelector('#recordTracks');list.replaceChildren();
+  for(const range of _recordRanges.values()) {
+    const item=PANEL_GROUPS.flatMap(g=>g.items).find(i=>i[0]===range.key);if(!item)continue;
+    const row=document.createElement('div');row.className='recordRangeRow';row.dataset.recordKey=range.key;
+    row.innerHTML='<div class="rangeCaption"><span></span><span><button class="rangeValue" data-value="from" type="button">—</button> → <button class="rangeValue" data-value="to" type="button">—</button></span></div><div class="recordBar"><i class="rangeFill" hidden></i><span class="rangeHandle" data-side="from" role="slider" tabindex="0" hidden></span><span class="rangeHandle" data-side="to" role="slider" tabindex="0" hidden></span></div>';
+    row.querySelector('.rangeCaption>span').textContent=item[1];
+    const bar=row.querySelector('.recordBar');let drag=null;
+    const quantize=v=>Math.max(item[2],Math.min(item[3],Math.round(v/item[4])*item[4]));
+    const at=e=>{const rect=bar.getBoundingClientRect();return quantize(item[2]+(e.clientX-rect.left)/rect.width*(item[3]-item[2]));};
+    const finish=(e,cancel)=>{if(!drag||drag.id!==e.pointerId)return;if(cancel)Object.assign(range,drag.before);drag=null;try{bar.releasePointerCapture(e.pointerId);}catch(_){} _renderRangePositions();};
+    bar.addEventListener('pointerdown',e=>{
+      if(e.button!==0)return;e.preventDefault();_stopModulation();
+      const h=e.target.closest('.rangeHandle');
+      if(h){drag={id:e.pointerId,side:h.dataset.side,before:{...range}};h.focus();bar.setPointerCapture(e.pointerId);}
+      else {if(range.count!==1){range.from=at(e);range.to=null;range.count=1;}else {range.to=at(e);range.count=2;}_modStatus(range.count===1?'끝값을 클릭하세요.':'');}
+      _renderRangePositions();
+    });
+    bar.addEventListener('pointermove',e=>{if(!drag||e.pointerId!==drag.id)return;range[drag.side]=at(e);_renderRangePositions();});
+    bar.addEventListener('pointerup',e=>finish(e,false));bar.addEventListener('pointercancel',e=>finish(e,true));bar.addEventListener('lostpointercapture',e=>finish(e,true));
+    row.querySelectorAll('.rangeHandle').forEach(h=>{
+      h.setAttribute('aria-label',item[1]+' '+(h.dataset.side==='from'?'시작':'끝'));h.setAttribute('aria-valuemin',item[2]);h.setAttribute('aria-valuemax',item[3]);
+      h.addEventListener('keydown',e=>{if(!['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home','End'].includes(e.key))return;e.preventDefault();e.stopPropagation();_stopModulation();const side=h.dataset.side;range[side]=e.key==='Home'?item[2]:e.key==='End'?item[3]:quantize(range[side]+(['ArrowRight','ArrowUp'].includes(e.key)?1:-1)*item[4]*(e.shiftKey?10:1));_renderRangePositions();});
+    });
+    row.querySelectorAll('.rangeValue').forEach(el=>el.onclick=()=>showSliderValueInput(el,range[el.dataset.value]??getParamValue(range.key),item[4],v=>{_stopModulation();range[el.dataset.value]=quantize(v);const other=el.dataset.value==='from'?'to':'from';if(range[other]===null)range[other]=quantize(getParamValue(range.key));range.count=2;_renderRangePositions();}));
+    list.append(row);
+  }
+  dialog.querySelector('#modulationPanel').hidden=!_recordRanges.size;
+  _renderRangePositions();_drawEaseGraph();_recordButtons(!!_recording);
+  const rect=dialog.getBoundingClientRect();dialog.style.top=Math.max(8,Math.min(rect.top,innerHeight-rect.height-8))+'px';_recordPopupBase(dialog);
 }
 function _drawEaseGraph() {
-  if (!_recordMode) return;
-  const graph = document.getElementById('easeGraph'); if (!graph) return;
-  const [x1,y1,x2,y2] = _easeCurve, x = t=>24+220*t, y=t=>114-96*t;
-  graph.querySelector('.easeCurve').setAttribute('d',`M24 114 C${x(x1)} ${y(y1)} ${x(x2)} ${y(y2)} 244 18`);
-  graph.querySelector('.easeArms').setAttribute('d',`M24 114 L${x(x1)} ${y(y1)} M244 18 L${x(x2)} ${y(y2)}`);
-  graph.querySelectorAll('.easeHandle').forEach((h,i)=>{
-    h.setAttribute('cx',x(_easeCurve[i*2])); h.setAttribute('cy',y(_easeCurve[i*2+1]));
-    h.setAttribute('aria-label',`${i+1}번 곡선 핸들, 시간 ${_easeCurve[i*2].toFixed(2)}, 진행률 ${_easeCurve[i*2+1].toFixed(2)}. 방향키로 조절`);
-  });
-  const phase = _modulation.running ? 1-Math.abs(2*((_modulation.elapsed/_modulation.period)%1)-1) : 0;
-  const head = graph.querySelector('.easePlayhead'); head.setAttribute('cx',x(phase)); head.setAttribute('cy',y(_bezierEase(phase)));
-  const accent = _bondInvColor();
-  graph.querySelectorAll('.easeHandle,.easePlayhead').forEach(el=>el.style.fill=accent);
-  document.querySelectorAll('.sliderCurrent').forEach(el=>{ el.style.background=accent; });
+  if(!_recordMode)return;
+  const graph=document.getElementById('easeGraph');if(!graph)return;
+  const x=t=>16+232*t,y=t=>112-96*t,[x1,y1,x2,y2]=_easeCurve;
+  graph.querySelector('.easeCurve').setAttribute('d',`M16 112 C${x(x1)} ${y(y1)} ${x(x2)} ${y(y2)} 248 16`);
+  graph.querySelector('.easeArms').setAttribute('d',`M16 112 L${x(x1)} ${y(y1)} M248 16 L${x(x2)} ${y(y2)}`);
+  graph.querySelectorAll('.easeHandle').forEach((h,i)=>{const hx=x(_easeCurve[i*2]),hy=y(_easeCurve[i*2+1]);h.setAttribute('points',`${hx},${hy-5} ${hx+5},${hy} ${hx},${hy+5} ${hx-5},${hy}`);h.setAttribute('aria-label',`${i+1}번 곡선 핸들, 시간 ${_easeCurve[i*2].toFixed(2)}, 진행률 ${_easeCurve[i*2+1].toFixed(2)}. 방향키로 조절`);h.style.fill=_bondInvColor();});
+  const phase=_modulation.running?1-Math.abs(2*((_modulation.elapsed/_modulation.period)%1)-1):0;
+  const head=graph.querySelector('.easePlayhead');head.setAttribute('cx',x(phase));head.setAttribute('cy',y(_bezierEase(phase)));
 }
-function _buildModulationPanel(host) {
-  const box = document.createElement('div'); box.id = 'modulationPanel';
-  box.innerHTML = '<span id="modKey">슬라이더에서 구간 선택</span>'+
-    '<label>시작 <input id="modFrom" aria-label="시작값" type="number" disabled> → 끝 <input id="modTo" aria-label="끝값" type="number" disabled></label>'+
-    '<label title="한 번 왕복하는 시간입니다.">왕복 시간 <input id="modPeriod" type="number" min="0.2" max="60" value="4" step="0.1"> 초</label>'+
-    '<svg id="easeGraph" viewBox="0 0 264 140" aria-label="시간과 진행률 곡선">'+
-    '<path d="M24 18 V114 H244" fill="none" stroke="currentColor" stroke-width="1" opacity=".4"/>'+
-    '<text x="24" y="10">진행률</text><text x="224" y="132">시간</text>'+
-    '<path class="easeArms" fill="none" stroke="currentColor" stroke-width="1" opacity=".4"/>'+
-    '<path class="easeCurve" fill="none" stroke="currentColor" stroke-width="1"/>'+
-    '<circle class="easeHandle" data-handle="0" r="5" fill="currentColor" stroke="currentColor" tabindex="0" role="button"/>'+
-    '<circle class="easeHandle" data-handle="1" r="5" fill="currentColor" stroke="currentColor" tabindex="0" role="button"/>'+
-    '<circle class="easePlayhead" r="2" fill="currentColor"/></svg>'+
-    '<div class="btnRow"><button id="modToggle" class="pillBtn" type="button">재생</button><button id="easeReset" class="pillBtn" type="button">곡선 초기화</button></div><small id="modStatus" role="status"></small>';
-  host.append(box);
-  box.querySelector('#modToggle').onclick = () => _modulation.running ? _stopModulation() : _startModulation();
-  box.querySelector('#easeReset').onclick = () => { _easeCurve=[0.42,0,0.58,1]; _drawEaseGraph(); };
-  for (const id of ['modFrom','modTo']) box.querySelector('#'+id).onchange = () => {
-    _stopModulation(); const value=Number(box.querySelector('#'+id).value);
-    if (Number.isFinite(value)) { _rangeSelection[id==='modFrom'?'from':'to']=value; _rangeSelection.count=2; }
-    sliderUpdaters.forEach(u=>u());
-  };
-  box.querySelector('#modPeriod').onchange = () => {
-    const value = Number(box.querySelector('#modPeriod').value);
-    if (!Number.isFinite(value) || value<0.2 || value>60) {
-      _stopModulation(); document.getElementById('modStatus').textContent='왕복 시간은 0.2~60초입니다.'; return;
-    }
-    if (Number.isFinite(value) && value>=0.2 && value<=60 && _modulation.running) {
-      _modulation.elapsed *= value/_modulation.period; _modulation.period=value;
-    }
-  };
-  const graph = box.querySelector('#easeGraph'); let drag = null;
-  const finish = (e,cancel) => {
-    if (!drag || e.pointerId!==drag.id) return;
-    if (cancel) _easeCurve = drag.original;
-    drag=null; try { graph.releasePointerCapture(e.pointerId); } catch (_) {} _drawEaseGraph();
-  };
-  graph.addEventListener('pointerdown',e=>{
-    const handle=e.target.closest('.easeHandle'); if (!handle || e.button!==0) return;
-    e.preventDefault(); handle.focus(); drag={id:e.pointerId,index:Number(handle.dataset.handle)*2,original:_easeCurve.slice()}; graph.setPointerCapture(e.pointerId);
-  });
-  graph.addEventListener('pointermove',e=>{
-    if (!drag || e.pointerId!==drag.id) return;
-    const point = new DOMPoint(e.clientX,e.clientY).matrixTransform(graph.getScreenCTM().inverse());
-    _easeCurve[drag.index]=Math.max(0,Math.min(1,(point.x-24)/220));
-    _easeCurve[drag.index+1]=Math.max(0,Math.min(1,(114-point.y)/96)); _drawEaseGraph();
-  });
-  graph.addEventListener('pointerup',e=>finish(e,false)); graph.addEventListener('pointercancel',e=>finish(e,true)); graph.addEventListener('lostpointercapture',e=>finish(e,true));
-  graph.addEventListener('keydown',e=>{
-    const handle=e.target.closest('.easeHandle'); if (!handle || !['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.key)) return;
-    e.preventDefault(); e.stopPropagation(); const index=Number(handle.dataset.handle)*2+(['ArrowUp','ArrowDown'].includes(e.key)?1:0);
-    const delta=(['ArrowUp','ArrowRight'].includes(e.key)?1:-1)*(e.shiftKey?0.1:0.01);
-    _easeCurve[index]=Math.max(0,Math.min(1,_easeCurve[index]+delta)); _drawEaseGraph();
-  });
-  _syncRangeInputs(); _drawEaseGraph();
+function _buildRecordingPopup() {
+  const box=document.createElement('div');box.id='recordDialog';box.className='mhDialog';box.setAttribute('role','dialog');box.setAttribute('aria-label','녹화');box.tabIndex=-1;
+  box.innerHTML='<div class="mhMeta"><span class="mhDialogTitle">녹화</span><span class="stageBtn dragHandle" title="드래그해서 위치 이동">▩</span><button class="stageBtn closeX" type="button" aria-label="녹화 창 닫기">✕</button></div>'+
+    '<div class="recordContent"><div id="recordTracks"></div><div id="modulationPanel" hidden><label>왕복 시간 <input id="modPeriod" type="number" min="0.2" max="60" step="0.1"> 초</label><label>반복 <input id="modRepeats" type="number" min="1" max="100" step="1"> 회</label><label><input id="recordLinked" type="checkbox"> 왕복 변조</label>'+
+    '<svg id="easeGraph" viewBox="0 0 264 136" aria-label="시간과 진행률 곡선"><path d="M16 16 V112 H248" fill="none" stroke="currentColor" opacity=".4"/><text x="16" y="9">진행률</text><text x="228" y="130">시간</text><path class="easeArms" fill="none" stroke="currentColor" opacity=".4"/><path class="easeCurve" fill="none" stroke="currentColor"/><polygon class="easeHandle" data-handle="0" tabindex="0" role="button"/><polygon class="easeHandle" data-handle="1" tabindex="0" role="button"/><circle class="easePlayhead" r="2" fill="currentColor"/></svg>'+
+    '<div class="mhActions"><button id="easeReset" class="pillBtn" type="button">곡선 초기화</button></div></div><div class="mhActions recordTransport"><button class="pillBtn" id="recordStart" title="투명 MOV · 최대 30초·64MiB·1920px">녹화</button><button class="pillBtn" id="modToggle" type="button">재생</button><button class="pillBtn" id="recordStop" type="button">정지</button></div><div id="modStatus" class="mhMsg" role="status"></div><div id="recordStatus" class="mhMsg" role="status"></div></div>';
+  const guide=_buildGuideList([['재생·일시정지','Space'],['변수 선택','설정 슬라이더 제목 체크'],['범위 지정','시작·끝 클릭 / 마름모 끌기'],['곡선 조절','마름모 끌기 / 방향키'],['저장','녹화 후 정지'],['취소·닫기','Esc']]);box.append(guide);
+  document.body.append(box);box.style.width=Math.max(280,_panelInputWidthPx())+'px';
+  _placeSettingsDialog(box,{anchor:document.getElementById('recordModeBtn')});_makeDialogDraggable(box);
+  box.querySelector('.closeX').onclick=()=>_setRecordMode(false);
+  box.querySelector('#recordStart').onclick=_startRecording;box.querySelector('#recordStop').onclick=_stopTransport;box.querySelector('#modToggle').onclick=_togglePlayback;
+  box.querySelector('#modPeriod').value=_recordPeriod;box.querySelector('#modRepeats').value=_recordRepeats;box.querySelector('#recordLinked').checked=_recordLinked;
+  for(const id of ['modPeriod','modRepeats'])box.querySelector('#'+id).onchange=()=>{_stopModulation();if(id==='modPeriod')_recordPeriod=Number(box.querySelector('#'+id).value);else _recordRepeats=Number(box.querySelector('#'+id).value);};
+  box.querySelector('#recordLinked').onchange=e=>{_recordLinked=e.target.checked;};
+  box.querySelector('#easeReset').onclick=()=>{_easeCurve=[.42,0,.58,1];_drawEaseGraph();};
+  const graph=box.querySelector('#easeGraph');let drag=null;
+  const finish=(e,cancel)=>{if(!drag||e.pointerId!==drag.id)return;if(cancel)_easeCurve=drag.original;drag=null;try{graph.releasePointerCapture(e.pointerId);}catch(_){} _drawEaseGraph();};
+  graph.addEventListener('pointerdown',e=>{const h=e.target.closest('.easeHandle');if(!h||e.button!==0)return;e.preventDefault();h.focus();drag={id:e.pointerId,index:Number(h.dataset.handle)*2,original:_easeCurve.slice()};graph.setPointerCapture(e.pointerId);});
+  graph.addEventListener('pointermove',e=>{if(!drag||e.pointerId!==drag.id)return;const p=new DOMPoint(e.clientX,e.clientY).matrixTransform(graph.getScreenCTM().inverse());_easeCurve[drag.index]=Math.max(0,Math.min(1,(p.x-16)/232));_easeCurve[drag.index+1]=Math.max(0,Math.min(1,(112-p.y)/96));_drawEaseGraph();});
+  graph.addEventListener('pointerup',e=>finish(e,false));graph.addEventListener('pointercancel',e=>finish(e,true));graph.addEventListener('lostpointercapture',e=>finish(e,true));
+  graph.addEventListener('keydown',e=>{const h=e.target.closest('.easeHandle');if(!h||!['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.key))return;e.preventDefault();e.stopPropagation();const i=Number(h.dataset.handle)*2+(['ArrowUp','ArrowDown'].includes(e.key)?1:0);_easeCurve[i]=Math.max(0,Math.min(1,_easeCurve[i]+(['ArrowUp','ArrowRight'].includes(e.key)?1:-1)*(e.shiftKey?.1:.01)));_drawEaseGraph();});
+  _renderRecordTracks();box.focus();
 }
+document.addEventListener('keydown',e=>{
+  if(!_recordMode||e.defaultPrevented||e.isComposing||e.keyCode===229||e.ctrlKey||e.metaKey||e.altKey||e.repeat)return;
+  const target=e.target;
+  if(target.closest?.('.mhDialog:not(#recordDialog),.editor')||target.isContentEditable)return;
+  if(e.code==='Space'||e.key===' ') {
+    if(target.closest?.('input,textarea,select,[role=checkbox]'))return;
+    e.preventDefault();e.stopImmediatePropagation();_togglePlayback();
+  } else if(e.key==='Escape'&&!target.closest?.('.sliderValuePrompt')) {e.preventDefault();e.stopImmediatePropagation();_setRecordMode(false);}
+},true);
 
 function buildPanel() {
   const body = document.getElementById('panel-body');
@@ -7310,8 +7353,6 @@ function buildPanel() {
   ]);
   _panelGuide.id = 'panelGuide';
   body.appendChild(_panelGuide);
-  const motionPanel = document.createElement('div'); motionPanel.id = 'motionPanel'; motionPanel.hidden = !_recordMode;
-  _buildModulationPanel(motionPanel); _buildRecordingPanel(motionPanel); body.append(motionPanel);
   // 주사위 글리프 클릭 → 전체 랜덤 + 글리프 면 갱신
   const _grd = _panelGuide.querySelector('#globalRandomDie');
   if (_grd) {
@@ -7554,7 +7595,7 @@ function makeBarRow(label, mn, mx, step, getter, setter, opts) {
   const row = document.createElement('div');
   row.className = 'row';
   row.innerHTML =
-    '<div class="bar"><div class="fill"></div><i class="sliderCurrent"></i><i class="rangeStart"></i><i class="rangeEnd"></i></div>' +
+    '<div class="bar"><div class="fill"></div></div>' +
     '<span class="lbv"><span class="lbvLabel"></span> <span class="lbvVal"></span></span>';
   const lbv = row.querySelector('.lbv');
   const lbvLabel = row.querySelector('.lbvLabel');
@@ -7571,17 +7612,20 @@ function makeBarRow(label, mn, mx, step, getter, setter, opts) {
     lbvVal.textContent = _vd;
     const p = (mx === mn) ? 0 : Math.max(0, Math.min(1, (v - mn) / (mx - mn)));
     fill.style.width = (Math.max(0, Math.min(1, p)) * 100) + '%';
-    const key = opts?.dataKey;
-    const current = bar.querySelector('.sliderCurrent');
-    current.hidden = !_recordMode || !key;
-    current.style.left = (p*100)+'%'; current.style.background = _bondInvColor();
-    for (const [selector,value,visible] of [['.rangeStart',_rangeSelection.from,_rangeSelection.count>0],['.rangeEnd',_rangeSelection.to,_rangeSelection.count>1]]) {
-      const marker = bar.querySelector(selector); marker.hidden = !_recordMode || key !== _rangeSelection.key || !visible;
-      marker.style.left = (Math.max(0,Math.min(1,(value-mn)/(mx-mn)))*100)+'%';
+    if (opts?.dataKey) {
+      lbvLabel.textContent = (_recordMode ? (_recordRanges.has(opts.dataKey) ? '☑ ' : '☐ ') : '') + label;
+      lbvLabel.setAttribute('aria-checked',String(_recordRanges.has(opts.dataKey)));
+      lbvLabel.tabIndex = _recordMode ? 0 : -1;
     }
     // 부드럽게는 항상 활성, 점 크기·획 굵기와 공존
   };
 
+  if (opts?.dataKey) {
+    lbvLabel.setAttribute('role','checkbox');
+    lbvLabel.setAttribute('aria-label',label+' 변조 선택');
+    lbvLabel.addEventListener('click',()=>{if(_recordMode)_toggleRecordTrack(opts.dataKey);});
+    lbvLabel.addEventListener('keydown',e=>{if(_recordMode && (e.key===' '||e.key==='Enter')){e.preventDefault();e.stopPropagation();_toggleRecordTrack(opts.dataKey);}});
+  }
   // 숫자 클릭 → floating input으로 범위 밖 숫자도 직접 입력
   lbvVal.addEventListener('click', (e) => {
     e.stopPropagation();
@@ -7612,12 +7656,7 @@ function makeBarRow(label, mn, mx, step, getter, setter, opts) {
   };
   bar.addEventListener('pointerdown', e => {
     e.preventDefault();
-    if (_recordMode && opts?.dataKey) {
-      const rect = bar.getBoundingClientRect();
-      let value = mn+Math.max(0,Math.min(1,(e.clientX-rect.left)/rect.width))*(mx-mn);
-      if (step) value = Math.round(value/step)*step;
-      _selectModulationRange(opts.dataKey,Math.max(mn,Math.min(mx,value))); return;
-    }
+
     dragging = true;
     try { bar.setPointerCapture(e.pointerId); } catch(_){}
     onMove(e);
@@ -7977,7 +8016,7 @@ function randomizeAll() {
   _stopModulation();
   // 0) 자유 슬라이더 (gravity 등): 그대로 풀 범위 — DERIVED_KEYS는 아래에서 별도 처리
   PANEL_GROUPS.forEach(group => group.items.forEach(([key, label, mn, mx, step]) => {
-    if (DERIVED_KEYS.has(key) || ['wind','windDirection'].includes(key)) return;
+    if (DERIVED_KEYS.has(key) || ['jitter'].includes(key)) return;
     setParamValue(key, randInt(mn, mx), { silent: true });
   }));
   // 흘리기 — 랜덤 트리거 시 노드+길이 재추첨 (슬라이더 개수는 유지). 잔상도 비움.
@@ -9409,19 +9448,11 @@ function saveSVG() {
 let _recording = null;
 function _recordStatus(text) { const el = document.getElementById('recordStatus'); if (el) el.textContent = text; }
 function _recordButtons(active) {
-  for (const id of ['recordDuration', 'recordLinked', 'recordStart']) document.getElementById(id).disabled = active;
-  document.getElementById('recordStop').disabled = !active;
-  document.getElementById('recordCancel').disabled = !active;
-}
-function _buildRecordingPanel(host) {
-  const box = document.createElement('div'); box.id = 'recordingPanel';
-  box.innerHTML = '<label>최대 길이 <input id="recordDuration" type="number" min="1" max="30" value="10"> 초</label>' +
-    '<label><input id="recordLinked" type="checkbox"> 왕복 변조</label>' +
-    '<div class="btnRow"><button class="pillBtn" id="recordStart" title="투명 MOV · PNG 코덱 / 최대 15fps·30초·64MiB·1920px">녹화 시작</button><button class="pillBtn" id="recordStop" disabled>정지·저장</button><button class="pillBtn" id="recordCancel" disabled>취소</button></div><small id="recordStatus" role="status"></small>';
-  box.querySelector('#recordStart').onclick = _startRecording;
-  box.querySelector('#recordStop').onclick = () => _stopRecording(false);
-  box.querySelector('#recordCancel').onclick = () => _stopRecording(true);
-  host.append(box);
+  const box=document.getElementById('recordDialog');if(!box)return;
+  box.querySelector('#recordStart').disabled=active;
+  box.querySelector('#recordStop').disabled=!active&&!_transportPlaying&&!_modulation.running;
+  box.querySelector('#modToggle').textContent=_transportPlaying&&!_previewPaused?'일시정지':'재생';
+  for(const id of ['modPeriod','modRepeats','recordLinked'])box.querySelector('#'+id).disabled=active;
 }
 
 function _downloadRecording(blob, ext) {
@@ -9431,10 +9462,11 @@ function _downloadRecording(blob, ext) {
 }
 function _startRecording() {
   if (_recording || !world || !_recordMode) return;
-  const duration = Number(document.getElementById('recordDuration').value);
-  if (!Number.isFinite(duration) || duration < 1 || duration > 30) { _recordStatus('길이는 1~30초로 입력하세요.'); return; }
-  const linked = document.getElementById('recordLinked').checked;
-  if (linked && !_startModulation()) { _recordStatus('왕복 변조 설정을 먼저 확인하세요.'); return; }
+  const duration = 30; // Safety ceiling for manual recording; no persistent length input.
+  const linked = _recordRanges.size > 0 && _recordLinked;
+  if (linked && _recordPeriod*_recordRepeats>30) {_recordStatus('녹화할 왕복 시간 × 반복은 30초 이내로 설정하세요.');return;}
+  if (linked && !_startModulation()) { _recordStatus('왕복 변조 구간을 확인하세요.'); return; }
+  _previewPaused=false;_transportPlaying=true;
   const off = document.createElement('canvas'), scale = Math.min(1, 1920 / Math.max(cssW, cssH));
   off.width = Math.max(2, Math.floor(cssW * scale / 2) * 2); off.height = Math.max(2, Math.floor(cssH * scale / 2) * 2);
   const rec = { canvas: off, ctx: off.getContext('2d'), viewport: { x: 0, y: 0, w: cssW, h: cssH }, started: performance.now(), duration: duration * 1000, frames: [], times: [], bytes: 0, last: -Infinity, busy: null, linked, stopping: false, cancelled: false, format: 'mov' };
@@ -9444,7 +9476,7 @@ function _startRecording() {
     _captureRecordingFrame(rec.started);
     if (rec.stopping || _recording !== rec) return;
 
-    rec.timer = setTimeout(() => _stopRecording(false), rec.duration);
+    rec.timer = setTimeout(() => _stopRecording(false, '30초 한도에 도달해 저장했습니다.'), rec.duration);
     _recordStatus('녹화 중 · MOV');
     _captureRecordingFrame(rec.started);
   } catch (error) { _stopRecording(true, error.message); }
@@ -9486,6 +9518,7 @@ async function _stopRecording(cancel = false, message = '') {
   finally {
     rec.frames.length = 0;
     if (rec.linked) _stopModulation();
+    _transportPlaying=false;_previewPaused=_recordMode;
     if (_recording === rec) _recording = null;
     _recordButtons(false);
   }
