@@ -93,6 +93,26 @@ const { chromium } = require('playwright');
     console.log('Smoothing pixel comparisons', smoothing);
     // GPU canvas compositing can round a few edge channels differently after translation.
     assert.ok(smoothing.every(x => x.different <= 64 && x.maxDelta <= 3));
+    await page.locator('#modulationPanel summary').click();
+    await page.locator('#modKey').selectOption('nodeR');
+    await page.locator('#modFrom').fill('4'); await page.locator('#modTo').fill('20');
+    await page.locator('#modPeriod').fill('2'); await page.locator('#modToggle').click();
+    const modulation = await page.evaluate(() => {
+      _advanceModulation(0); const start = PARAMS.nodeR;
+      for (let i = 1; i <= 10; i++) _advanceModulation(i * 100);
+      const middle = PARAMS.nodeR;
+      for (let i = 11; i <= 20; i++) _advanceModulation(i * 100);
+      const end = PARAMS.nodeR; _stopModulation();
+      return { start, middle, end, restored: PARAMS.nodeR };
+    });
+    assert.equal(modulation.start, 4); assert.ok(Math.abs(modulation.middle - 20) < 0.001);
+    assert.ok(Math.abs(modulation.end - 4) < 0.001); assert.equal(modulation.restored, 20);
+    await page.locator('#modToggle').click();
+    await page.evaluate(() => setParamValue('nodeR', 11));
+    assert.deepEqual(await page.evaluate(() => [_modulation.running, PARAMS.nodeR]), [false, 11]);
+    await page.locator('#modFrom').fill('999'); await page.locator('#modToggle').click();
+    assert.equal(await page.evaluate(() => _modulation.running), false);
+    console.log('PASS: modulation endpoints, cycle, restoration, manual interruption, input validation');
     assert.deepEqual(errors, []);
   } finally { await browser?.close(); server.close(); }
 })().catch(e => { console.error(e); process.exitCode = 1; });
