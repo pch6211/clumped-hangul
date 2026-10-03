@@ -83,24 +83,27 @@ const { chromium } = require('playwright');
     const smoothing = await page.evaluate(() => {
       PARAMS.cornerR = 5; PARAMS.nodeR = 20; PARAMS.lineW = 12;
       const crop = _smoothViewport, comparisons = [];
-      for (const shape of [0, 50, 100]) {
+      for (const [shape, border] of [[0,0],[50,0],[100,0],[0,8],[50,8],[100,8]]) {
         PARAMS.shape = shape;
+        PARAMS.borderWidth = border;
         const a = document.createElement('canvas'), b = document.createElement('canvas');
         a.width = b.width = cssW; a.height = b.height = cssH;
         const ca = a.getContext('2d'), cb = b.getContext('2d');
-        drawSmoothedBodies(ca, world.bodies, '#123456', '#fff');
+        const render = context => border ? drawBorders(context, world.bodies, '#123456') : drawSmoothedBodies(context, world.bodies, '#123456', '#fff');
+        render(ca);
         _smoothViewport = (_, viewport) => viewport || { x: 0, y: 0, w: cssW, h: cssH };
-        drawSmoothedBodies(cb, world.bodies, '#123456', '#fff'); _smoothViewport = crop;
+        render(cb); _smoothViewport = crop;
         const aa = ca.getImageData(0,0,cssW,cssH).data, bb = cb.getImageData(0,0,cssW,cssH).data;
-        let different = 0, maxDelta = 0; for (let i = 0; i < aa.length; i++) if (aa[i] !== bb[i]) { different++; maxDelta = Math.max(maxDelta, Math.abs(aa[i] - bb[i])); }
-        comparisons.push({ shape, different, maxDelta });
+        let different = 0, maxDelta = 0, alphaDifferent = 0;
+        for (let i = 0; i < aa.length; i++) if (aa[i] !== bb[i]) { different++; if (i % 4 === 3) alphaDifferent++; maxDelta = Math.max(maxDelta, Math.abs(aa[i] - bb[i])); }
+        comparisons.push({ shape, border, different, alphaDifferent, maxDelta });
       }
+      PARAMS.borderWidth = 0;
       return comparisons;
     });
     console.log('Smoothing pixel comparisons', smoothing);
-    // Translating Canvas paths can change raster rounding at a few threshold-edge pixels.
-    // Allow at most 16 pixels' channels out of 921,600 pixels; never a shifted/clipped contour.
-    assert.ok(smoothing.every(x => x.different <= 64));
+    // Frequent-read masks use the same CPU raster path at both sizes.
+    assert.ok(smoothing.every(x => x.different === 0));
     await page.locator('#modulationPanel summary').click();
     await page.locator('#modKey').selectOption('nodeR');
     await page.locator('#modFrom').fill('4'); await page.locator('#modTo').fill('20');
@@ -175,6 +178,13 @@ const { chromium } = require('playwright');
       const opaqueDownload = page.waitForEvent('download'); await page.locator('#recordStart').click();
       const opaque = await opaqueDownload; await opaque.saveAs('test-results/' + (opaque.suggestedFilename().endsWith('.mp4') ? 'opaque.mp4' : 'opaque.webm'));
       await page.waitForFunction(() => !_recording);
+    }
+    if (await page.locator('#recordFormat option[value="webm-alpha"]').count()) {
+      await page.locator('#recordFormat').selectOption('webm-alpha');
+      const webmDownload = page.waitForEvent('download'); await page.locator('#recordStart').click();
+      await (await webmDownload).saveAs('test-results/transparent.webm');
+      await page.waitForFunction(() => !_recording);
+      console.log('PASS: runtime-verified WebM VP8 alpha recording');
     }
     await page.evaluate(() => cancelAnimationFrame(rafId));
     console.log('PASS: MOV alpha, live effects/reset, linked modulation cleanup, cancellation, auto-stop, opaque video', alpha);

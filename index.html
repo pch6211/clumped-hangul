@@ -3,7 +3,7 @@
 <html lang="ko"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-<title>뭉친 한글 Clumped Hangul v.1.11</title>
+<title>뭉친 한글 Clumped Hangul v.1.13-dev</title>
 <meta name="description" content="">
 <!-- Google AdSense 로더 (퍼블리셔 ca-pub-7237044319292911) — 우하단 광고 박스용 -->
 <!-- [v1.09] AdSense 승인 대기 중 — 일단 mute. 승인 후 아래 라인 주석 해제. -->
@@ -3586,7 +3586,7 @@ function _loadCenterLayout(value) {
   const points = {};
   if (value && typeof value.text === 'string' && value.points && typeof value.points === 'object') {
     Object.entries(value.points).slice(0, 10000).forEach(([key, p]) => {
-      if (p && Number.isFinite(p.x) && Number.isFinite(p.y) && Math.abs(p.x) <= 100000 && Math.abs(p.y) <= 100000) points[key] = { x: p.x, y: p.y };
+      if (/^\d+:/.test(key) && p && Number.isFinite(p.x) && Number.isFinite(p.y) && Math.abs(p.x) <= 100000 && Math.abs(p.y) <= 100000) points[key] = { x: p.x, y: p.y };
     });
     _centerLayout = { text: value.text, points };
   } else _centerLayout = { text: '', points };
@@ -5033,10 +5033,10 @@ let _smMask = null, _smTmp = null;
 // [E3] 테두리 작업 캔버스 (정확한 도형 팽창 = 프리미티브 인플레이션) — 캐시 재사용
 let _bdOuter = null, _bdInner = null, _bdRing = null;
 // Bound the unchanged three-pass blur to occupied pixels plus its full kernel reach.
-function _smoothViewport(bodies, viewport) {
-  const scale = Math.max(1, Math.min(4, Math.round(PARAMS.smoothScale || 1)));
+function _smoothViewport(bodies, viewport, renderScale, inflation = 0) {
+  const scale = renderScale || Math.max(1, Math.min(4, Math.round(PARAMS.smoothScale || 1)));
   const radius = Math.max(1, Math.round(PARAMS.cornerR * Math.max(0, PARAMS.blurFactor || 0.5) * scale));
-  const pad = Math.max(PARAMS.nodeR, PARAMS.lineW) / 2 + 3 * radius / scale + 3;
+  const pad = Math.max(PARAMS.nodeR, PARAMS.lineW) / 2 + inflation + 3 * radius / scale + 3;
   let left = Infinity, top = Infinity, right = -Infinity, bottom = -Infinity;
   const point = (x, y) => { left = Math.min(left, x); top = Math.min(top, y); right = Math.max(right, x); bottom = Math.max(bottom, y); };
   bodies.forEach(b => b.nodes.forEach(n => point(n.x, n.y)));
@@ -5072,7 +5072,7 @@ function drawSmoothedBodies(targetCtx, bodies, fg, bg, viewport) {
   if (mask.width !== W * SCALE || mask.height !== H * SCALE) {
     mask.width = W * SCALE; mask.height = H * SCALE;
   }
-  const mctx = mask.getContext('2d');
+  const mctx = mask.getContext('2d', { willReadFrequently: true });
   mctx.setTransform(1, 0, 0, 1, 0, 0);
   mctx.filter = 'none';
   mctx.globalCompositeOperation = 'source-over';
@@ -5184,6 +5184,8 @@ function drawBorders(targetCtx, bodies, fg, viewport) {
   if (!_bordersOn() || !bodies) return;
   const bW = Math.max(0, PARAMS.borderWidth || 0);
   if (bW <= 0) return;
+  viewport = _smoothViewport(bodies, viewport, 2, bW);
+  if (!viewport) return;
   const _borderColor = fg;
   // viewport = { x, y, w, h } — 내보내기에서 bbox 전달 시 사용. 미지정이면 화면 전체.
   const VX = (viewport && viewport.x) || 0;
@@ -5199,9 +5201,9 @@ function drawBorders(targetCtx, bodies, fg, viewport) {
   if (!_bdInner) _bdInner = document.createElement('canvas');
   if (!_bdRing)  _bdRing  = document.createElement('canvas');
   [_bdOuter, _bdInner, _bdRing].forEach(c => { if (c.width !== MW || c.height !== MH) { c.width = MW; c.height = MH; } });
-  const octx = _bdOuter.getContext('2d');
-  const ictx = _bdInner.getContext('2d');
-  const rctx = _bdRing.getContext('2d');
+  const octx = _bdOuter.getContext('2d', { willReadFrequently: true });
+  const ictx = _bdInner.getContext('2d', { willReadFrequently: true });
+  const rctx = _bdRing.getContext('2d', { willReadFrequently: true });
   // 실루엣을 infl(px)만큼 팽창해 흑색으로 칠함. 획=lineW+2·infl, 점=(r+infl) + 점모양(shape).
   //   viewport 모드: world 좌표를 (-VX, -VY) 만큼 평행이동해 mask 안에 들어오게 함.
   const paintSil = (mctx, infl) => {
@@ -7032,7 +7034,7 @@ function _startModulation() {
 function _advanceModulation(now) {
   const m = _modulation;
   if (!m.running) return;
-  const dt = m.last === null ? 0 : Math.max(0, Math.min(0.1, (now - m.last) / 1000)); m.last = now;
+  const dt = m.last === null ? 0 : Math.max(0, (now - m.last) / 1000); m.last = now;
   if (_centerDrag || draggedNode) return;
   m.elapsed += dt;
   const structural = STRUCTURAL_KEYS.has(m.key);
@@ -7207,7 +7209,10 @@ function makeGroupRandomizer(group) {
       setParamValue('cornerR', (Math.random() < 0.2) ? randInt(0, 20) : 0, { silent: true });
     } else {
       group.items.forEach(([key, _label, mn, mx, _step]) => {
-        setParamValue(key, randInt(mn, mx), { silent: true });
+        const lower = key === 'letterSpacing' ? 0 : mn; // Auto spacing keeps its original recommendation range.
+        const step = _step || 1;
+        const value = lower + Math.floor(Math.random() * (Math.floor((mx - lower) / step) + 1)) * step;
+        setParamValue(key, Math.min(mx, value), { silent: true });
       });
     }
     // 글자색 그룹: 자동 매칭 해제 (사용자가 RGB 의도)
@@ -9233,6 +9238,7 @@ function saveSVG() {
 // PNG 저장 — 배경 투명. 캔버스 크기 = 글자+흘리기 경계상자 + 사방 50px (화면 크기 무시).
 //   파이프라인: 흘리기 → 테두리 → 부드럽게 (drawBorders/drawSmoothedBodies 내부에 흘리기 포함됨).
 let _recording = null;
+let _webmAlphaSupported = false;
 function _recordStatus(text) { const el = document.getElementById('recordStatus'); if (el) el.textContent = text; }
 function _recordButtons(active) {
   for (const id of ['recordFormat', 'recordDuration', 'recordLinked', 'recordStart']) document.getElementById(id).disabled = active;
@@ -9241,7 +9247,7 @@ function _recordButtons(active) {
 }
 function _opaqueRecordingType() {
   if (typeof MediaRecorder === 'undefined') return null;
-  return ['video/mp4;codecs=avc1.42001E', 'video/webm;codecs=vp9', 'video/webm;codecs=vp8'].find(t => MediaRecorder.isTypeSupported(t)) || null;
+  return ['video/webm;codecs=vp8', 'video/webm;codecs=vp9', 'video/mp4;codecs=avc1.42001E'].find(t => MediaRecorder.isTypeSupported(t)) || null;
 }
 function _buildRecordingPanel(host) {
   const box = document.createElement('details'); box.id = 'recordingPanel';
@@ -9249,13 +9255,18 @@ function _buildRecordingPanel(host) {
     '<label>최대 길이(초) <input id="recordDuration" type="number" min="1" max="30" value="10"></label>' +
     '<label><input id="recordLinked" type="checkbox"> 왕복 변조를 처음부터 함께 시작·정지</label>' +
     '<button class="pillBtn" id="recordStart">녹화 시작</button> <button class="pillBtn" id="recordStop" disabled>정지·저장</button> <button class="pillBtn" id="recordCancel" disabled>취소</button>' +
-    '<small>투명 MOV는 PNG 코덱을 지원하는 편집 앱용입니다. 브라우저 재생·MP4 투명은 지원하지 않습니다. 최대 15fps·30초·64MiB, 긴 변 1920px. 시작 화면 크기가 고정되어 밖으로 이동한 글자는 잘립니다.</small><small id="recordStatus" role="status">배경과 편집 핸들은 투명 MOV에 포함되지 않습니다.</small>';
+    '<small>투명 MOV는 PNG 코덱을 지원하는 편집 앱용입니다. MOV 브라우저 재생·MP4 투명은 지원하지 않습니다. 투명 WebM은 실제 알파 검사를 통과할 때만 표시되며 편집 앱 호환성은 다릅니다. 최대 15fps·30초·64MiB, 긴 변 1920px. 시작 화면 크기가 고정되어 밖으로 이동한 글자는 잘립니다.</small><small id="recordStatus" role="status">배경과 편집 핸들은 투명 MOV에 포함되지 않습니다.</small>';
   const type = _opaqueRecordingType();
   if (type) { const option = document.createElement('option'); option.value = 'opaque'; option.textContent = (type.startsWith('video/mp4') ? 'MP4' : 'WebM') + ' (배경 포함)'; box.querySelector('#recordFormat').append(option); }
   box.querySelector('#recordStart').onclick = _startRecording;
   box.querySelector('#recordStop').onclick = () => _stopRecording(false);
   box.querySelector('#recordCancel').onclick = () => _stopRecording(true);
   host.append(box);
+  MHMedia.probeWebMAlpha().then(supported => {
+    _webmAlphaSupported = supported;
+    if (!supported || !box.isConnected) return;
+    const option = document.createElement('option'); option.value = 'webm-alpha'; option.textContent = 'WebM VP8 (투명 · 이 브라우저에서 확인됨)'; box.querySelector('#recordFormat').append(option);
+  });
 }
 function _downloadRecording(blob, ext) {
   const url = URL.createObjectURL(blob), a = document.createElement('a');
@@ -9273,11 +9284,14 @@ function _startRecording() {
   const rec = { canvas: off, ctx: off.getContext('2d'), viewport: { x: 0, y: 0, w: cssW, h: cssH }, started: performance.now(), duration: duration * 1000, frames: [], times: [], bytes: 0, last: -Infinity, busy: null, linked, stopping: false, cancelled: false, format: document.getElementById('recordFormat').value };
   _recording = rec; _recordButtons(true);
   try {
-    if (rec.format === 'opaque') {
-      const type = _opaqueRecordingType(); if (!type) throw new Error('이 브라우저는 일반 영상 녹화를 지원하지 않습니다.');
+    if (linked) _advanceModulation(rec.started);
+    _captureRecordingFrame(rec.started); // Paint before captureStream so the first sample is not blank.
+    if (rec.stopping || _recording !== rec) return;
+    if (rec.format !== 'mov') {
+      const type = rec.format === 'webm-alpha' ? (_webmAlphaSupported ? 'video/webm;codecs=vp8' : null) : _opaqueRecordingType(); if (!type) throw new Error('이 브라우저는 일반 영상 녹화를 지원하지 않습니다.');
       rec.stream = off.captureStream(15);
       rec.recorder = new MediaRecorder(rec.stream, { mimeType: type });
-      rec.done = new Promise((resolve, reject) => { rec.recorder.onstop = resolve; rec.recorder.onerror = event => reject(event.error || new Error('영상 인코딩 실패')); });
+      rec.done = new Promise((resolve, reject) => { rec.recorder.onstop = resolve; rec.recorder.onerror = event => { reject(event.error || new Error('영상 인코딩 실패')); _stopRecording(true, '브라우저 영상 인코딩에 실패했습니다. 투명 MOV를 선택해 주세요.'); }; });
       rec.done.catch(() => {});
       rec.recorder.ondataavailable = e => {
         if (!e.data.size || rec.cancelled) return;
@@ -9286,7 +9300,6 @@ function _startRecording() {
       };
       rec.recorder.start(250);
     }
-    if (linked) _advanceModulation(rec.started);
     rec.timer = setTimeout(() => _stopRecording(false), rec.duration);
     _recordStatus('녹화 중 · 설정 변경과 드래그를 바로 반영합니다.');
     _captureRecordingFrame(rec.started);
@@ -9303,7 +9316,7 @@ function _captureRecordingFrame(now) {
     if (rec.format === 'opaque') { c.fillStyle = currentBgColor(); c.fillRect(0,0,v.w,v.h); }
     _renderArtwork(c, v);
     if (rec.format !== 'mov') return;
-    rec.busy = new Promise(resolve => off.toBlob(resolve, 'image/png'));
+    rec.busy = new Promise(resolve => { off.toBlob(resolve, 'image/png'); });
     rec.busy.then(blob => {
       if (rec.cancelled || _recording !== rec) return;
       if (!blob || blob.type !== 'image/png') { _stopRecording(true, 'PNG 프레임 생성에 실패했습니다.'); return; }
@@ -9330,7 +9343,7 @@ async function _stopRecording(cancel = false, message = '') {
       } else {
         const type = rec.recorder.mimeType; _downloadRecording(new Blob(rec.frames, { type }), type.startsWith('video/mp4') ? 'mp4' : 'webm');
       }
-      _recordStatus(message || '영상을 저장했습니다.');
+      _recordStatus(message || ('영상을 저장했습니다.' + (rec.format === 'mov' ? ' ' + rec.frames.length + '프레임 · 평균 ' + (rec.frames.length / (end / 1000)).toFixed(1) + 'fps' : '')));
     } else _recordStatus(message || (rec.cancelled ? '녹화를 취소했습니다.' : '저장할 프레임이 없습니다.'));
   } catch (error) { _recordStatus('녹화 실패: ' + error.message); }
   finally {
@@ -11308,7 +11321,10 @@ function triggerSettingsLoad() {
             if (_mta) _mta.value = _show;
           }
           if (data.params && typeof data.params === 'object') {
-            Object.keys(data.params).forEach(k => { if (k in PARAMS) PARAMS[k] = data.params[k]; });
+            Object.keys(data.params).forEach(k => {
+              const value = data.params[k];
+              if (Object.hasOwn(PARAMS, k) && typeof value === typeof PARAMS[k] && (typeof value !== 'number' || Number.isFinite(value))) PARAMS[k] = value;
+            });
           }
           if (data.elasticity) {
             if (typeof data.elasticity.K_ANGLE  === 'number') K_ANGLE  = data.elasticity.K_ANGLE;

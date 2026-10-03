@@ -40,6 +40,42 @@
     const moov = atom('moov', mvhd, atom('trak', tkhd, atom('mdia', mdhd, hdlr, minf)));
     return new Blob([ftyp, u32(size + 8), bytes('mdat'), ...frames, moov], { type: 'video/quicktime' });
   }
-  if (typeof module !== 'undefined') module.exports = { makePngMov };
-  else root.MHMedia = { makePngMov };
+  // MIME support alone does not prove alpha survives encoding and decoding.
+  async function probeWebMAlpha() {
+    const mime = 'video/webm;codecs=vp8';
+    if (typeof MediaRecorder === 'undefined' || !MediaRecorder.isTypeSupported(mime)) return false;
+    let stream, timer, url, video, timeout, recorder;
+    try {
+      const canvas = document.createElement('canvas'); canvas.width = canvas.height = 32;
+      const ctx = canvas.getContext('2d'); ctx.fillStyle = 'red'; ctx.fillRect(0,0,8,8);
+      stream = canvas.captureStream(15);
+      const chunks = []; recorder = new MediaRecorder(stream, { mimeType: mime });
+      recorder.ondataavailable = e => chunks.push(e.data);
+      const done = new Promise((resolve, reject) => { recorder.onstop = resolve; recorder.onerror = reject; });
+      done.catch(() => {});
+      recorder.start();
+      timer = setInterval(() => { ctx.clearRect(0,0,32,32); ctx.fillStyle = 'red'; ctx.fillRect(0,0,8,8); }, 40);
+      await new Promise(resolve => { setTimeout(resolve, 500); }); recorder.stop(); await done;
+      clearInterval(timer);
+      url = URL.createObjectURL(new Blob(chunks, { type: mime }));
+      video = document.createElement('video'); video.muted = true;
+      const ready = new Promise((resolve, reject) => { video.onloadeddata = resolve; video.onerror = reject; });
+      video.src = url;
+      await Promise.race([ready, new Promise((_, reject) => { timeout = setTimeout(() => reject(new Error('Alpha probe timeout')), 2500); })]);
+      clearTimeout(timeout);
+      // Some encoders begin with an empty sample. Validate an interior frame.
+      const seeked = new Promise((resolve, reject) => { video.onseeked = resolve; video.onerror = reject; });
+      video.currentTime = 0.15;
+      await Promise.race([seeked, new Promise((_, reject) => { timeout = setTimeout(() => reject(new Error('Alpha seek timeout')), 2500); })]);
+      ctx.clearRect(0,0,32,32); ctx.drawImage(video,0,0);
+      return ctx.getImageData(24,24,1,1).data[3] === 0 && ctx.getImageData(4,4,1,1).data[3] > 200;
+    } catch (_) { return false; }
+    finally {
+      clearInterval(timer); clearTimeout(timeout);
+      if (recorder?.state === 'recording') recorder.stop();
+      stream?.getTracks().forEach(t => t.stop()); if (url) URL.revokeObjectURL(url); video?.remove();
+    }
+  }
+  if (typeof module !== 'undefined') module.exports = { makePngMov, probeWebMAlpha };
+  else root.MHMedia = { makePngMov, probeWebMAlpha };
 })(typeof window === 'undefined' ? this : window);
