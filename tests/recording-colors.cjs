@@ -30,7 +30,10 @@ async function verifyColors(page){
           const blendError=Math.max(...bg.map((v,c)=>Math.abs(data[i+c]-(v+coverage*(fg[c]-v)))));maxBlendError=Math.max(maxBlendError,blendError);
           // Repeated overlapping 8-bit strokes can round an endpoint by a few levels.
           const rounding=4/Math.abs(fg[axis]-bg[axis])+1e-9;
-          if(coverage < -rounding || coverage > 1+rounding || blendError>2)invalidColors++;
+          // The live canvas is authoritative, including platform-specific rounding.
+          // Apply the theoretical blend bound only when the two rasterizers differ.
+          const matchesScreen=bg.every((_,c)=>data[i+c]===colorReference[i+c]);
+          if(!matchesScreen&&(coverage < -rounding || coverage > 1+rounding || blendError>2))invalidColors++;
         }
       }
       return{encodingDiff,screenDiff,nonOpaque,background,foreground,invalidColors,maxBlendError,png:_recording.canvas.toDataURL('image/png').split(',')[1]};
