@@ -7244,7 +7244,7 @@ function buildPanel() {
     ['변수 입력', '숫자 클릭'],
     ['SVG 저장', 'Ctrl S'],
     ['PNG 저장', 'Ctrl P'],
-    ['MOV 저장', 'mov → 정지'],
+    ['MOV 저장', 'MOV → 정지'],
   ]);
   _panelGuide.id = 'panelGuide';
   body.appendChild(_panelGuide);
@@ -9360,7 +9360,7 @@ function _recordStatus(text) {
 function _recordButtons() {
   const button=document.getElementById('recordMov');
   if (!button) return;
-  button.textContent=_recording?.stopping?'저장 중…':_recording?'정지':'mov';
+  button.textContent=_recording?.stopping?'저장 중…':_recording?'정지':'MOV';
   button.disabled=!!_recording?.stopping;
   button.setAttribute('aria-pressed',String(!!_recording));
 }
@@ -9388,6 +9388,7 @@ function _captureRecordingFrame(now) {
   try {
     const c=rec.ctx,v=rec.viewport,off=rec.canvas;
     c.setTransform(1,0,0,1,0,0);c.clearRect(0,0,off.width,off.height);
+    c.fillStyle=currentBgColor();c.fillRect(0,0,off.width,off.height);
     c.setTransform(off.width/v.w,0,0,off.height/v.h,0,0);
     _renderArtwork(c,v);
     let timeout;

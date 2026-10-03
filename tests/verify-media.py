@@ -1,35 +1,42 @@
-"""Independent decoder test, run after recorder.cjs. Requires FFmpeg on PATH."""
+"""Independent MOV color/opacity and PNG transparency checks. Requires FFmpeg."""
 import json
 import os
 import subprocess
 from pathlib import Path
 
 ffmpeg = os.environ.get('FFMPEG_EXE', 'ffmpeg')
-movie = 'test-results/transparent.mov'
-first = subprocess.run([ffmpeg, '-hide_banner', '-i', movie, '-frames:v', '1',
-                        '-f', 'rawvideo', '-pix_fmt', 'rgba', 'pipe:1'], capture_output=True, check=True)
-alpha = first.stdout[3::4]
-assert len(first.stdout) == 640 * 480 * 4
-assert all(first.stdout[(y * 640 + x) * 4 + 3] == 0 for y in range(8) for x in range(8)), 'MOV corner must be transparent'
-report = {'transparentPixels': alpha.count(0), 'opaquePixels': alpha.count(255),
-          'fractionalAlphaPixels': sum(0 < a < 255 for a in alpha),
-          'decoder': first.stderr.decode(errors='replace')}
-assert report['transparentPixels'] > 1000 and report['opaquePixels'] > 100
-subprocess.run([ffmpeg, '-v', 'error', '-i', movie, '-fps_mode', 'passthrough', '-enc_time_base', '1:1000', '-f', 'null', '-'], check=True)
-for path in Path('test-results').glob('opaque.*'):
-    subprocess.run([ffmpeg, '-v', 'error', '-i', str(path), '-f', 'null', '-'], check=True)
-Path('test-results/decoder.json').write_text(json.dumps(report, indent=2), encoding='utf8')
-print(json.dumps({k: v for k, v in report.items() if k != 'decoder'}, indent=2))
 
-# Verify the documented editing alternative, not just that a conversion exits 0.
-prores = 'test-results/prores4444.mov'
-subprocess.run([ffmpeg, '-v', 'error', '-y', '-i', movie, '-c:v', 'prores_ks',
-                '-profile:v', '4', '-pix_fmt', 'yuva444p10le', prores], check=True)
-converted = subprocess.run([ffmpeg, '-v', 'error', '-i', prores, '-frames:v', '1',
-                            '-f', 'rawvideo', '-pix_fmt', 'rgba', 'pipe:1'], capture_output=True, check=True)
-converted_alpha = converted.stdout[3::4]
-prores_report = {'transparent': converted_alpha.count(0), 'opaque': converted_alpha.count(255),
-                 'fractional': sum(0 < a < 255 for a in converted_alpha)}
-assert prores_report['transparent'] > 1000 and prores_report['opaque'] > 100
-Path('test-results/prores-alpha.json').write_text(json.dumps(prores_report, indent=2), encoding='utf8')
-print('PASS: ProRes 4444 conversion retains alpha', prores_report)
+def decode(path, first=False):
+    command = [ffmpeg, '-v', 'error', '-i', str(path)]
+    if first:
+        command += ['-frames:v', '1']
+    return subprocess.run(command + ['-fps_mode', 'passthrough', '-f', 'rawvideo', '-pix_fmt', 'rgba', 'pipe:1'], capture_output=True, check=True).stdout
+
+metadata = json.loads(Path('test-results/recording-colors.json').read_text(encoding='utf8'))
+size = metadata['width'] * metadata['height'] * 4
+frames = decode('test-results/recording-colors.mov')
+assert len(frames) == size * len(metadata['cases'])
+report = []
+for case in metadata['cases']:
+    index = case['index']
+    actual = frames[index * size:(index + 1) * size]
+    expected = decode(Path('test-results') / case['file'], first=True)
+    assert actual == expected, f"Decoded MOV differs from captured frame: {case['label']}"
+    assert actual[3::4] == bytes([255]) * (size // 4), case['label']
+    assert actual[:4] == bytes(case['bg'] + [255]), case['label']
+    report.append({'label': case['label'], 'pixelDifferences': 0, 'background': case['bg'], 'foreground': case['fg'], 'opaquePixels': size // 4})
+
+# PNG still excludes the background and retains antialiased transparent edges.
+png = decode('test-results/color-artwork.png', first=True)
+alpha = png[3::4]
+assert alpha.count(0) > 1000 and alpha.count(255) > 100
+assert any(0 < value < 255 for value in alpha)
+
+movie = Path('test-results/colored.mov')
+if movie.exists():
+    first = decode(movie, first=True)
+    assert len(first) == size and first[3::4] == bytes([255]) * (size // 4)
+    subprocess.run([ffmpeg, '-v', 'error', '-i', str(movie), '-fps_mode', 'passthrough', '-f', 'null', '-'], check=True)
+
+Path('test-results/decoder.json').write_text(json.dumps({'MOV': report, 'PNG': {'transparent': alpha.count(0), 'opaque': alpha.count(255)}}, indent=2), encoding='utf8')
+print('PASS: independently decoded 7 MOV frames preserve captured RGB exactly and include an opaque background; PNG transparency preserved')
