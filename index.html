@@ -254,6 +254,7 @@
   /* [v1.10b] HUD 안 '획 잇기' 항목의 노드 미리보기 — 글자 크기에 맞춘 인라인 캔버스.
      실제 호버 강조와 동일한 모양(PARAMS.shape)·색(_bondInvColor)·크기(nodeR 비례) 으로 그려짐. */
   /* [v1.10b] 획 잇기 미리보기 — 획 수정과 동일한 15×12 캔버스로 통일. */
+  #hudCenterPreview { transform: scale(1.5); transform-origin: center; }
   .hudHlPreview {
     display: inline-block;
     vertical-align: middle;
@@ -7200,7 +7201,7 @@ function buildPanel() {
   pngBtn.addEventListener('click', () => savePNG());
   btnRow.appendChild(pngBtn);
   const recordBtn=document.createElement('button');recordBtn.className='pillBtn';recordBtn.id='recordMov';
-  recordBtn.title='투명 MOV 녹화 · 최대 30초 / 64MiB · Esc 취소';
+  recordBtn.title='MOV 녹화 · 최대 30초 / 64MiB';
   recordBtn.onclick=()=>{if(_recording)void _stopRecording();else _startRecording();};
   btnRow.appendChild(recordBtn);
   const fileRow=document.createElement('div');fileRow.className='btnRow';
@@ -7218,7 +7219,7 @@ function buildPanel() {
   fileRow.appendChild(loadBtn);
   body.appendChild(btnRow);body.appendChild(fileRow);
   const status=document.createElement('div');status.id='recordStatus';status.setAttribute('role','status');
-  status.style.cssText='font-size:11px;line-height:1.5;margin-top:6px';body.appendChild(status);
+  status.style.cssText='font-size:inherit;line-height:1.5;margin-top:6px';body.appendChild(status);
   _recordButtons();_recordStatus(_recordMessage);
   for(const [key,tip] of [['jitter','글자가 떨리는 폭입니다. 임의 설정은 0~30입니다.'],['jitterSpeed','떨리는 빠르기입니다. 0이면 현재 떨림을 멈춥니다.']]){
     const row=body.querySelector('[data-key="'+key+'"]');if(row)row.title=tip;
@@ -7237,7 +7238,6 @@ function buildPanel() {
     ['SVG 저장', 'Ctrl S'],
     ['PNG 저장', 'Ctrl P'],
     ['MOV 저장', 'mov → 정지'],
-    ['녹화 취소', 'Esc'],
   ]);
   _panelGuide.id = 'panelGuide';
   body.appendChild(_panelGuide);
@@ -9368,7 +9368,7 @@ function _startRecording() {
   off.width=Math.max(2,Math.floor(cssW*scale/2)*2);off.height=Math.max(2,Math.floor(cssH*scale/2)*2);
   const rec={canvas:off,ctx:off.getContext('2d'),viewport:{x:0,y:0,w:cssW,h:cssH},
     started:performance.now(),duration:30000,frames:[],times:[],bytes:0,last:-Infinity,busy:null,stopping:false,cancelled:false};
-  _recording=rec;_recordButtons();_recordStatus('녹화 중 · Esc 취소');
+  _recording=rec;_recordButtons();_recordStatus('녹화 중');
   rec.timer=setTimeout(()=>_stopRecording(false,'30초 한도에 도달해 저장했습니다.'),rec.duration);
   _captureRecordingFrame(rec.started);
 }
@@ -9409,7 +9409,7 @@ async function _stopRecording(cancel=false,message='') {
     if(!rec.cancelled && rec.frames.length){
       const durations=rec.times.map((t,i)=>Math.max(1,(rec.times[i+1]??end)-t));
       const blob=MHMedia.makePngMov(rec.frames,rec.canvas.width,rec.canvas.height,durations);
-      _downloadRecording(blob);_recordStatus(message||'투명 MOV를 저장했습니다.');
+      _downloadRecording(blob);_recordStatus(message||'MOV를 저장했습니다.');
     }else _recordStatus(rec.error||message||(rec.cancelled?'녹화를 취소했습니다.':'저장할 프레임이 없습니다.'));
   }catch(error){_recordStatus('녹화 실패: '+error.message);}
   finally{
@@ -9417,9 +9417,6 @@ async function _stopRecording(cancel=false,message='') {
     if(_recording===rec)_recording=null;_recordButtons();
   }
 }
-document.addEventListener('keydown',e=>{
-  if(_recording && e.code==='Escape' && !e.isComposing){e.preventDefault();e.stopImmediatePropagation();void _stopRecording(true);}
-},true);
 document.addEventListener('visibilitychange',()=>{if(document.hidden)void _stopRecording(false,'탭이 숨겨져 녹화를 종료하고 저장했습니다.');});
 window.addEventListener('beforeunload',e=>{if(_recording){e.preventDefault();e.returnValue='';}});
 window.addEventListener('pagehide',()=>{void _stopRecording(true);});

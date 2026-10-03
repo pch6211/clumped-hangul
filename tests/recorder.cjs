@@ -20,7 +20,12 @@ run(async page=>{
   await start();const oldSize=await page.evaluate(()=>[_recording.canvas.width,_recording.canvas.height]);await page.evaluate(()=>{for(let i=0;i<12;i++)resetWorld();TEXT='새 글자';world=buildWorld(TEXT);PARAMS.cornerR=3;PARAMS.borderWidth=2;});
   await page.setViewportSize({width:800,height:600});await page.waitForFunction(()=>cssW===800);assert.deepEqual(await page.evaluate(()=>[_recording.canvas.width,_recording.canvas.height]),oldSize);
   await page.evaluate(()=>_captureRecordingFrame(performance.now()+80));await page.waitForFunction(()=>!_recording.busy);const resize=page.waitForEvent('download');await button.click();await resize;await page.waitForFunction(()=>!_recording);
-  await start();const cancelled=downloads;await page.keyboard.press('Escape');await page.waitForFunction(()=>!_recording);assert.equal(downloads,cancelled);
+  await start();const beforeEscape=downloads;await page.keyboard.press('Escape');assert.equal(await page.evaluate(()=>!!_recording&&!_recording.stopping),true);assert.equal(await button.innerText(),'정지');assert.equal(downloads,beforeEscape);
+  // Existing Escape closes the settings panel; reopening must retain recording state.
+  assert.equal(await page.locator('#panel').isVisible(),false);await page.evaluate(()=>togglePanel());assert.equal(await button.innerText(),'정지');
+  await page.locator('[data-key="nodeR"] .lbvVal').click();await page.locator('.sliderValuePrompt').press('Escape');assert.equal(await page.locator('.sliderValuePrompt').count(),0);assert.equal(await page.evaluate(()=>!!_recording&&!_recording.stopping),true);
+  const escaped=page.waitForEvent('download');await button.click();await escaped;await page.waitForFunction(()=>!_recording);const cancelled=downloads;
+  const statusStyle=await page.locator('#recordStatus').evaluate(el=>({font:getComputedStyle(el).fontSize,panel:getComputedStyle(document.getElementById('panel')).fontSize,text:el.textContent}));assert.equal(statusStyle.font,statusStyle.panel);assert.ok(!statusStyle.text.includes('투명'));assert.equal(await page.getByText('녹화 취소',{exact:true}).count(),0);
   // Null encoder result, thrown rendering error and finalizer error all recover.
   for(const failure of ['encode','render','mux']){
     await page.evaluate(failure=>{window._savedRender=_renderArtwork;window._savedMux=MHMedia.makePngMov;if(failure==='encode')HTMLCanvasElement.prototype.toBlob=cb=>cb(null);if(failure==='render')_renderArtwork=()=>{throw Error('test-render');};if(failure==='mux')MHMedia.makePngMov=()=>{throw Error('test-mux');};_startRecording();},failure);
