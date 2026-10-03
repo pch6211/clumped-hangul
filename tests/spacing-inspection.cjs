@@ -4,6 +4,7 @@ const http=require('node:http');
 const {chromium}=require('playwright');
 (async()=>{
   const server=http.createServer((req,res)=>{
+    if(req.url==='/motion-curve.js'){res.setHeader('Content-Type','application/javascript');res.end(fs.readFileSync('motion-curve.js'));return;}
     const script=req.url==='/media-export.js';res.setHeader('Content-Type',script?'application/javascript':'text/html; charset=utf-8');
     res.end(fs.readFileSync(script?'media-export.js':'index.html'));
   }).listen(0,'127.0.0.1');

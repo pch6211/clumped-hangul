@@ -20,6 +20,7 @@ const linter = new Linter();
 const scripts = [...fs.readFileSync('index.html', 'utf8').matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)]
   .filter(m => !/\bsrc=/.test(m[1])).map((m, i) => [`index.html script ${i + 1}`, m[2]]);
 scripts.push(['media-export.js', fs.readFileSync('media-export.js', 'utf8')]);
+scripts.push(['motion-curve.js', fs.readFileSync('motion-curve.js', 'utf8')]);
 let count = 0;
 for (const [name, code] of scripts) {
   // The legacy single-file app retains disabled implementations after early

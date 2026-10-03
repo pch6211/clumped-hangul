@@ -5,6 +5,7 @@ const { chromium } = require('playwright');
 
 (async () => {
   const server = http.createServer((req, res) => {
+    if(req.url==='/motion-curve.js'){res.setHeader('Content-Type','application/javascript');res.end(fs.readFileSync('motion-curve.js'));return;}
     const script = req.url === '/media-export.js';
     res.setHeader('Content-Type', script ? 'application/javascript' : 'text/html; charset=utf-8');
     res.end(fs.readFileSync(script ? 'media-export.js' : (process.env.TEST_HTML || 'index.html')));
@@ -50,7 +51,7 @@ const { chromium } = require('playwright');
       PARAMS.nodeR=32; const large=_centerRadius(); PARAMS.nodeR=20;
       return {wholeGlyph:_hoverCenterBody(p)===b,large,small:_centerRadius()};
     });
-    assert.deepEqual(hover,{wholeGlyph:true,large:32,small:20});
+    assert.deepEqual(hover,{wholeGlyph:true,large:24,small:15});
     const anchor = await page.evaluate(() => ({ x: world.bodies[0].anchorX, y: world.bodies[0].anchorY }));
     await page.mouse.move(anchor.x, anchor.y); await page.mouse.down();
     assert.equal(await page.evaluate(() => !!_centerDrag && !draggedNode), true);
@@ -79,7 +80,7 @@ const { chromium } = require('playwright');
     const jitter = await page.evaluate(() => {
       const saved=world;const measure=strength=>{
         world={bodies:[{anchorX:100,anchorY:100,nodes:Array.from({length:16},(_,i)=>({x:i*10,y:20})),edges:[]}]};
-        PARAMS.jitter=strength;_motionTime=0;_motionLast=null;const samples=[];
+        PARAMS.jitter=strength;PARAMS.jitterSpeed=100;_jitterPhase=0;_motionTime=0;_motionLast=null;const samples=[];
         for(let i=0;i<240;i++){_advanceMotion(i*1000/60);_stripNodeJitter();_applyNodeJitter();if(i>120)samples.push(world.bodies[0].nodes[0].jitterState.x);}
         let crossings=0;for(let i=1;i<samples.length;i++)if(samples[i]*samples[i-1]<0)crossings++;
         const rms=Math.sqrt(samples.reduce((s,v)=>s+v*v,0)/samples.length),mean=samples.reduce((s,v)=>s+v,0)/samples.length;
@@ -93,6 +94,23 @@ const { chromium } = require('playwright');
     assert.ok(jitter.strong.crossings>25 && Math.abs(jitter.strong.mean)<1 && jitter.strong.spread>3);
     assert.ok(Object.values(jitter).every(j=>j.anchor===100 && j.residual<.001));
     console.log('PASS: fast zero-mean per-node jitter, intensity, stationary anchors, restoration',jitter);
+    const speeds=await page.evaluate(()=>{
+      const saved=world,results=[];
+      for(const speed of [1,30,100]){
+        world={bodies:[{anchorX:100,anchorY:100,nodes:[{x:10,y:20}],edges:[]}]};PARAMS.jitter=100;PARAMS.jitterSpeed=speed;_jitterPhase=0;_motionLast=null;let square=0,count=0,crossings=0,prev=0;
+        for(let i=0;i<7200;i++){_advanceMotion(i*1000/60);_stripNodeJitter();_applyNodeJitter();const x=world.bodies[0].nodes[0].jitterState.x;if(i>120){square+=x*x;count++;if(x*prev<0)crossings++;}prev=x;}
+        const n=world.bodies[0].nodes[0];PARAMS.jitterSpeed=0;for(let i=7200;i<7320;i++){_advanceMotion(i*1000/60);_stripNodeJitter();_applyNodeJitter();}const held=n.x;
+        for(let i=7320;i<7440;i++){_advanceMotion(i*1000/60);_stripNodeJitter();_applyNodeJitter();}const stopped=Math.abs(n.x-held);
+        PARAMS.jitter=0;for(let i=7440;i<7560;i++){_advanceMotion(i*1000/60);_stripNodeJitter();_applyNodeJitter();}
+        results.push({speed,hz:_jitterFrequency(speed),rms:Math.sqrt(square/count),crossings,stopped,residual:Math.hypot(n.x-10,n.y-20),anchor:world.bodies[0].anchorX});
+      }
+      world=saved;PARAMS.jitter=0;PARAMS.jitterSpeed=30;return results;
+    });
+    assert.ok(speeds[0].hz<.04&&speeds[1].hz<.2&&speeds[2].hz===12);
+    assert.ok(speeds[0].crossings<10&&speeds[1].crossings>30&&speeds[2].crossings>2000);
+    assert.ok(Math.max(...speeds.map(s=>s.rms))/Math.min(...speeds.map(s=>s.rms))<1.3);
+    assert.ok(speeds.every(s=>s.stopped<.001&&s.residual<.001&&s.anchor===100));
+    console.log('PASS: slow-to-fast independent jitter speed, stable amplitude, zero-speed hold and zero-strength restoration',speeds);
     const weld=await page.evaluate(()=>{const saved=world;world={bodies:[{nodes:[{x:20,y:20},{x:20,y:20},{x:20,y:20}],magnetPairs:[[0,1],[1,2]]}]};PARAMS.jitter=100;for(let i=0;i<60;i++){_advanceMotion(i*16);_stripNodeJitter();_applyNodeJitter();}const ns=world.bodies[0].nodes,delta=Math.max(...ns.map(n=>Math.hypot(n.x-ns[0].x,n.y-ns[0].y)));world=saved;PARAMS.jitter=0;return delta;});
     assert.ok(weld<.0001);
     const smoothing = await page.evaluate(() => {

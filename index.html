@@ -446,7 +446,6 @@
   .editor .stage .meta { display: flex; gap: 8px; align-items: baseline; margin-bottom: 7px; justify-content: flex-start; line-height: 1; }
   .stageBtn { display: inline-flex; align-items: center; justify-content: center; font-size: 10px; line-height: 1; height: 14px; user-select: none; flex: 0 0 auto; vertical-align: middle; }
   .stageBtn.closeX { cursor: pointer; }
-  button[data-layout-mode] { border: 1px solid currentColor; border-radius: 2px; background: transparent; color: inherit; font-family: inherit; padding: 1px 4px; margin-left: 6px; cursor: pointer; }
   .stageBtn.dragHandle { cursor: grab; font-size: 11px; height: 15px; position: relative; top: 0; }  /* [v1.09] +1px 키움, top -2 → 0 (2px 내림) */
   .stageBtn.dragHandle.dragging { cursor: grabbing; }
   .editor .stage .meta .label { flex: 1 1 auto; text-align: left; }
@@ -532,29 +531,34 @@
 #recordModeBtn[aria-pressed=true] { text-decoration: underline; text-underline-offset: 4px; }
 #recordDialog { max-width: calc(100vw - 16px); max-height: calc(100vh - 16px); overflow-y: auto; scrollbar-width: thin; scrollbar-color: currentColor transparent; }
 #recordDialog [hidden] { display: none; }
-#recordDialog .recordContent { background: var(--editor-bg,transparent); border: 1px solid currentColor; padding: 12px; }
+#recordDialog .recordContent { background: var(--editor-bg,transparent); border: 1px solid currentColor; padding: 12px; margin-top: 10px; }
+#recordDialog .recordSelectors { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 12px; }
+#recordDialog .recordSelectors label { margin: 0; display: flex; align-items: center; gap: 5px; }
+#recordDialog .recordTiming { display: flex; gap: 12px; flex-wrap: wrap; }
 #recordDialog .closeX { background: transparent; color: inherit; border: 0; padding: 0; font: inherit; }
 #recordDialog label { display: block; margin: 8px 0; }
-#recordDialog input[type=number] { width: 44px; font: inherit; color: inherit; background: transparent; border: 0; border-bottom: 1px solid currentColor; border-radius: 0; }
+#recordDialog .mhAdminInput { flex: 0 0 auto; width: 46px; padding: 2px 4px; font-family: inherit; font-size: 9px; letter-spacing: .3px; border: 1px solid currentColor; background: transparent; color: inherit; outline: none; text-align: right; box-sizing: border-box; border-radius: 0; }
 #recordDialog input[type=checkbox] { accent-color: currentColor; }
 #recordDialog .guideList { margin-top: 8px; }
 #recordDialog .guideLine { white-space: normal; }
 #recordDialog .mhActions { gap: 6px; margin-top: 10px; }
 #recordDialog .recordTransport { justify-content: flex-start; }
 #recordDialog .pillBtn { padding: 5px 12px; }
-.panel .lbvLabel[tabindex="0"] { cursor: pointer; }
 .recordRangeRow { margin: 0 0 14px; }
 .rangeCaption { display: flex; justify-content: space-between; }
 .rangeValue { border: 0; border-bottom: 1px dotted currentColor; background: transparent; font: inherit; color: inherit; padding: 0; cursor: pointer; }
 .recordBar { height: 16px; position: relative; margin: 2px 5px; touch-action: none; cursor: ew-resize; }
-.recordBar::before { content: ''; position: absolute; left: 0; right: 0; top: 8px; height: 1px; background: currentColor; opacity: .16; }
+.recordBar::before { content: ''; position: absolute; left: 0; right: 0; top: 8px; height: 1px; background: currentColor; }
 .rangeFill { position: absolute; top: 8px; height: 1px; background: currentColor; pointer-events: none; }
 .rangeHandle { position: absolute; top: 8px; width: 7px; height: 7px; transform: translate(-50%,-50%) rotate(45deg); cursor: ew-resize; outline: none; }
 .rangeHandle:focus-visible { outline: 1px solid currentColor; outline-offset: 2px; }
 #easeGraph { display: block; width: 100%; height: auto; touch-action: none; overflow: visible; margin: 12px 0 4px; }
-#easeGraph path { stroke-width: 1px; vector-effect: non-scaling-stroke; }
+#easeGraph path { fill: none; stroke: currentColor; stroke-width: 1px; vector-effect: non-scaling-stroke; }
+#easeGraph .easeArms { stroke-dasharray: 3 3; }
+#easeGraph .easeHandle { fill: var(--ease-accent,currentColor); }
+#easeGraph .easePoint { fill: var(--editor-bg,white); stroke: currentColor; stroke-width: 1px; vector-effect: non-scaling-stroke; cursor: move; outline: none; }
 #easeGraph .easeHandle { cursor: grab; outline: none; }
-#easeGraph .easeHandle:focus-visible { stroke: currentColor; stroke-width: 1px; vector-effect: non-scaling-stroke; }
+#easeGraph .easePoint:focus-visible, #easeGraph .easeHandle:focus-visible { stroke: currentColor; stroke-width: 1px; vector-effect: non-scaling-stroke; }
 #easeGraph text { fill: currentColor; font: 10px sans-serif; }
 
 </style>
@@ -662,6 +666,7 @@
   <div class="editorCtxMenu" id="editorCtxMenu"></div>
 </div>
 <script src="media-export.js"></script>
+<script src="motion-curve.js"></script>
 <script>
 /* ╔══════════════════════════════════════════════════════════════════════════╗
    ║  ⚙  설정 대시보드 (MH_CFG)  —  여기만 고치면 됩니다                          ║
@@ -741,6 +746,7 @@ const MH_CFG = {
     borderWidth: 0,      // [E3] 테두리 — 글자를 채우지 않고 윤곽선(두께=이 값)으로 감쌈 (0=없음 ~ 30)
     flow: 0,             // 흘리기 — 현재 노드 중 N 개(고정값) 골라 아래로 흘러내리는 선. localStorage('mh_flow') 영속. 0 = 비활성.
     jitter: 0,
+    jitterSpeed: 30,
     cornerR: 0,          // 부드럽게 — 픽셀 마스크 + blur 기반 모서리 부드러움
     // 원시 물리 (튜닝값 — UI 슬라이더는 숨김 상태)
     repulse: 20,         // 반발 — 노드끼리 밀어내는 힘
@@ -2260,7 +2266,8 @@ const PANEL_GROUPS = [
     ['borderWidth', '테두리', 0, 30, 1],
     ['flow',        '페인트', 0, 10, 1],
     ['cornerR',     '부드럽게',  0,  20, 1],
-    ['jitter', '떨림', 0, 100, 1],
+    ['jitter', '떨림 강도', 0, 100, 1],
+    ['jitterSpeed', '떨림 속도', 0, 100, 1],
   ]},
   { id: 'bg', title: '배경 색', items: [
     ['_bgR', '빨강', 0, 255, 1],
@@ -3632,7 +3639,7 @@ function _finishCenterDrag(e, cancel = false) {
   canvas.classList.remove('dragging');
   try { canvas.releasePointerCapture(drag.id); } catch (_) {}
 }
-function _centerRadius() { return Math.max(PARAMS.nodeR || 0, 6); }
+function _centerRadius() { return 1.5*Math.max((PARAMS.nodeR || 0)/2, 3); }
 function _hoverCenterBody(p = _centerPointer) {
   if (!p || !world) return null;
   let best = null, distance = Infinity;
@@ -3954,7 +3961,6 @@ _persistLayoutState();
 function _persistLayoutState(){try{localStorage.setItem('mh_layout_v2',JSON.stringify(_layoutState));}catch(_){}}
 function _setLayoutMode(mode) {
   _stopModulation();_layoutState.mode=mode;_persistLayoutState();resetWorld();
-  document.querySelectorAll('[data-layout-mode]').forEach(el=>{el.textContent=mode==='optical-v2'?'시각적':'기존';el.setAttribute('aria-pressed',String(mode==='optical-v2'));});
 }
 function _layoutHash(text) {let hash=_layoutState.seed;for(const ch of text)hash=Math.imul(hash^ch.codePointAt(0),16777619)>>>0;return hash;}
 function _layoutRandom(seed) {return()=>((seed=(Math.imul(seed,1664525)+1013904223)>>>0)/4294967296);}
@@ -5715,10 +5721,12 @@ document.addEventListener('pointerup',     _endPxMeasure, false);
 document.addEventListener('pointercancel', _endPxMeasure, false);
 window.addEventListener('resize', () => { if (_pxMeasure) _renderPxMeasure(); });
 
-let _motionTime = 0, _motionLast = null, _jitterDt = 1 / 60;
+let _motionTime = 0, _motionLast = null, _jitterDt = 1 / 60, _jitterPhase = 0;
+function _jitterFrequency(speed=PARAMS.jitterSpeed){const v=Math.max(0,Math.min(100,speed||0));return v===0?0:.03*Math.pow(400,v/100);}
 function _advanceMotion(now) {
   _jitterDt = _motionLast === null ? 1/60 : Math.max(0, Math.min(0.05, (now-_motionLast)/1000));
   _motionLast = now; _motionTime += _jitterDt;
+  _jitterPhase=(_jitterPhase+2*Math.PI*_jitterFrequency()*_jitterDt)%(Math.PI*2000);
 }
 // A damped spring per node. Strip its displacement before the base solver, then
 // integrate rapid, zero-mean acceleration and apply it to that node only.
@@ -5740,10 +5748,14 @@ function _applyNodeJitter() {
     if (n === draggedNode) { delete n.jitterState; return; }
     if (_centerDrag || draggedNode) { n.x += w.x; n.y += w.y; w.applied = true; return; }
     const phase = ni*2.39996+bi*1.7;
-    const amplitude = 12*Math.pow(strength/100,1.35);
-    const fx = amplitude*6500*(Math.sin(_motionTime*69+phase)+0.3*Math.sin(_motionTime*107+phase*1.7));
-    const fy = amplitude*6500*(Math.sin(_motionTime*83+phase*1.3)+0.3*Math.sin(_motionTime*113+phase));
+    const amplitude = 12*Math.pow(strength/100,1.35)/1.3,omega=2*Math.PI*_jitterFrequency();
+    // Feed-forward compensation preserves displacement amplitude across speed.
+    // At speed zero the phase holds; strength zero still restores the rest pose.
+    const force=(p,w)=>(1900-w*w)*Math.sin(p)+55*w*Math.cos(p);
     for (let k=0;k<substeps;k++) {
+      const t=_jitterPhase-omega*(_jitterDt-(k+1)*dt);
+      const fx=amplitude*(force(t+phase,omega)+.3*force(t*1.55+phase*1.7,omega*1.55));
+      const fy=amplitude*(force(t*1.2+phase*1.3,omega*1.2)+.3*force(t*1.64+phase,omega*1.64));
       w.vx += (fx-1900*w.x-55*w.vx)*dt;
       w.vy += (fy-1900*w.y-55*w.vy)*dt;
       w.x += w.vx*dt; w.y += w.vy*dt;
@@ -7199,7 +7211,7 @@ function setupPcTextBar() {
 
 let _recordMode = false, _recordOpener = null, _previewPaused = false, _transportPlaying = false;
 const _recordRanges = new Map();
-let _easeCurve = [0.42,0,0.58,1], _recordPeriod = 4, _recordRepeats = 1, _recordLinked = true;
+let _recordPeriod = 4, _recordRepeats = 1;
 const _modulation = { running:false, tracks:[], period:4, repeats:1, elapsed:0, last:null, lastUI:0, lastStructural:-Infinity, complete:false };
 function _setRecordMode(on) {
   if (on === _recordMode) return;
@@ -7211,19 +7223,7 @@ function _setRecordMode(on) {
   } else { _recordOpener=document.activeElement; _buildRecordingPopup(); }
   sliderUpdaters.forEach(u=>u());
 }
-function _toggleRecordTrack(key) {
-  _stopModulation();
-  if (_recordRanges.has(key)) _recordRanges.delete(key);
-  else _recordRanges.set(key,{key,from:null,to:null,count:0});
-  _renderRecordTracks(); sliderUpdaters.forEach(u=>u());
-}
-function _bezierEase(t,curve = _easeCurve) {
-  if(t<=1e-9)return 0;if(t>=1-1e-9)return 1;
-  const cubic=(u,a,b)=>3*(1-u)*(1-u)*u*a+3*(1-u)*u*u*b+u*u*u;
-  let lo=0,hi=1;
-  for(let i=0;i<24;i++){const u=(lo+hi)/2;if(cubic(u,curve[0],curve[2])<t)lo=u;else hi=u;}
-  return cubic((lo+hi)/2,curve[1],curve[3]);
-}
+function _bezierEase(t) { return MHCurve.evaluate(_easePoints,t); }
 function _modulationValue(phase,from,to) {
   const t=1-Math.abs(2*((phase%1+1)%1)-1);
   return from+(to-from)*_bezierEase(t);
@@ -7238,6 +7238,7 @@ function _stopModulation(restore=true) {
     setParamValue(track.key,track.base,{modulated:true,silent:true});
     rebuild ||= STRUCTURAL_KEYS.has(track.key);
   }
+  if(m.fgAuto!==undefined)_fgAuto=m.fgAuto;
   if(rebuild)resetWorld();
   _transportPlaying=false; _recordButtons(!!_recording); sliderUpdaters.forEach(u=>u());_drawEaseGraph();
 }
@@ -7247,17 +7248,20 @@ function _startModulation() {
   const tracks=[];
   for(const range of _recordRanges.values()) {
     const item=PANEL_GROUPS.flatMap(g=>g.items).find(i=>i[0]===range.key);
+    if(range.count===0)continue;
     if(!item || range.count!==2 || ![range.from,range.to].every(Number.isFinite) || Math.min(range.from,range.to)<item[2] || Math.max(range.from,range.to)>item[3]) {
       _modStatus('선택한 슬라이더의 시작과 끝을 지정하세요.');return false;
     }
     tracks.push({...range,base:getParamValue(range.key),step:item[4]});
   }
+  if(!tracks.length)return false;
   if(!Number.isFinite(_recordPeriod)||_recordPeriod<0.2||_recordPeriod>60||!Number.isInteger(_recordRepeats)||_recordRepeats<1||_recordRepeats>100) {
     _modStatus('왕복 시간 0.2~60초, 반복 1~100회로 입력하세요.');return false;
   }
+  _modulation.fgAuto=_fgAuto;if(tracks.some(t=>t.key.startsWith('_fg')))_fgAuto=false;
   _opticalLayoutLock={text:currentText(),lines:world.lines,spacing:PARAMS.letterSpacing,lineHeight:Math.max(40,PARAMS.lineHeight),positions:world.bodies.map(b=>({ch:b.ch,x:b.anchorX,y:b.anchorY,column:b.layoutColumn??0,line:b.layoutLine??0}))};
   Object.assign(_modulation,{running:true,tracks,period:_recordPeriod,repeats:_recordRepeats,elapsed:0,last:null,lastUI:-Infinity,lastStructural:-Infinity,complete:false});
-  if(_recording&&!_recording.stopping)_recording.linked=_recordLinked;
+  if(_recording&&!_recording.stopping)_recording.linked=true;
   _transportPlaying=true;_previewPaused=false;_modStatus('');_recordButtons(!!_recording);return true;
 }
 function _advanceModulation(now) {
@@ -7292,7 +7296,7 @@ function _finishPlayback() {
 }
 function _togglePlayback() {
   if(_transportPlaying) {_previewPaused=!_previewPaused;_recordButtons(!!_recording);return;}
-  if(_recordRanges.size) {if(!_startModulation())return;}
+  if([..._recordRanges.values()].some(r=>r.count>0)) {if(!_startModulation())return;}
   else {_transportPlaying=true;_previewPaused=false;}
   _recordButtons(!!_recording);
 }
@@ -7321,7 +7325,8 @@ function _renderRecordTracks() {
     const item=PANEL_GROUPS.flatMap(g=>g.items).find(i=>i[0]===range.key);if(!item)continue;
     const row=document.createElement('div');row.className='recordRangeRow';row.dataset.recordKey=range.key;
     row.innerHTML='<div class="rangeCaption"><span></span><span><button class="rangeValue" data-value="from" type="button">—</button> → <button class="rangeValue" data-value="to" type="button">—</button></span></div><div class="recordBar"><i class="rangeFill" hidden></i><span class="rangeHandle" data-side="from" role="slider" tabindex="0" hidden></span><span class="rangeHandle" data-side="to" role="slider" tabindex="0" hidden></span></div>';
-    row.querySelector('.rangeCaption>span').textContent=item[1];
+    const group=PANEL_GROUPS.find(g=>g.items.some(i=>i[0]===range.key));
+    row.querySelector('.rangeCaption>span').textContent=group.title+' · '+item[1];
     const bar=row.querySelector('.recordBar');let drag=null;
     const quantize=v=>Math.max(item[2],Math.min(item[3],Math.round(v/item[4])*item[4]));
     const at=e=>{const rect=bar.getBoundingClientRect();return quantize(item[2]+(e.clientX-rect.left)/rect.width*(item[3]-item[2]));};
@@ -7330,7 +7335,7 @@ function _renderRecordTracks() {
       if(e.button!==0)return;e.preventDefault();_stopModulation();
       const h=e.target.closest('.rangeHandle');
       if(h){drag={id:e.pointerId,side:h.dataset.side,before:{...range}};h.focus();bar.setPointerCapture(e.pointerId);}
-      else {if(range.count!==1){range.from=at(e);range.to=null;range.count=1;}else {range.to=at(e);range.count=2;}_modStatus(range.count===1?'끝값을 클릭하세요.':'');}
+      else {if(range.count!==1){range.from=at(e);range.to=null;range.count=1;}else {range.to=at(e);range.count=2;}}
       _renderRangePositions();
     });
     bar.addEventListener('pointermove',e=>{if(!drag||e.pointerId!==drag.id)return;range[drag.side]=at(e);_renderRangePositions();});
@@ -7343,50 +7348,99 @@ function _renderRecordTracks() {
     list.append(row);
   }
   dialog.querySelector('#modulationPanel').hidden=!_recordRanges.size;
+  dialog.querySelector('.recordControls').hidden=!_recordRanges.size;
   _renderRangePositions();_drawEaseGraph();_recordButtons(!!_recording);
   const rect=dialog.getBoundingClientRect();dialog.style.top=Math.max(8,Math.min(rect.top,innerHeight-rect.height-8))+'px';_recordPopupBase(dialog);
 }
+let _activePopup = null, _easePoints = MHCurve.defaults(), _easePast = [], _easeFuture = [];
+const _easeSnapshot=()=>MHCurve.copy(_easePoints);
+function _easeCommit(before){if(JSON.stringify(before)===JSON.stringify(_easePoints))return;_easePast.push(before);if(_easePast.length>100)_easePast.shift();_easeFuture=[];}
+function _easeUndo(redo=false){const from=redo?_easeFuture:_easePast,to=redo?_easePast:_easeFuture;if(!from.length)return;to.push(_easeSnapshot());_easePoints=from.pop();_drawEaseGraph();}
+for(const type of ['pointerdown','focusin'])document.addEventListener(type,e=>{
+  if(e.target.closest?.('.sliderValuePrompt'))return;
+  _activePopup=e.target.closest?.('.mhDialog,.editor .stage,.editor .sidebar,#panel')||null;
+},true);
 function _drawEaseGraph() {
-  if(!_recordMode)return;
-  const graph=document.getElementById('easeGraph');if(!graph)return;
-  const x=t=>16+232*t,y=t=>112-96*t,[x1,y1,x2,y2]=_easeCurve;
-  graph.querySelector('.easeCurve').setAttribute('d',`M16 112 C${x(x1)} ${y(y1)} ${x(x2)} ${y(y2)} 248 16`);
-  graph.querySelector('.easeArms').setAttribute('d',`M16 112 L${x(x1)} ${y(y1)} M248 16 L${x(x2)} ${y(y2)}`);
-  graph.querySelectorAll('.easeHandle').forEach((h,i)=>{const hx=x(_easeCurve[i*2]),hy=y(_easeCurve[i*2+1]);h.setAttribute('points',`${hx},${hy-5} ${hx+5},${hy} ${hx},${hy+5} ${hx-5},${hy}`);h.setAttribute('aria-label',`${i+1}번 곡선 핸들, 시간 ${_easeCurve[i*2].toFixed(2)}, 진행률 ${_easeCurve[i*2+1].toFixed(2)}. 방향키로 조절`);h.style.fill=_bondInvColor();});
+  if(!_recordMode)return;const graph=document.getElementById('easeGraph');if(!graph)return;
+  const x=t=>16+232*t,y=t=>56-48*t,signature=JSON.stringify(_easePoints);
+  graph.querySelector('.easeGeometry').style.setProperty('--ease-accent',_bondInvColor());
+  if(graph._signature!==signature){
+    graph._signature=signature;
+    const focus=document.activeElement?.closest?.('#easeGraph [data-curve-key]')?.dataset.curveKey;
+    let path=`M${x(_easePoints[0].x)} ${y(_easePoints[0].y)}`,arms='',handles='',points='';
+    const diamond=(a,i,side)=>{const px=x(a.x),py=y(a.y),anchor=side==='point';return `<polygon class="${anchor?'easePoint':'easeHandle'}" data-curve-key="${i}-${side}" data-point="${i}" data-side="${side}" points="${px},${py-5} ${px+5},${py} ${px},${py+5} ${px-5},${py}" tabindex="0" role="button" aria-label="${i+1}번 ${anchor?'곡선 점':side==='in'?'들어오는 핸들':'나가는 핸들'}"/>`;};
+    _easePoints.forEach((p,i)=>{
+      if(i){const prev=_easePoints[i-1];path+=` C${x(prev.out.x)} ${y(prev.out.y)} ${x(p.in.x)} ${y(p.in.y)} ${x(p.x)} ${y(p.y)}`;}
+      for(const side of ['in','out'])if(p[side]){const h=p[side];arms+=`M${x(p.x)} ${y(p.y)} L${x(h.x)} ${y(h.y)} `;if(Math.hypot(x(h.x)-x(p.x),y(h.y)-y(p.y))>3)handles+=diamond(h,i,side);}
+      points+=diamond(p,i,'point');
+    });
+    graph.querySelector('.easeGeometry').innerHTML=`<path class="easeArms" d="${arms}"/><path class="easeCurve" d="${path}"/>${handles}${points}`;
+    if(focus)graph.querySelector(`[data-curve-key="${focus}"]`)?.focus({preventScroll:true});
+  }
   const phase=_modulation.running?1-Math.abs(2*((_modulation.elapsed/_modulation.period)%1)-1):0;
   const head=graph.querySelector('.easePlayhead');head.setAttribute('cx',x(phase));head.setAttribute('cy',y(_bezierEase(phase)));
 }
-function _buildRecordingPopup() {
-  const box=document.createElement('div');box.id='recordDialog';box.className='mhDialog';box.setAttribute('role','dialog');box.setAttribute('aria-label','녹화');box.tabIndex=-1;
-  box.innerHTML='<div class="mhMeta"><span class="mhDialogTitle">녹화</span><span class="stageBtn dragHandle" title="드래그해서 위치 이동">▩</span><button class="stageBtn closeX" type="button" aria-label="녹화 창 닫기">✕</button></div>'+
-    '<div class="recordContent"><div id="recordTracks"></div><div id="modulationPanel" hidden><label>왕복 시간 <input id="modPeriod" type="number" min="0.2" max="60" step="0.1"> 초</label><label>반복 <input id="modRepeats" type="number" min="1" max="100" step="1"> 회</label><label><input id="recordLinked" type="checkbox"> 왕복 변조</label>'+
-    '<svg id="easeGraph" viewBox="0 0 264 136" aria-label="시간과 진행률 곡선"><path d="M16 16 V112 H248" fill="none" stroke="currentColor" opacity=".4"/><text x="16" y="9">진행률</text><text x="228" y="130">시간</text><path class="easeArms" fill="none" stroke="currentColor" opacity=".4"/><path class="easeCurve" fill="none" stroke="currentColor"/><polygon class="easeHandle" data-handle="0" tabindex="0" role="button"/><polygon class="easeHandle" data-handle="1" tabindex="0" role="button"/><circle class="easePlayhead" r="2" fill="currentColor"/></svg>'+
-    '<div class="mhActions"><button id="easeReset" class="pillBtn" type="button">곡선 초기화</button></div></div><div class="mhActions recordTransport"><button class="pillBtn" id="recordStart" title="투명 MOV · 최대 30초·64MiB·1920px">녹화</button><button class="pillBtn" id="modToggle" type="button">재생</button><button class="pillBtn" id="recordStop" type="button">정지</button></div><div id="modStatus" class="mhMsg" role="status"></div><div id="recordStatus" class="mhMsg" role="status"></div></div>';
-  const guide=_buildGuideList([['재생·일시정지','Space'],['변수 선택','설정 슬라이더 제목 체크'],['범위 지정','시작·끝 클릭 / 마름모 끌기'],['곡선 조절','마름모 끌기 / 방향키'],['저장','녹화 후 정지'],['취소·닫기','Esc']]);box.append(guide);
-  document.body.append(box);box.style.width=Math.max(280,_panelInputWidthPx())+'px';
-  _placeSettingsDialog(box,{anchor:document.getElementById('recordModeBtn')});_makeDialogDraggable(box);
-  box.querySelector('.closeX').onclick=()=>_setRecordMode(false);
-  box.querySelector('#recordStart').onclick=_startRecording;box.querySelector('#recordStop').onclick=_stopTransport;box.querySelector('#modToggle').onclick=_togglePlayback;
-  box.querySelector('#modPeriod').value=_recordPeriod;box.querySelector('#modRepeats').value=_recordRepeats;box.querySelector('#recordLinked').checked=_recordLinked;
-  for(const id of ['modPeriod','modRepeats'])box.querySelector('#'+id).onchange=()=>{_stopModulation();if(id==='modPeriod')_recordPeriod=Number(box.querySelector('#'+id).value);else _recordRepeats=Number(box.querySelector('#'+id).value);};
-  box.querySelector('#recordLinked').onchange=e=>{_recordLinked=e.target.checked;};
-  box.querySelector('#easeReset').onclick=()=>{_easeCurve=[.42,0,.58,1];_drawEaseGraph();};
-  const graph=box.querySelector('#easeGraph');let drag=null;
-  const finish=(e,cancel)=>{if(!drag||e.pointerId!==drag.id)return;if(cancel)_easeCurve=drag.original;drag=null;try{graph.releasePointerCapture(e.pointerId);}catch(_){} _drawEaseGraph();};
-  graph.addEventListener('pointerdown',e=>{const h=e.target.closest('.easeHandle');if(!h||e.button!==0)return;e.preventDefault();h.focus();drag={id:e.pointerId,index:Number(h.dataset.handle)*2,original:_easeCurve.slice()};graph.setPointerCapture(e.pointerId);});
-  graph.addEventListener('pointermove',e=>{if(!drag||e.pointerId!==drag.id)return;const p=new DOMPoint(e.clientX,e.clientY).matrixTransform(graph.getScreenCTM().inverse());_easeCurve[drag.index]=Math.max(0,Math.min(1,(p.x-16)/232));_easeCurve[drag.index+1]=Math.max(0,Math.min(1,(112-p.y)/96));_drawEaseGraph();});
+function _wireEaseGraph(graph){
+  let drag=null;
+  const at=e=>{const p=new DOMPoint(e.clientX,e.clientY).matrixTransform(graph.getScreenCTM().inverse());return{x:(p.x-16)/232,y:(56-p.y)/48};};
+  const finish=(e,cancel)=>{if(!drag||e.pointerId!==drag.id)return;const old=drag;drag=null;if(cancel)_easePoints=old.before;else _easeCommit(old.before);try{graph.releasePointerCapture(e.pointerId);}catch(_){} _drawEaseGraph();};
+  graph._cancelCurveDrag=()=>{if(!drag)return false;finish({pointerId:drag.id},true);return true;};
+  graph.addEventListener('pointerdown',e=>{
+    if(e.button!==0)return;e.preventDefault();const p=at(e),h=e.target.closest('[data-curve-key]');
+    if(h){h.focus();drag={id:e.pointerId,index:Number(h.dataset.point),side:h.dataset.side,pull:e.shiftKey&&h.dataset.side==='point',before:_easeSnapshot()};graph.setPointerCapture(e.pointerId);}
+    else if(p.x>0&&p.x<1&&p.y>=0&&p.y<=1){const before=_easeSnapshot();const close=Math.abs(_bezierEase(p.x)-p.y)*48<=5;_easePoints=MHCurve.insert(_easePoints,p.x,close?undefined:p.y);_easeCommit(before);_drawEaseGraph();const i=_easePoints.findIndex(a=>Math.abs(a.x-p.x)<.001);graph.querySelector(`[data-curve-key="${i}-point"]`)?.focus();}
+  });
+  graph.addEventListener('pointermove',e=>{
+    if(!drag||e.pointerId!==drag.id)return;const p=at(e),a=drag.before[drag.index];
+    if(drag.pull)_easePoints=MHCurve.pull(drag.before,drag.index,p.x-a.x,p.y-a.y);
+    else if(drag.side==='point')_easePoints=MHCurve.movePoint(drag.before,drag.index,p.x,p.y);
+    else {const collapse=Math.hypot((p.x-a.x)*232,(p.y-a.y)*48)<4;_easePoints=MHCurve.moveHandle(drag.before,drag.index,drag.side,collapse?a.x:p.x,collapse?a.y:p.y);}
+    _drawEaseGraph();
+  });
   graph.addEventListener('pointerup',e=>finish(e,false));graph.addEventListener('pointercancel',e=>finish(e,true));graph.addEventListener('lostpointercapture',e=>finish(e,true));
-  graph.addEventListener('keydown',e=>{const h=e.target.closest('.easeHandle');if(!h||!['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.key))return;e.preventDefault();e.stopPropagation();const i=Number(h.dataset.handle)*2+(['ArrowUp','ArrowDown'].includes(e.key)?1:0);_easeCurve[i]=Math.max(0,Math.min(1,_easeCurve[i]+(['ArrowUp','ArrowRight'].includes(e.key)?1:-1)*(e.shiftKey?.1:.01)));_drawEaseGraph();});
-  _renderRecordTracks();box.focus();
+  graph.addEventListener('keydown',e=>{
+    const h=e.target.closest('[data-curve-key]');if(!h||e.isComposing||e.ctrlKey||e.metaKey||e.altKey)return;
+    if(!['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Delete','Backspace','Enter','Escape'].includes(e.key))return;
+    e.preventDefault();e.stopPropagation();const i=Number(h.dataset.point),side=h.dataset.side,before=_easeSnapshot(),a=_easePoints[i];
+    if(e.key==='Escape'&&drag){finish({pointerId:drag.id},true);return;}
+    if(e.key==='Delete'||e.key==='Backspace'){if(side==='point')_easePoints=MHCurve.remove(_easePoints,i);else _easePoints=MHCurve.moveHandle(_easePoints,i,side,a.x,a.y);}
+    else if(e.key==='Enter'&&side==='point'){const folded=['in','out'].some(s=>a[s]&&Math.hypot(a[s].x-a.x,a[s].y-a.y)<1e-6);_easePoints=folded?MHCurve.pull(_easePoints,i,.12,0):MHCurve.corner(_easePoints,i);}
+    else if(e.key.startsWith('Arrow')){const q=side==='point'?a:a[side],step=e.shiftKey?.1:.01,x=q.x+(e.key==='ArrowRight'?step:e.key==='ArrowLeft'?-step:0),y=q.y+(e.key==='ArrowUp'?step:e.key==='ArrowDown'?-step:0);_easePoints=side==='point'?MHCurve.movePoint(_easePoints,i,x,y):MHCurve.moveHandle(_easePoints,i,side,x,y);}
+    _easeCommit(before);_drawEaseGraph();
+  });
+}
+function _buildRecordingPopup() {
+  const box=document.createElement('div');box.id='recordDialog';box.className='mhDialog';box.setAttribute('role','dialog');box.setAttribute('aria-label','MOV');box.tabIndex=-1;
+  box.innerHTML='<div class="mhMeta"><span class="mhDialogTitle">MOV</span><span class="stageBtn dragHandle" title="드래그해서 위치 이동">▩</span><button class="stageBtn closeX" type="button" aria-label="MOV 창 닫기">✕</button></div>'+
+    '<div class="mhActions recordTransport"><button class="pillBtn" id="recordStart" title="투명 MOV · 최대 30초·64MiB·1920px">녹화</button><button class="pillBtn" id="modToggle" type="button">재생</button><button class="pillBtn" id="recordStop" type="button">정지</button></div><div id="modStatus" class="mhMsg" role="status"></div><div id="recordStatus" class="mhMsg" role="status"></div>'+
+    '<div class="recordContent recordSelectors" aria-label="변조 항목"></div><div class="recordContent recordControls" hidden><div id="recordTracks"></div><div id="modulationPanel" hidden><div class="recordTiming"><label>왕복 시간 <input id="modPeriod" class="mhAdminInput" type="number" min="0.2" max="60" step="0.1"> 초</label><label>반복 <input id="modRepeats" class="mhAdminInput" type="number" min="1" max="100" step="1"> 회</label></div>'+
+    '<svg id="easeGraph" viewBox="0 0 264 68" aria-label="시간과 진행률 곡선"><path d="M16 8 V56 H248" class="easeAxes"/><text x="16" y="7">진행률</text><text x="228" y="68">시간</text><g class="easeGeometry"></g><circle class="easePlayhead" r="2" fill="currentColor"/></svg><div class="mhActions"><button id="easeReset" class="pillBtn" type="button">곡선 초기화</button></div></div></div>';
+  const selectors=box.querySelector('.recordSelectors');
+  for(const group of PANEL_GROUPS.filter(g=>!g.hidden)){
+    const label=document.createElement('label'),check=document.createElement('input');check.type='checkbox';check.dataset.recordGroup=group.id;check.checked=group.items.some(i=>_recordRanges.has(i[0]));
+    label.append(check,document.createTextNode(group.title));selectors.append(label);
+    check.onchange=()=>{_stopModulation();for(const [key] of group.items){if(check.checked&&!_recordRanges.has(key))_recordRanges.set(key,{key,from:null,to:null,count:0});if(!check.checked)_recordRanges.delete(key);}_renderRecordTracks();};
+  }
+  box.append(_buildGuideList([['재생·일시정지','Space'],['범위 지정','시작·끝 클릭 / 마름모 끌기'],['곡선 점 추가','그래프 클릭'],['점·핸들 이동','끌기 / 방향키'],['핸들 꺼내기','Shift + 점 끌기'],['곡선·직선 전환','점 선택 후 Enter'],['점 삭제','점 선택 후 Delete'],['실행취소·다시실행','Ctrl Z / Ctrl Shift Z'],['저장','녹화 후 정지'],['취소·닫기','Esc']]));
+  document.body.append(box);box.style.width=Math.max(280,_panelInputWidthPx())+'px';_placeSettingsDialog(box,{anchor:document.getElementById('recordModeBtn')});_makeDialogDraggable(box);
+  box.querySelector('.closeX').onclick=()=>_setRecordMode(false);box.querySelector('#recordStart').onclick=_startRecording;box.querySelector('#recordStop').onclick=_stopTransport;box.querySelector('#modToggle').onclick=_togglePlayback;
+  box.querySelector('#modPeriod').value=_recordPeriod;box.querySelector('#modRepeats').value=_recordRepeats;
+  for(const id of ['modPeriod','modRepeats'])box.querySelector('#'+id).onchange=()=>{_stopModulation();if(id==='modPeriod')_recordPeriod=Number(box.querySelector('#'+id).value);else _recordRepeats=Number(box.querySelector('#'+id).value);};
+  box.querySelector('#easeReset').onclick=()=>{const before=_easeSnapshot();_easePoints=MHCurve.defaults();_easeCommit(before);_drawEaseGraph();};
+  _wireEaseGraph(box.querySelector('#easeGraph'));_renderRecordTracks();box.focus();_activePopup=box;
 }
 document.addEventListener('keydown',e=>{
-  if(!_recordMode||e.defaultPrevented||e.isComposing||e.keyCode===229||e.ctrlKey||e.metaKey||e.altKey||e.repeat)return;
-  const target=e.target;
-  if(target.closest?.('.mhDialog:not(#recordDialog),.editor')||target.isContentEditable)return;
-  if(e.code==='Space'||e.key===' ') {
-    if(target.closest?.('input,textarea,select,[role=checkbox],[data-layout-mode]'))return;
-    e.preventDefault();e.stopImmediatePropagation();_togglePlayback();
-  } else if(e.key==='Escape'&&!target.closest?.('.sliderValuePrompt')) {e.preventDefault();e.stopImmediatePropagation();_setRecordMode(false);}
+  if(!_recordMode||_activePopup?.id!=='recordDialog'||e.defaultPrevented||e.isComposing||e.keyCode===229)return;
+  const target=e.target,editing=target.isContentEditable||target.closest?.('input,textarea,select');
+  if(editing){
+    if((e.ctrlKey||e.metaKey)&&e.code==='KeyZ')e.stopImmediatePropagation();
+    if(e.key==='Escape'&&!target.closest?.('.sliderValuePrompt')){e.preventDefault();e.stopImmediatePropagation();_setRecordMode(false);}
+    return;
+  }
+  if((e.ctrlKey||e.metaKey)&&!e.altKey&&e.code==='KeyZ'){e.preventDefault();e.stopImmediatePropagation();if(!e.repeat&&!document.getElementById('easeGraph')?._cancelCurveDrag())_easeUndo(e.shiftKey);return;}
+  if(e.ctrlKey||e.metaKey||e.altKey||e.repeat)return;
+  if(e.code==='Space'||e.key===' '){e.preventDefault();e.stopImmediatePropagation();_togglePlayback();}
+  else if(e.key==='Escape'){e.preventDefault();e.stopImmediatePropagation();_setRecordMode(false);}
 },true);
 
 function buildPanel() {
@@ -7407,9 +7461,6 @@ function buildPanel() {
     _shownGroupCount++;
     const titleEl = makeTitleWithDie(group.title, group.id);
     body.appendChild(titleEl);
-    if (group.id==='spacing') {
-      const mode=document.createElement('button');mode.className='stageBtn';mode.dataset.layoutMode='';mode.textContent=_layoutState.mode==='optical-v2'?'시각적':'기존';mode.setAttribute('aria-label','자간 방식');mode.title='기존 저장 작업은 기존 간격 유지. 시각적은 예상 윤곽으로 배치합니다.';mode.onclick=()=>_setLayoutMode(_layoutState.mode==='optical-v2'?'legacy-uniform':'optical-v2');titleEl.append(mode);
-    }
     group.items.forEach(([key, label, mn, mx, step]) => {
       body.appendChild(makeBarRow(label, mn, mx, step,
         () => getParamValue(key),
@@ -7734,20 +7785,9 @@ function makeBarRow(label, mn, mx, step, getter, setter, opts) {
     lbvVal.textContent = _vd;
     const p = (mx === mn) ? 0 : Math.max(0, Math.min(1, (v - mn) / (mx - mn)));
     fill.style.width = (Math.max(0, Math.min(1, p)) * 100) + '%';
-    if (opts?.dataKey) {
-      lbvLabel.textContent = (_recordMode ? (_recordRanges.has(opts.dataKey) ? '☑ ' : '☐ ') : '') + label;
-      lbvLabel.setAttribute('aria-checked',String(_recordRanges.has(opts.dataKey)));
-      lbvLabel.tabIndex = _recordMode ? 0 : -1;
-    }
     // 부드럽게는 항상 활성, 점 크기·획 굵기와 공존
   };
 
-  if (opts?.dataKey) {
-    lbvLabel.setAttribute('role','checkbox');
-    lbvLabel.setAttribute('aria-label',label+' 변조 선택');
-    lbvLabel.addEventListener('click',()=>{if(_recordMode)_toggleRecordTrack(opts.dataKey);});
-    lbvLabel.addEventListener('keydown',e=>{if(_recordMode && (e.key===' '||e.key==='Enter')){e.preventDefault();e.stopPropagation();_toggleRecordTrack(opts.dataKey);}});
-  }
   // 숫자 클릭 → floating input으로 범위 밖 숫자도 직접 입력
   lbvVal.addEventListener('click', (e) => {
     e.stopPropagation();
@@ -8139,7 +8179,7 @@ function randomizeAll() {
   _stopModulation();
   // 0) 자유 슬라이더 (gravity 등): 그대로 풀 범위 — DERIVED_KEYS는 아래에서 별도 처리
   PANEL_GROUPS.forEach(group => group.items.forEach(([key, label, mn, mx, step]) => {
-    if (DERIVED_KEYS.has(key) || ['jitter'].includes(key)) return;
+    if (DERIVED_KEYS.has(key) || ['jitter','jitterSpeed'].includes(key)) return;
     setParamValue(key, randInt(mn, mx), { silent: true });
   }));
   // 흘리기 — 랜덤 트리거 시 노드+길이 재추첨 (슬라이더 개수는 유지). 잔상도 비움.
@@ -9585,7 +9625,7 @@ function _recordButtons(active) {
   box.querySelector('#recordStart').disabled=active;
   box.querySelector('#recordStop').disabled=!active&&!_transportPlaying&&!_modulation.running;
   box.querySelector('#modToggle').textContent=_transportPlaying&&!_previewPaused?'일시정지':'재생';
-  for(const id of ['modPeriod','modRepeats','recordLinked'])box.querySelector('#'+id).disabled=active;
+  for(const id of ['modPeriod','modRepeats'])box.querySelector('#'+id).disabled=active;
 }
 
 function _downloadRecording(blob, ext) {
@@ -9596,7 +9636,7 @@ function _downloadRecording(blob, ext) {
 function _startRecording() {
   if (_recording || !world || !_recordMode) return;
   const duration = 30; // Safety ceiling for manual recording; no persistent length input.
-  const linked = _recordRanges.size > 0 && _recordLinked;
+  const linked = [..._recordRanges.values()].some(r=>r.count>0);
   if (linked && _recordPeriod*_recordRepeats>30) {_recordStatus('녹화할 왕복 시간 × 반복은 30초 이내로 설정하세요.');return;}
   if (linked && !_startModulation()) { _recordStatus('왕복 변조 구간을 확인하세요.'); return; }
   _previewPaused=false;_transportPlaying=true;
@@ -11614,7 +11654,6 @@ function triggerSettingsLoad() {
         if (data && data.schema && data.schema.indexOf('mungchin-hangul-settings') === 0) {
           const restoredLayout = _parseLayoutState(data.layout);
           _stopModulation(); _layoutState = restoredLayout; _persistLayoutState();
-          document.querySelectorAll('[data-layout-mode]').forEach(el=>{el.textContent=_layoutState.mode==='optical-v2'?'시각적':'기존';el.setAttribute('aria-pressed',String(_layoutState.mode==='optical-v2'));});
           // [v1.10b] text 도 복원 (사용자 요청). 입력바 UI 도 함께 동기화.
           if (typeof data.text === 'string') {
             TEXT = data.text;
@@ -11632,6 +11671,7 @@ function triggerSettingsLoad() {
             });
           }
           if (data.params && !Object.hasOwn(data.params,'jitter')) PARAMS.jitter=Number.isFinite(data.params.wind)?Math.max(0,Math.min(100,data.params.wind)):0;
+          if (!data.params || !Object.hasOwn(data.params,'jitterSpeed')) PARAMS.jitterSpeed=PARAMS.jitter>0?100:30;
           if (data.elasticity) {
             if (typeof data.elasticity.K_ANGLE  === 'number') K_ANGLE  = data.elasticity.K_ANGLE;
             if (typeof data.elasticity.K_ROT    === 'number') K_ROT    = data.elasticity.K_ROT;

@@ -5,7 +5,8 @@ async function configure(page){await page.evaluate(()=>{cancelAnimationFrame(raf
 async function snapshot(page,text){return page.evaluate(text=>{let seed=42;Math.random=()=>((seed=(Math.imul(seed,1664525)+1013904223)>>>0)/4294967296);TEXT=text;world=buildWorld(text);return world.bodies.map(b=>({ch:b.ch,x:b.anchorX,y:b.anchorY,first:[b.nodes[0].x,b.nodes[0].y],count:b.nodes.length}));},text);}
 (async()=>{
   const old=process.env.UPDATE_LAYOUT_FIXTURE?cp.execFileSync('git',['show','1c72b1b:index.html'],{maxBuffer:2e6}):null;
-  const server=http.createServer((req,res)=>{const js=req.url==='/media-export.js';res.setHeader('Content-Type',js?'application/javascript':'text/html; charset=utf-8');res.end(req.url==='/legacy'?old:fs.readFileSync(js?'media-export.js':'index.html'));}).listen(0,'127.0.0.1');
+  const server=http.createServer((req,res)=>{
+    if(req.url==='/motion-curve.js'){res.setHeader('Content-Type','application/javascript');res.end(fs.readFileSync('motion-curve.js'));return;}const js=req.url==='/media-export.js';res.setHeader('Content-Type',js?'application/javascript':'text/html; charset=utf-8');res.end(req.url==='/legacy'?old:fs.readFileSync(js?'media-export.js':'index.html'));}).listen(0,'127.0.0.1');
   await new Promise(r=>server.once('listening',r));let browser;
   try{
     browser=await chromium.launch({headless:true,channel:process.env.TEST_BROWSER||undefined});const page=await browser.newPage({viewport:{width:1600,height:900}}),errors=[];
@@ -46,10 +47,11 @@ async function snapshot(page,text){return page.evaluate(text=>{let seed=42;Math.
     const warning=page.waitForEvent('dialog');await load('test-results/layout-future.json');await(await warning).accept();
     assert.equal(await page.evaluate(()=>JSON.stringify({TEXT,PARAMS,layout:_layoutState,centers:_centerLayout})),untouched);
     await page.evaluate(()=>{_setLayoutMode('legacy-uniform');_centerLayout.points={};resetWorld();});await load('test-results/layout-v2.json');await page.waitForFunction(()=>_layoutState.mode==='optical-v2');assert.deepEqual(await page.evaluate(()=>_centerLayout.points),pinned);
-    const legacy={...saved,schema:'mungchin-hangul-settings-v1'};delete legacy.layout;fs.writeFileSync('test-results/layout-v1.json',JSON.stringify(legacy));await load('test-results/layout-v1.json');await page.waitForFunction(()=>_layoutState.mode==='legacy-uniform');assert.deepEqual(await page.evaluate(()=>_centerLayout.points),pinned);
+    const legacy={...saved,schema:'mungchin-hangul-settings-v1',params:{...saved.params,jitter:70}};delete legacy.layout;delete legacy.params.jitterSpeed;fs.writeFileSync('test-results/layout-v1.json',JSON.stringify(legacy));await load('test-results/layout-v1.json');await page.waitForFunction(()=>_layoutState.mode==='legacy-uniform');assert.deepEqual(await page.evaluate(()=>_centerLayout.points),pinned);
+    assert.equal(await page.evaluate(()=>PARAMS.jitterSpeed),100);await page.evaluate(()=>{PARAMS.jitter=0;PARAMS.jitterSpeed=30;});
     const legacyGap=await page.evaluate(()=>world.bodies[3].anchorX-world.bodies[2].anchorX);assert.equal(legacyGap,67);
-    await page.getByRole('button',{name:'자간 방식'}).click();assert.equal(await page.evaluate(()=>_layoutState.mode),'optical-v2');assert.deepEqual(await page.evaluate(()=>_centerLayout.points),pinned);
-    await page.locator('#recordModeBtn').click();await page.locator('[data-key="choHoriz"] .lbvLabel').click();
+    assert.equal(await page.locator('[data-layout-mode]').count(),0);await page.evaluate(()=>_setLayoutMode('optical-v2'));assert.equal(await page.evaluate(()=>_layoutState.mode),'optical-v2');assert.deepEqual(await page.evaluate(()=>_centerLayout.points),pinned);
+    await page.locator('#recordModeBtn').click();await page.locator('[data-record-group="form"]').check();
     const lock=await page.evaluate(()=>{Object.assign(_recordRanges.get('choHoriz'),{from:0,to:2,count:2});_recordPeriod=1;_recordRepeats=2;const before=world.bodies.map(b=>[b.anchorX,b.anchorY]);_startModulation();for(let i=0;i<=10;i++)_advanceModulation(i*100);const after=world.bodies.map(b=>[b.anchorX,b.anchorY]);_stopModulation();return{before,after};});assert.deepEqual(lock.before,lock.after);
     await page.locator('#recordDialog').focus();await page.keyboard.press('Escape');
     const spacingMotion=await page.evaluate(()=>{
