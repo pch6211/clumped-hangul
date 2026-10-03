@@ -4964,14 +4964,15 @@ function drawNodeShape(n, r) {
 // [v1.11b 테스트] iPad/Safari (17.x 이하 + iOS Safari 모두) 의 ctx.filter='blur(...)' 미지원
 //   대응용 JS 박스블러 (분리형 슬라이딩 윈도 × 3패스 ≈ Gaussian). 알파 채널만 처리.
 //   픽셀당 O(1) 슬라이딩 윈도 → 반경 무관 일정 시간. 화면 픽셀 수에만 비례.
+let _blurBuffers = null;
 function _jsBoxBlurAlpha(imgData, radiusPx) {
   const W = imgData.width, H = imgData.height;
   if (W <= 0 || H <= 0) return;
   const r = Math.max(1, Math.round(radiusPx));
   const d = imgData.data;
   const N = W * H;
-  let src = new Float32Array(N);
-  let dst = new Float32Array(N);
+  if (!_blurBuffers || _blurBuffers[0].length !== N) _blurBuffers = [new Float32Array(N), new Float32Array(N)];
+  let [src, dst] = _blurBuffers;
   for (let i = 0, j = 3; i < N; i++, j += 4) src[i] = d[j];
   const div = 2 * r + 1;
   const ITER = 3;
@@ -5023,7 +5024,26 @@ function smoothedTotalWidth() { return Math.max(0, PARAMS.lineW || 0); }
 let _smMask = null, _smTmp = null;
 // [E3] 테두리 작업 캔버스 (정확한 도형 팽창 = 프리미티브 인플레이션) — 캐시 재사용
 let _bdOuter = null, _bdInner = null, _bdRing = null;
+// Bound the unchanged three-pass blur to occupied pixels plus its full kernel reach.
+function _smoothViewport(bodies, viewport) {
+  const scale = Math.max(1, Math.min(4, Math.round(PARAMS.smoothScale || 1)));
+  const radius = Math.max(1, Math.round(PARAMS.cornerR * Math.max(0, PARAMS.blurFactor || 0.5) * scale));
+  const pad = Math.max(PARAMS.nodeR, PARAMS.lineW) / 2 + 3 * radius / scale + 3;
+  let left = Infinity, top = Infinity, right = -Infinity, bottom = -Infinity;
+  const point = (x, y) => { left = Math.min(left, x); top = Math.min(top, y); right = Math.max(right, x); bottom = Math.max(bottom, y); };
+  bodies.forEach(b => b.nodes.forEach(n => point(n.x, n.y)));
+  const flow = _collectFlowPrimitives();
+  flow.lines.forEach(l => { point(l.x0, l.y0); point(l.x1, l.y1); });
+  flow.ends.forEach(e => point(e.x, e.y));
+  const v = viewport || { x: 0, y: 0, w: cssW, h: cssH };
+  left = Math.max(v.x, Math.floor(left - pad)); top = Math.max(v.y, Math.floor(top - pad));
+  right = Math.min(v.x + v.w, Math.ceil(right + pad)); bottom = Math.min(v.y + v.h, Math.ceil(bottom + pad));
+  if (!(right > left && bottom > top)) return null;
+  return { x: left, y: top, w: right - left, h: bottom - top };
+}
 function drawSmoothedBodies(targetCtx, bodies, fg, bg, viewport) {
+  viewport = _smoothViewport(bodies, viewport);
+  if (!viewport) return;
   const cornerR = Math.max(0, PARAMS.cornerR || 0);
   if (cornerR <= 0) return;
   // viewport = { x, y, w, h } — 내보내기에서 bbox 전달 시 사용. 미지정이면 화면 전체.

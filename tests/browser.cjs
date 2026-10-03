@@ -73,6 +73,26 @@ const { chromium } = require('playwright');
     });
     assert.ok(motion.excursion > 1 && motion.excursion < 100); assert.ok(motion.residual < 0.001);
     console.log('PASS: bounded wind/jitter returns to the saved center', motion);
+    const smoothing = await page.evaluate(() => {
+      PARAMS.cornerR = 5; PARAMS.nodeR = 20; PARAMS.lineW = 12;
+      const crop = _smoothViewport, comparisons = [];
+      for (const shape of [0, 50, 100]) {
+        PARAMS.shape = shape;
+        const a = document.createElement('canvas'), b = document.createElement('canvas');
+        a.width = b.width = cssW; a.height = b.height = cssH;
+        const ca = a.getContext('2d'), cb = b.getContext('2d');
+        drawSmoothedBodies(ca, world.bodies, '#123456', '#fff');
+        _smoothViewport = (_, viewport) => viewport || { x: 0, y: 0, w: cssW, h: cssH };
+        drawSmoothedBodies(cb, world.bodies, '#123456', '#fff'); _smoothViewport = crop;
+        const aa = ca.getImageData(0,0,cssW,cssH).data, bb = cb.getImageData(0,0,cssW,cssH).data;
+        let different = 0, maxDelta = 0; for (let i = 0; i < aa.length; i++) if (aa[i] !== bb[i]) { different++; maxDelta = Math.max(maxDelta, Math.abs(aa[i] - bb[i])); }
+        comparisons.push({ shape, different, maxDelta });
+      }
+      return comparisons;
+    });
+    console.log('Smoothing pixel comparisons', smoothing);
+    // GPU canvas compositing can round a few edge channels differently after translation.
+    assert.ok(smoothing.every(x => x.different <= 64 && x.maxDelta <= 3));
     assert.deepEqual(errors, []);
   } finally { await browser?.close(); server.close(); }
 })().catch(e => { console.error(e); process.exitCode = 1; });
