@@ -7430,7 +7430,8 @@ function _buildRecordingPopup() {
   _wireEaseGraph(box.querySelector('#easeGraph'));_renderRecordTracks();box.focus();_activePopup=box;
 }
 document.addEventListener('keydown',e=>{
-  if(!_recordMode||_activePopup?.id!=='recordDialog'||e.defaultPrevented||e.isComposing||e.keyCode===229)return;
+  if(!_recordMode||_activePopup?.id!=='recordDialog'||e.defaultPrevented)return;
+  if(e.isComposing||e.keyCode===229){e.stopImmediatePropagation();return;}
   const target=e.target,editing=target.isContentEditable||target.closest?.('input,textarea,select');
   if(editing){
     if((e.ctrlKey||e.metaKey)&&e.code==='KeyZ')e.stopImmediatePropagation();
