@@ -3,7 +3,7 @@ run(async page=>{
   await page.setViewportSize({width:640,height:480});await page.waitForFunction(()=>cssW===640);await configure(page);await page.evaluate(()=>togglePanel());
   const button=page.locator('#recordMov');assert.equal(await button.innerText(),'mov');assert.equal(await page.locator('#recordDialog,#easeGraph,[data-record-group]').count(),0);
   let downloads=0;page.on('download',()=>downloads++);
-  const start=async()=>{await button.click();await page.waitForFunction(()=>_recording?.frames.length>0);assert.equal(await button.innerText(),'정지');};
+  const start=async()=>{await button.click();await page.waitForFunction(()=>_recording?.frames.length>0&&!_recording.busy);assert.equal(await button.innerText(),'정지');};
   await page.evaluate(()=>document.getElementById('recordMov').addEventListener('click',()=>{
     if(!_recording || _recording.stopping)return;
     const c=document.createElement('canvas');c.width=640;c.height=480;const x=c.getContext('2d');_renderArtwork(x,{x:0,y:0,w:640,h:480});window.reference=x.getImageData(0,0,640,480).data;

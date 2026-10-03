@@ -84,7 +84,7 @@ run(async page=>{
   await numeric('jitter',100);await numeric('jitterSpeed',100);assert.deepEqual(await page.evaluate(()=>[PARAMS.jitter,PARAMS.jitterSpeed]),[100,100]);
   await page.evaluate(()=>{openEditor();localStorage.setItem('release-test-sentinel','yes');});page.once('dialog',d=>d.accept());await Promise.all([page.waitForEvent('load'),page.locator('#btnEditorReset').click()]);await page.waitForFunction(()=>typeof world!=='undefined'&&world?.bodies.length);
   const reset=await page.evaluate(()=>{cancelAnimationFrame(rafId);return{text:TEXT,strength:PARAMS.jitter,speed:PARAMS.jitterSpeed,sentinel:localStorage.getItem('release-test-sentinel')};});assert.equal(reset.text,'뭉친 한글');assert.equal(reset.sentinel,null);assert.ok(reset.strength<=30&&reset.strength>=0&&reset.speed<=100&&reset.speed>=0);
-  assert.equal(await page.locator('#hudCenterPreview').count(),1);assert.ok(await page.getByText('글자 옮기기',{exact:true}).isVisible());
+  assert.equal(await page.locator('#hudCenterPreview').count(),1);assert.ok(await page.getByText('글자 옮기기:',{exact:true}).isVisible());
   // The shipped main has removed the old intro DOM. Preserve that behavior.
   assert.equal(await page.locator('#introPanel').count(),0);
   await page.evaluate(()=>{cancelAnimationFrame(rafId);togglePanel();toggleGuide();});assert.equal(await page.locator('#panelGuide').isVisible(),false);assert.equal(await page.locator('#hudCenterPreview').isVisible(),false);await page.evaluate(()=>toggleGuide());assert.equal(await page.locator('#panelGuide').isVisible(),true);assert.equal(await page.locator('#hudCenterPreview').isVisible(),true);await page.screenshot({path:'test-results/release-desktop.png'});

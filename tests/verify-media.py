@@ -10,6 +10,7 @@ first = subprocess.run([ffmpeg, '-hide_banner', '-i', movie, '-frames:v', '1',
                         '-f', 'rawvideo', '-pix_fmt', 'rgba', 'pipe:1'], capture_output=True, check=True)
 alpha = first.stdout[3::4]
 assert len(first.stdout) == 640 * 480 * 4
+assert all(first.stdout[(y * 640 + x) * 4 + 3] == 0 for y in range(8) for x in range(8)), 'MOV corner must be transparent'
 report = {'transparentPixels': alpha.count(0), 'opaquePixels': alpha.count(255),
           'fractionalAlphaPixels': sum(0 < a < 255 for a in alpha),
           'decoder': first.stderr.decode(errors='replace')}
