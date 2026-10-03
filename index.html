@@ -4276,6 +4276,7 @@ function step(dt, simulation = world, predicting = false) {
 
   for (let sub = 0; sub < SPEED; sub++) {
     simulation.bodies.forEach(body => {
+      if (!predicting) body._weldedPairs = new Set();
       body.nodes.forEach(n => {
         // G가 0이어도 곱셈만 일어나므로 효과 없음 (gravityFrozen일 때 G=0)
         n.vx += (body.anchorX - n.x) * G * 0.02 * dt;
@@ -4310,6 +4311,7 @@ function step(dt, simulation = world, predicting = false) {
           const dx = B.x - A.x, dy = B.y - A.y;
           const dist = Math.hypot(dx, dy);
           if (dist <= MAGNET_MERGE_D) {
+            if (!predicting) body._weldedPairs.add(pr);
             // 어느 정도 이상 가까워짐 → 하나로 합침(중점 스냅 + 속도 평균, 이후 같은 점 유지)
             const mx = (A.x + B.x) / 2, my = (A.y + B.y) / 2;
             const mvx = (A.vx + B.vx) / 2, mvy = (A.vy + B.vy) / 2;
@@ -4462,6 +4464,16 @@ function step(dt, simulation = world, predicting = false) {
         n.vx *= DAMP; n.vy *= DAMP;
         n.x += n.vx * dt; n.y += n.vy * dt;
       });
+      // Later forces can separate a just-welded pair. Project the whole joined
+      // component after integration, preserving the original editable vertices.
+      if (!predicting && body._weldedPairs.size) {
+        _junctionGroups(body,false).forEach(group=>{
+          if(group.length<2)return;
+          const mean={x:0,y:0,vx:0,vy:0};
+          group.forEach(i=>{for(const key of Object.keys(mean))mean[key]+=body.nodes[i][key]/group.length;});
+          group.forEach(i=>Object.assign(body.nodes[i],mean));
+        });
+      }
     });
     // 마우스로 잡고 있는 노드는 매 스텝 마우스 위치에 고정.
     //   [항목3·4 재조정] 기존 자성 복구 — 붙임 대상(커서 기준 최근접 후보)이
@@ -5669,8 +5681,8 @@ function _advanceMotion(now) {
   _motionLast = now; _motionTime += _jitterDt;
   _jitterPhase=(_jitterPhase+2*Math.PI*_jitterFrequency()*_jitterDt)%(Math.PI*2000);
 }
-// A damped spring per node. Strip its displacement before the base solver, then
-// integrate rapid, zero-mean acceleration and apply it to that node only.
+// A damped spring per independent node or welded junction. Strip displacement
+// before the base solver, then integrate one shared motion for each junction.
 // Rest displacement is zero; glyph anchors and the original physics remain intact.
 function _stripNodeJitter() {
   if (!world) return;
@@ -5679,15 +5691,30 @@ function _stripNodeJitter() {
     if (n.jitterState.applied) { n.x -= n.jitterState.x; n.y -= n.jitterState.y; n.jitterState.applied = false; }
   }));
 }
+// Only explicit attachment pairs that have actually met form a junction.
+// Coincident, unconnected strokes remain independent; dragging releases a pair.
+function _junctionGroups(body,includeCoincident=true) {
+  const ns=body.nodes,parent=ns.map((_,i)=>i);
+  const root=i=>{while(parent[i]!==i){parent[i]=parent[parent[i]];i=parent[i];}return i;};
+  (body.magnetPairs||[]).forEach(pair=>{
+    const [i,j]=pair,a=ns[i],b=ns[j];
+    if(!a||!b||a===draggedNode||b===draggedNode)return;
+    if(body._weldedPairs?.has(pair)||(includeCoincident&&Math.hypot(a.x-b.x,a.y-b.y)<.001))parent[root(j)]=root(i);
+  });
+  const groups=new Map();ns.forEach((_,i)=>{const key=root(i);if(!groups.has(key))groups.set(key,[]);groups.get(key).push(i);});
+  return [...groups.values()];
+}
 function _applyNodeJitter() {
   if (!world) return;
   const strength = Math.max(0,Math.min(100,PARAMS.jitter || 0));
   const substeps = Math.max(1,Math.ceil(_jitterDt*240)), dt = _jitterDt/substeps;
-  world.bodies.forEach((b,bi) => b.nodes.forEach((n,ni) => {
-    if (!strength && !n.jitterState) return;
-    const w = n.jitterState || (n.jitterState = { x:0,y:0,vx:0,vy:0 });
+  world.bodies.forEach((b,bi) => _junctionGroups(b).forEach(group => {
+    const ni=group[0],n=b.nodes[ni];
+    if (!strength && !group.some(i=>b.nodes[i].jitterState)) return;
+    const w = {...(n.jitterState || { x:0,y:0,vx:0,vy:0 })};
     if (n === draggedNode) { delete n.jitterState; return; }
-    if (_centerDrag || draggedNode) { n.x += w.x; n.y += w.y; w.applied = true; return; }
+    const apply=()=>group.forEach(i=>{const node=b.nodes[i];node.x+=w.x;node.y+=w.y;node.jitterState={...w,applied:true};});
+    if (_centerDrag || draggedNode) { apply(); return; }
     const phase = ni*2.39996+bi*1.7;
     const amplitude = 12*Math.pow(strength/100,1.35)/1.3,omega=2*Math.PI*_jitterFrequency();
     // Feed-forward compensation preserves displacement amplitude across speed.
@@ -5701,25 +5728,9 @@ function _applyNodeJitter() {
       w.vy += (fy-1900*w.y-55*w.vy)*dt;
       w.x += w.vx*dt; w.y += w.vy*dt;
     }
-    if (!strength && Math.hypot(w.x,w.y,w.vx,w.vy)<0.001) { delete n.jitterState; return; }
-    n.x += w.x; n.y += w.y; w.applied = true;
+    if (!strength && Math.hypot(w.x,w.y,w.vx,w.vy)<0.001) { group.forEach(i=>{delete b.nodes[i].jitterState;}); return; }
+    apply();
   }));
-  // Preserve welded junctions when applying the per-node force layer.
-  world.bodies.forEach(b => {
-    if (!b.magnetPairs?.length) return;
-    const parent = b.nodes.map((_,i)=>i);
-    const root = i => { while (parent[i]!==i) i=parent[i]; return i; };
-    (b.magnetPairs || []).forEach(([i,j]) => {
-      const a=b.nodes[i], c=b.nodes[j], aw=a.jitterState, cw=c.jitterState;
-      if (!aw || !cw || a===draggedNode || c===draggedNode) return;
-      if (Math.hypot(a.x-aw.x-c.x+cw.x,a.y-aw.y-c.y+cw.y)<0.001) parent[root(j)]=root(i);
-    });
-    b.nodes.forEach((n,i)=>{
-      const source=b.nodes[root(i)].jitterState, w=n.jitterState;
-      if (root(i)===i || !source || !w) return;
-      n.x += source.x-w.x; n.y += source.y-w.y; Object.assign(w,source);
-    });
-  });
 }
 
 function tick(now = performance.now()) {

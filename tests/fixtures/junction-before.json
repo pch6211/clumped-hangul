@@ -1,0 +1,5 @@
+{
+  "source": "ef7b947e2fc3396895ab62d4ec8512b8cf7ceb06",
+  "fixture": "junctions.cjs real step solver, three explicitly paired vertices, 240 frames",
+  "before": {"strength":80,"speed":60,"maxGap":28.59294195440704,"maxStateGap":21.27400560491464,"intact":true}
+}
