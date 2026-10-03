@@ -2213,7 +2213,7 @@ const PANEL_GROUPS = [
   ]},
   { id: 'spacing', title: '간격', items: [
     ['pointDist',    '점 간격',   4,  60, 1],
-    ['letterSpacing','글자 간격', 0, 150, 1],
+    ['letterSpacing','글자 간격', -150, 150, 1],
     ['lineHeight',   '행 간격',   0, 300, 1]
   ]},
   // 탄성은 K_xxx 변수에 저장되며 슬라이더는 반전 표시 (값 ↑ = 탄성 ↑ = 단단함, 값 ↓ = 흐물거림)
@@ -5614,8 +5614,8 @@ window.addEventListener('keydown', e => {
   // Alt+방향키: 자간 ±5 / 행간 ±10 (텍스트 입력 중에도 동작)
   if (e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
     let key = null, delta = 0, lo = 0, hi = 100;
-    if (e.key === 'ArrowLeft')       { key = 'letterSpacing'; delta = -5;  lo = 0;  hi = 150; }
-    else if (e.key === 'ArrowRight') { key = 'letterSpacing'; delta = +5;  lo = 0;  hi = 150; }
+    if (e.key === 'ArrowLeft')       { key = 'letterSpacing'; delta = -5;  lo = -150;  hi = 150; }
+    else if (e.key === 'ArrowRight') { key = 'letterSpacing'; delta = +5;  lo = -150;  hi = 150; }
     else if (e.key === 'ArrowUp')    { key = 'lineHeight';    delta = +10; lo = 40; hi = 300; }
     else if (e.key === 'ArrowDown')  { key = 'lineHeight';    delta = -10; lo = 40; hi = 300; }
     if (key) {
@@ -7205,7 +7205,8 @@ function makeBarRow(label, mn, mx, step, getter, setter, opts) {
     showSliderValueInput(lbvVal, getter(), step, (v) => {
       if (step) v = Math.round(v / step) * step;
       // 음수만 차단 — 슬라이더 min보다 작은 양수(0 포함)도 사용자가 직접 입력하면 그 값을 사용
-      if (v < 0) v = 0;
+      if (!Number.isFinite(v)) return;
+      v = Math.max(opts?.dataKey === 'letterSpacing' ? -150 : 0, v);
       setter(v);
       render();
     });
