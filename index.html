@@ -3,7 +3,7 @@
 <html lang="ko"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-<title>뭉친 한글 Clumped Hangul v.1.11</title>
+<title>뭉친 한글 Clumped Hangul v.1.13-dev</title>
 <meta name="description" content="">
 <!-- Google AdSense 로더 (퍼블리셔 ca-pub-7237044319292911) — 우하단 광고 박스용 -->
 <!-- [v1.09] AdSense 승인 대기 중 — 일단 mute. 승인 후 아래 라인 주석 해제. -->
@@ -528,6 +528,39 @@
     color: var(--editor-bg, transparent);
     border-color: var(--editor-fg, currentColor);
   }
+#recordModeBtn[aria-pressed=true] { text-decoration: underline; text-underline-offset: 4px; }
+#recordDialog { max-width: calc(100vw - 16px); max-height: calc(100vh - 16px); overflow-y: auto; scrollbar-width: thin; scrollbar-color: currentColor transparent; }
+#recordDialog [hidden] { display: none; }
+#recordDialog .recordContent { background: var(--editor-bg,transparent); border: 1px solid currentColor; padding: 12px; margin-top: 10px; }
+#recordDialog .recordSelectors { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 12px; }
+#recordDialog .recordSelectors label { margin: 0; display: flex; align-items: center; gap: 5px; }
+#recordDialog .recordTiming { display: flex; gap: 12px; flex-wrap: wrap; }
+#recordDialog .closeX { background: transparent; color: inherit; border: 0; padding: 0; font: inherit; }
+#recordDialog label { display: block; margin: 8px 0; }
+#recordDialog .mhAdminInput { flex: 0 0 auto; width: 46px; padding: 2px 4px; font-family: inherit; font-size: 9px; letter-spacing: .3px; border: 1px solid currentColor; background: transparent; color: inherit; outline: none; text-align: right; box-sizing: border-box; border-radius: 0; }
+#recordDialog input[type=checkbox] { accent-color: currentColor; }
+#recordDialog .guideList { margin-top: 8px; }
+#recordDialog .guideLine { white-space: normal; }
+#recordDialog .mhActions { gap: 6px; margin-top: 10px; }
+#recordDialog .recordTransport { justify-content: flex-start; }
+#recordDialog .pillBtn { padding: 5px 12px; }
+.recordRangeRow { margin: 0 0 14px; }
+.rangeCaption { display: flex; justify-content: space-between; }
+.rangeValue { border: 0; border-bottom: 1px dotted currentColor; background: transparent; font: inherit; color: inherit; padding: 0; cursor: pointer; }
+.recordBar { height: 16px; position: relative; margin: 2px 5px; touch-action: none; cursor: ew-resize; }
+.recordBar::before { content: ''; position: absolute; left: 0; right: 0; top: 8px; height: 1px; background: currentColor; }
+.rangeFill { position: absolute; top: 8px; height: 1px; background: currentColor; pointer-events: none; }
+.rangeHandle { position: absolute; top: 8px; width: 7px; height: 7px; transform: translate(-50%,-50%) rotate(45deg); cursor: ew-resize; outline: none; }
+.rangeHandle:focus-visible { outline: 1px solid currentColor; outline-offset: 2px; }
+#easeGraph { display: block; width: 100%; height: auto; touch-action: none; overflow: visible; margin: 12px 0 4px; }
+#easeGraph path { fill: none; stroke: currentColor; stroke-width: 1px; vector-effect: non-scaling-stroke; }
+#easeGraph .easeArms { stroke-dasharray: 3 3; }
+#easeGraph .easeHandle { fill: var(--ease-accent,currentColor); }
+#easeGraph .easePoint { fill: var(--editor-bg,white); stroke: currentColor; stroke-width: 1px; vector-effect: non-scaling-stroke; cursor: move; outline: none; }
+#easeGraph .easeHandle { cursor: grab; outline: none; }
+#easeGraph .easePoint:focus-visible, #easeGraph .easeHandle:focus-visible { stroke: currentColor; stroke-width: 1px; vector-effect: non-scaling-stroke; }
+#easeGraph text { fill: currentColor; font: 10px sans-serif; }
+
 </style>
 </head>
 <body>
@@ -632,6 +665,8 @@
   </div>
   <div class="editorCtxMenu" id="editorCtxMenu"></div>
 </div>
+<script src="media-export.js"></script>
+<script src="motion-curve.js"></script>
 <script>
 /* ╔══════════════════════════════════════════════════════════════════════════╗
    ║  ⚙  설정 대시보드 (MH_CFG)  —  여기만 고치면 됩니다                          ║
@@ -710,6 +745,8 @@ const MH_CFG = {
     shape: 0,            // 점 모양: 0=원, 50=라운드, 100=사각
     borderWidth: 0,      // [E3] 테두리 — 글자를 채우지 않고 윤곽선(두께=이 값)으로 감쌈 (0=없음 ~ 30)
     flow: 0,             // 흘리기 — 현재 노드 중 N 개(고정값) 골라 아래로 흘러내리는 선. localStorage('mh_flow') 영속. 0 = 비활성.
+    jitter: 0,
+    jitterSpeed: 30,
     cornerR: 0,          // 부드럽게 — 픽셀 마스크 + blur 기반 모서리 부드러움
     // 원시 물리 (튜닝값 — UI 슬라이더는 숨김 상태)
     repulse: 20,         // 반발 — 노드끼리 밀어내는 힘
@@ -1522,6 +1559,9 @@ var _viewFocused = true;
 document.addEventListener('pointerdown', (e) => {
   _viewFocused = !!(e.target && e.target.id === 'universe');
 }, true);
+document.addEventListener('focusin', e => {
+  if (e.target !== canvas) _viewFocused = false;
+});
 let _moimkkolChar = null;         // 현재 시각화 중인 음절
 let _moimkkolBoxes = [];          // [{kind, x, y, w, h, jamo, design, selected}]
 let _moimkkolSelected = -1;       // 주(主) 선택 박스 인덱스 (리사이즈·커서 기준; 단일)
@@ -2213,7 +2253,7 @@ const PANEL_GROUPS = [
   ]},
   { id: 'spacing', title: '간격', items: [
     ['pointDist',    '점 간격',   4,  60, 1],
-    ['letterSpacing','글자 간격', 0, 150, 1],
+    ['letterSpacing','글자 간격', -150, 150, 1],
     ['lineHeight',   '행 간격',   0, 300, 1]
   ]},
   // 탄성은 K_xxx 변수에 저장되며 슬라이더는 반전 표시 (값 ↑ = 탄성 ↑ = 단단함, 값 ↓ = 흐물거림)
@@ -2228,7 +2268,9 @@ const PANEL_GROUPS = [
     ['lineW',       '획 굵기',   0,  30, 1],
     ['borderWidth', '테두리', 0, 30, 1],
     ['flow',        '페인트', 0, 10, 1],
-    ['cornerR',     '부드럽게',  0,  20, 1]
+    ['cornerR',     '부드럽게',  0,  20, 1],
+    ['jitter', '떨림 강도', 0, 100, 1],
+    ['jitterSpeed', '떨림 속도', 0, 100, 1],
   ]},
   { id: 'bg', title: '배경 색', items: [
     ['_bgR', '빨강', 0, 255, 1],
@@ -2286,6 +2328,7 @@ function getParamValue(key) {
 }
 function setParamValue(key, v, opts) {
   opts = opts || {};
+  if (!opts.modulated && typeof _modulation !== 'undefined' && _modulation.running && _modulation.tracks.some(track => track.key === key)) _stopModulation(false);
   if (key === '_invK_ANGLE')  { K_ANGLE = FLEX_MAX - v;  return; }
   if (key === '_invK_ROT')    { K_ROT = FLEX_MAX - v;    return; }
   if (key === '_invK_SPRING') { K_SPRING = FLEX_MAX - v; return; }
@@ -3566,6 +3609,86 @@ function buildToken(ch, consSub, vowSub, extras) {
 const canvas = document.getElementById('universe');
 const ctx = canvas.getContext('2d');
 let world = null;
+// Per-document, per-occurrence anchors. Repeated letters have independent positions.
+let _centerLayout = { text: '', points: {} };
+let _centerDrag = null, _centerPointer = null;
+try { _loadCenterLayout(JSON.parse(localStorage.getItem('mh_centers') || 'null')); } catch (_) {}
+function _loadCenterLayout(value) {
+  const points = {};
+  if (value && typeof value.text === 'string' && value.points && typeof value.points === 'object') {
+    Object.entries(value.points).slice(0, 10000).forEach(([key, p]) => {
+      if (/^\d+:/.test(key) && p && Number.isFinite(p.x) && Number.isFinite(p.y) && Math.abs(p.x) <= 100000 && Math.abs(p.y) <= 100000) points[key] = { x: p.x, y: p.y };
+    });
+    _centerLayout = { text: value.text, points };
+  } else _centerLayout = { text: '', points };
+}
+function _persistCenters() {
+  try { localStorage.setItem('mh_centers', JSON.stringify(_centerLayout)); } catch (_) {}
+}
+function _translateBody(body, dx, dy) {
+  body.anchorX += dx; body.anchorY += dy;
+  body.nodes.forEach(n => { n.x += dx; n.y += dy; });
+}
+function _finishCenterDrag(e, cancel = false) {
+  if (!_centerDrag || (e && e.pointerId !== _centerDrag.id)) return;
+  const drag = _centerDrag;
+  if (cancel) {
+    _translateBody(drag.body, drag.startX - drag.body.anchorX, drag.startY - drag.body.anchorY);
+  } else if (Math.hypot(drag.body.anchorX-drag.startX, drag.body.anchorY-drag.startY) > 0.01) {
+    const pin = { x: drag.body.anchorX, y: drag.body.anchorY };
+    _centerLayout.points[drag.body.centerKey] = pin;
+    _persistCenters();
+    _bondUndo.push({ kind:'center', text:_centerLayout.text, key:drag.body.centerKey,
+      before:{ pin:drag.beforePin, x:drag.startX, y:drag.startY },
+      after:{ pin:{...pin}, ...pin } });
+    if (_bondUndo.length > 50) _bondUndo.shift();
+    _bondRedo.length = 0;
+  }
+  _centerDrag = null;
+  canvas.classList.remove('dragging');
+  try { canvas.releasePointerCapture(drag.id); } catch (_) {}
+}
+function _clearCenterHistory() {
+  for (const stack of [_bondUndo, _bondRedo]) {
+    if (!stack) continue;
+    for (let i=stack.length-1;i>=0;i--) if (stack[i].kind==='center') stack.splice(i,1);
+  }
+}
+function _restoreCenterHistory(entry, side) {
+  if (entry.text !== _centerLayout.text) return;
+  const state=entry[side];
+  if (state.pin) _centerLayout.points[entry.key]={...state.pin};
+  else delete _centerLayout.points[entry.key];
+  const body=world?.bodies.find(b=>b.centerKey===entry.key);
+  if (body) _translateBody(body,state.x-body.anchorX,state.y-body.anchorY);
+  _persistCenters();
+}
+function _centerRadius() { return 1.5*Math.max((PARAMS.nodeR || 0)/2, 3); }
+function _hoverCenterBody(p = _centerPointer) {
+  if (!p || !world) return null;
+  let best = null, distance = Infinity;
+  const pad = Math.max(_centerRadius(), (PARAMS.lineW || 0) / 2);
+  for (const b of world.bodies) {
+    let minX = b.anchorX, maxX = minX, minY = b.anchorY, maxY = minY;
+    for (const n of b.nodes) if (!n.inv) {
+      minX = Math.min(minX,n.x); maxX = Math.max(maxX,n.x);
+      minY = Math.min(minY,n.y); maxY = Math.max(maxY,n.y);
+    }
+    if (p.x < minX-pad || p.x > maxX+pad || p.y < minY-pad || p.y > maxY+pad) continue;
+    const d = Math.hypot(p.x-b.anchorX,p.y-b.anchorY);
+    if (d < distance) { best = b; distance = d; }
+  }
+  return best;
+}
+function _drawCenterHandles() {
+  const b = _centerDrag?.body || (!draggedNode && _hoverCenterBody());
+  if (!b || !world.bodies.includes(b)) return;
+  const x = b.anchorX, y = b.anchorY, r = _centerRadius();
+  ctx.save(); ctx.fillStyle = _bondInvColor();
+  ctx.beginPath(); ctx.moveTo(x,y-r); ctx.lineTo(x+r,y);
+  ctx.lineTo(x,y+r); ctx.lineTo(x-r,y); ctx.closePath(); ctx.fill(); ctx.restore();
+}
+
 // 픽셀 거리 측정 도구 상태 — 배경(빈 영역) 좌클릭 드래그 시 활성. 수직/수평만 그려짐.
 //   { sx, sy, cx, cy, axis: 'h'|'v'|null }  좌표는 client(viewport) px.
 let _pxMeasure = null;
@@ -3732,177 +3855,7 @@ function _computeMagnetPairs(nodes, nodeJamos, ch) {
   return out;
 }
 
-function buildWorld(str) {
-  // 통일된 점 간격을 글자 렌더링 SCALE 기준으로 사용
-  const SCALE = Math.max(PARAMS.pointDist, 4);
-  // 자간 — 슬라이더 값 × 0.5 (v1.12b A/B 테스트 결과 — 사용자 결정).
-  //   자동 보정은 randomizeAll에서만 적용.
-  const letterSpacing = PARAMS.letterSpacing * 0.5;
-  const lineHeight = Math.max(40, PARAMS.lineHeight);
-  const spaceWidth = SCALE * 1; // 공백 — 글자폭의 절반 (이전 *2의 절반)
-  // 6개 자모별 길이 슬라이더는 buildToken 내부에서 PARAMS 직접 참조
-  const consSub = 0; // 호환용 — 더 이상 사용 안 함
-  const vowSub = 0;  // 호환용 — 더 이상 사용 안 함
-  const extra = PARAMS.randomExtra;
-  const drawW = cssW - panelOffsetX - editorRightOffset;
-  const usableW = Math.max(drawW * 0.80, 200);  // 자동 줄바꿈 기준 = 가용 영역 너비 80%
-
-  // 1) 텍스트 전체 자모/글자 인벤토리 — 한글, 영문, 특수문자 모두 추적
-  // 한글 음절은 cho/jung/jong 슬롯, 그 외는 body 단일 슬롯
-  const charSlots = [];
-  for (const ch of str) {
-    if (ch === ' ' || ch === '\n') continue;
-    const d = decomposeSyllable(ch);
-    if (d) {
-      const slots = { cho: 0, jung: 0 };
-      if (d.jong) slots.jong = 0;
-      charSlots.push({ ch, d, slots, kind: 'hangul' });
-    } else if (PRIMITIVES[ch] || PUNCT[ch]) {
-      charSlots.push({ ch, slots: { body: 0 }, kind: 'other' });
-    }
-  }
-  // 슬롯 평탄화 — 무작위 픽 대상
-  const flatSlots = [];
-  charSlots.forEach(item => {
-    if (item.kind === 'hangul') {
-      flatSlots.push({ item, key: 'cho' });
-      flatSlots.push({ item, key: 'jung' });
-      if ('jong' in item.slots) flatSlots.push({ item, key: 'jong' });
-    } else {
-      flatSlots.push({ item, key: 'body' });
-    }
-  });
-  // 분배 — 매 픽마다 랜덤 슬롯에 +1
-  const totalExtras = extra * flatSlots.length;
-  for (let i = 0; i < totalExtras; i++) {
-    if (flatSlots.length === 0) break;
-    const s = flatSlots[Math.floor(Math.random() * flatSlots.length)];
-    s.item.slots[s.key]++;
-  }
-  // 위치별 매핑 — 인덱스 카운터로 매 글자에 슬롯 짝짓기
-  let csIdx = 0;
-  const tokens = [];
-  for (let ch of str) {
-    let extrasForCh = null;
-    if (ch !== ' ' && ch !== '\n') {
-      const d = decomposeSyllable(ch);
-      if (d || PRIMITIVES[ch] || PUNCT[ch]) {
-        extrasForCh = charSlots[csIdx]?.slots;
-        csIdx++;
-      }
-      // 디자인 없는 글자: ch 유지, extrasForCh null. buildToken 의 _fallbackBoxGlyph 가
-      //   ㅁ + x 합성 글리프를 반환 → 토큰이 정상 출력됨.
-    }
-    const t = buildToken(ch, consSub, vowSub, extrasForCh);
-    if (t) tokens.push(t);
-  }
-
-  const items = tokens.map((t, ti) => {
-    if (t.type === 'space') {
-      // 공백 양옆 글자 종류로 축소 배율 결정 — 한글 양옆=1.0, 한쪽만 한글=0.5, 그 외=0
-      const _prev = tokens[ti - 1];
-      const _next = tokens[ti + 1];
-      const _prevH = !!(_prev && _prev.ch && decomposeSyllable(_prev.ch));
-      const _nextH = !!(_next && _next.ch && decomposeSyllable(_next.ch));
-      let _sideMul = 0;
-      if (_prevH && _nextH) _sideMul = 1.0;
-      else if (_prevH || _nextH) _sideMul = 0.5;
-      // 중력 → 한글 클러스터 강도 (높을수록 공백 줄임). 직접 비례 — 캡 없음.
-      const _gNormSp = Math.min(1, (PARAMS.gravity || 0) / 15);
-      const _shrink = _gNormSp * (PARAMS.spaceShrink || 0) * _sideMul;
-      return { type: 'space', width: spaceWidth * (1 - _shrink) };
-    }
-    if (t.type === 'newline') return { type: 'newline' };
-    const gB = bbox(t.glyph.nodes);
-    const w = (gB.w) * SCALE * 0.5;
-    // [F7] 비한글 분산 = 점간격 기반. w = bbox너비(그리드칸) × SCALE×0.5 인데 SCALE 은
-    //   점간격(pointDist)에서 도출되므로 w 자체가 "점간격 × 기본디자인 너비(+가로 추가점)".
-    //   → 임의 분산배수(_nhMul, 중력 기반) 폐기. 비한글도 자기 footprint 그대로 advance
-    //   → 한글 자모가 모이는 밀도와 동일하게 떨어짐(점간격 일관). 자간=전역 letterSpacing 공통.
-    //   (요청 "성공 시 모든 자간/행간 동일 계산"의 전역 확대는 후속 단계 — F7 은 비한글 우선)
-    return { type: 'glyph', token: t, width: Math.max(w, SCALE * 0.5) };
-  });
-
-  // [v1.12b] 자간 슬롯 폭 일정 모드 (A/B 테스트 결과 — 사용자 결정).
-  //   모든 글자가 동일 advance 폭 사용 → 글자 BBox 폭 차이로 인한 자간 불균질 인식 해소.
-  //   각 글리프는 슬롯 중앙에 정렬.
-  {
-    let _maxGW = 0;
-    items.forEach(it => { if (it.type === 'glyph' && it.width > _maxGW) _maxGW = it.width; });
-    if (_maxGW > 0) items.forEach(it => { if (it.type === 'glyph') it.width = _maxGW; });
-  }
-
-  // 단어 단위로 묶기: 공백/줄바꿈이 분리자
-  const units = []; // { type: 'word'|'space'|'newline', items?, width? }
-  let wItems = [];
-  let wW = 0;
-  const flushWord = () => {
-    if (wItems.length > 0) {
-      units.push({ type: 'word', items: wItems, width: wW });
-      wItems = []; wW = 0;
-    }
-  };
-  items.forEach(it => {
-    if (it.type === 'space') { flushWord(); units.push({ type: 'space', width: it.width }); }
-    else if (it.type === 'newline') { flushWord(); units.push({ type: 'newline' }); }
-    else {
-      if (wItems.length > 0) wW += letterSpacing;
-      wItems.push(it);
-      wW += it.width;
-    }
-  });
-  flushWord();
-
-  // 단어 단위 줄바꿈
-  const lines = [];
-  let cur = []; // flat items
-  let curW = 0;
-  const pushLine = () => {
-    // 줄 끝 trailing space 제거
-    while (cur.length > 0 && cur[cur.length-1].type === 'space') { curW -= cur[cur.length-1].width + (cur.length > 1 ? letterSpacing : 0); cur.pop(); }
-    lines.push(cur);
-    cur = []; curW = 0;
-  };
-  units.forEach(u => {
-    if (u.type === 'newline') { pushLine(); return; }
-    if (u.type === 'space') {
-      if (cur.length === 0) return;  // 줄 시작 공백 무시
-      cur.push({ type: 'space', width: u.width });
-      curW += letterSpacing + u.width;
-      return;
-    }
-    // word — 모바일: 단어별 행갈이 OFF + 글자별 자동 줄바꿈 ON / 데스크탑: 단어별 행갈이 ON
-    const addW = (cur.length === 0 ? 0 : letterSpacing) + u.width;
-    const _isMobileWrap = (typeof isMobile === 'function') && isMobile();  // 모바일 = 글자별 줄바꿈, PC = 단어별 행갈이
-    if (!_isMobileWrap && cur.length > 0 && curW + addW > usableW) pushLine();
-    if (cur.length > 0) curW += letterSpacing;
-    u.items.forEach((it, i) => {
-      if (i > 0) curW += letterSpacing;
-      // 모바일 글자별 줄바꿈: 이 글자를 더하면 가용 폭을 넘으면 새 줄로
-      if (_isMobileWrap && cur.length > 0 && (curW + it.width) > usableW) {
-        pushLine();  // curW = 0, cur = [] 상태가 됨
-      }
-      cur.push(it);
-      curW += it.width;
-    });
-  });
-  if (cur.length > 0) lines.push(cur);
-  if (lines.length === 0) lines.push([]);
-
-  const totalLinesHeight = lines.length * lineHeight;
-  const startY = ((cssH - _footerOffset()) - totalLinesHeight) / 2 + lineHeight / 2;
-
-  const bodies = [];
-  lines.forEach((line, li) => {
-    const lineY = startY + li * lineHeight;
-    const lineW = line.reduce((s, it, i) => s + it.width + (i > 0 ? letterSpacing : 0), 0);
-    let cursor = panelOffsetX + (drawW - lineW) / 2;
-    line.forEach((it, idx) => {
-      if (idx > 0) cursor += letterSpacing;
-      if (it.type === 'space') { cursor += it.width; return; }
-      const t = it.token;
-      const anchorX = cursor + it.width / 2;
-      cursor += it.width;
+function _createGlyphBody(t,anchorX,lineY,SCALE,random=Math.random) {
       const gB = bbox(t.glyph.nodes);
       const cx = (gB.minX + gB.maxX) / 2;
       const cy = (gB.minY + gB.maxY) / 2;
@@ -3919,8 +3872,8 @@ function buildWorld(str) {
       const bodyAnchorY = lineY + yShift * SCALE * 0.5;
       const initNodes = t.glyph.nodes.map(n => {
         const o = {
-          x: anchorX + (n.x - cx) * SCALE * 0.5 + (Math.random() - 0.5) * 4,
-          y: bodyAnchorY + (n.y - cy) * SCALE * 0.5 + (Math.random() - 0.5) * 4,
+          x: anchorX + (n.x - cx) * SCALE * 0.5 + (random() - 0.5) * 4,
+          y: bodyAnchorY + (n.y - cy) * SCALE * 0.5 + (random() - 0.5) * 4,
           vx: 0, vy: 0,
           restX: (n.x - cx) * SCALE * 0.5,
           restY: (n.y - cy) * SCALE * 0.5,
@@ -4005,22 +3958,317 @@ function buildWorld(str) {
         // 구두점은 일단 'cons'로 취급 (글자 점만 있어 minD 작아도 무방)
         initNodes.forEach(n => { n.jamoType = 'cons'; });
       }
-      bodies.push({
+      return {
         ch: t.ch, anchorX, anchorY: bodyAnchorY,
         nodes: initNodes, edges, angleTriples, jamos,
         magnetPairs,
         strokes: t.glyph.strokes,
         isPunct: !!t.isPunct
-      });
+      };
+}
+
+// Versioned layout: legacy files retain their uniform slots and absolute pins.
+let _layoutState = {version:2,mode:'optical-v2',seed:20261003,anchorSpace:'absolute-css-px',anchorKeyVersion:1};
+let _opticalLayoutLock = null;
+const _opticalCache = new Map();
+function _parseLayoutState(value) {
+  if(value==null)return {..._layoutState,mode:'legacy-uniform'};
+  if(value.version!==2 || !['legacy-uniform','optical-v2'].includes(value.mode) || (value.anchorSpace!=null&&value.anchorSpace!=='absolute-css-px') || (value.anchorKeyVersion!=null&&value.anchorKeyVersion!==1))throw Error('지원하지 않는 배치 버전입니다.');
+  return {version:2,mode:value.mode,seed:Number.isInteger(value.seed)?value.seed>>>0:20261003,anchorSpace:'absolute-css-px',anchorKeyVersion:1};
+}
+try {
+  const saved=localStorage.getItem('mh_layout_v2');
+  if(saved)_layoutState=_parseLayoutState(JSON.parse(saved));
+  else if(['jeomgureum_text_v1','mh_centers','mh_admin_defaults','mh_moimkkol_positions_v6','mh_moimkkol_baseline_v4','jeomgureum_editor_defs_v6','mh_design_baseline_v3'].some(key=>localStorage.getItem(key)!==null))_layoutState.mode='legacy-uniform';
+}catch(_){_layoutState.mode='legacy-uniform';}
+_persistLayoutState();
+function _persistLayoutState(){try{localStorage.setItem('mh_layout_v2',JSON.stringify(_layoutState));}catch(_){}}
+function _setLayoutMode(mode) {
+  _stopModulation();_layoutState.mode=mode;_persistLayoutState();resetWorld();
+}
+function _layoutHash(text) {let hash=_layoutState.seed;for(const ch of text)hash=Math.imul(hash^ch.codePointAt(0),16777619)>>>0;return hash;}
+function _layoutRandom(seed) {return()=>((seed=(Math.imul(seed,1664525)+1013904223)>>>0)/4294967296);}
+function buildWorld(str,options) {
+  if(_layoutState.mode!=='optical-v2')return _buildWorldInternal(str,options);
+  // Keep random subdivision stable for this document. This synchronous scope
+  // restores the caller's RNG before any event or animation callback can run.
+  const random=Math.random;Math.random=_layoutRandom(_layoutHash(str));
+  try{return _buildWorldInternal(str,options);}finally{Math.random=random;}
+}
+function _predictOpticalProfile(token,scale) {
+  const settings=[scale,PARAMS.gravity,PARAMS.repulse,PARAMS.shapeBoost,PARAMS.damping,PARAMS.pointDist,PARAMS.nodeR,PARAMS.lineW,PARAMS.shape,PARAMS.borderWidth,PARAMS.springBoost,PARAMS.magnetForce,PARAMS.magnetMergeFactor,PARAMS.choHoriz,PARAMS.choVert,PARAMS.jungHoriz,PARAMS.jungVert,PARAMS.jongHoriz,PARAMS.jongVert,PARAMS.randomExtra,K_SPRING,K_ANGLE,K_ROT,poseLockOn,angleSpringOn];
+  const key=JSON.stringify([token.ch,token.glyph,settings,_moimkkolYShift[_moimkkolPatternKey(token.ch)]||0]);
+  if(_opticalCache.has(key))return _opticalCache.get(key);
+  const body=_createGlyphBody(token,0,0,scale,_layoutRandom(1337));
+  // Independent, fixed-step forecast. Never mutate the displayed world or use
+  // live animation bounds; stop after a bounded work budget in node operations.
+  const count=body.nodes.length,iterations=count<=160?96:count<=512?32:0;
+  for(let i=0;i<iterations;i++)step(1,{bodies:[body]},true);
+  if(body.nodes.some(n=>!Number.isFinite(n.x)||!Number.isFinite(n.y)||Math.abs(n.x)>4096||Math.abs(n.y)>4096))body.nodes.forEach(n=>{n.x=n.designX;n.y=body.anchorY+n.designY;});
+  const profile=_rasterOpticalProfile(body,scale);
+  if(_opticalCache.size>=256)_opticalCache.delete(_opticalCache.keys().next().value);
+  _opticalCache.set(key,profile);return profile;
+}
+function _rasterOpticalProfile(body,scale) {
+  const border=Math.max(0,PARAMS.borderWidth||0),radius=Math.max(0,PARAMS.nodeR/2),line=Math.max(0,PARAMS.lineW);
+  const visible=body.nodes.filter(n=>!n.inv),edgePoints=[];
+  body.edges.forEach(e=>{if(!e.transparent)edgePoints.push(body.nodes[e.a],body.nodes[e.b]);});
+  const points=visible.concat(edgePoints),bb=bbox(points),pad=Math.max(radius,line/2)+border+2;
+  const minX=Math.floor(bb.minX-pad),minY=Math.floor(bb.minY-pad),width=Math.max(1,Math.ceil(bb.w+2*pad)),height=Math.max(1,Math.ceil(bb.h+2*pad));
+  // At most 256x256 pixels per cached forecast, independent of screen size.
+  const resolution=Math.min(2,256/width,256/height),canvas=document.createElement('canvas');
+  canvas.width=Math.max(1,Math.ceil(width*resolution));canvas.height=Math.max(1,Math.ceil(height*resolution));
+  const c=canvas.getContext('2d',{willReadFrequently:true});c.scale(resolution,resolution);c.translate(-minX,-minY);c.lineWidth=line+2*border;c.lineCap='round';c.lineJoin='round';
+  if(line+2*border>0)body.edges.forEach(e=>{if(e.transparent)return;const a=body.nodes[e.a],b=body.nodes[e.b];c.beginPath();c.moveTo(a.x,a.y);c.lineTo(b.x,b.y);c.stroke();});
+  const connected=new Set();body.edges.forEach(e=>{if(!e.transparent){connected.add(e.a);connected.add(e.b);}});
+  body.nodes.forEach((n,i)=>{
+    if(n.inv)return;const r=(connected.has(i)?radius:radius>0?radius:line/2)+border;if(r<=0)return;
+    const corner=Math.max(0,Math.min(r,r*(100-(PARAMS.shape||0))/100));c.beginPath();
+    if(corner>=r-.5)c.arc(n.x,n.y,r,0,Math.PI*2);else c.roundRect(n.x-r,n.y-r,2*r,2*r,corner);c.fill();
+  });
+  const data=c.getImageData(0,0,canvas.width,canvas.height).data,bands=[];let left=Infinity,right=-Infinity,top=Infinity,bottom=-Infinity;
+  for(let y=0;y<canvas.height;y++){
+    let l=Infinity,r=-Infinity;for(let x=0;x<canvas.width;x++)if(data[(y*canvas.width+x)*4+3]>32){l=Math.min(l,x);r=x+1;}
+    if(r<l){bands.push(null);continue;}
+    l=minX+l/resolution;r=minX+r/resolution;bands.push([l,r]);left=Math.min(left,l);right=Math.max(right,r);top=Math.min(top,minY+y/resolution);bottom=Math.max(bottom,minY+(y+1)/resolution);
+  }
+  if(!Number.isFinite(left))return{minX:-scale/4,maxX:scale/4,minY:0,maxY:0,width:scale/2,bands:[],originY:0,resolution:1};
+  return{minX:left,maxX:right,minY:top,maxY:bottom,width:Math.max(scale/4,right-left),bands,originY:minY,resolution};
+}
+function _opticalGap(left,right,scale) {
+  const target=Math.max(2,scale*.25),bboxSeparation=left.maxX-right.minX;
+  const top=Math.max(left.minY,right.minY),bottom=Math.min(left.maxY,right.maxY),separations=[];
+  for(let i=0;i<48;i++){
+    const y=top+(i+.5)*(bottom-top)/48;
+    const a=left.bands[Math.floor((y-left.originY)*left.resolution)],b=right.bands[Math.floor((y-right.originY)*right.resolution)];
+    if(a&&b)separations.push(a[1]-b[0]);
+  }
+  if(bottom-top<Math.max(left.maxY-left.minY,right.maxY-right.minY)*.3 || separations.length<8)return target;
+  const mean=separations.reduce((a,b)=>a+b,0)/separations.length,max=Math.max(...separations);
+  // A whitespace target plus a collision floor; cap interlocking to 35% of the
+  // narrower glyph so punctuation and isolated protrusions cannot over-tighten.
+  const distance=Math.min(bboxSeparation+target,Math.max(max+.5,mean+target,bboxSeparation+target-.35*Math.min(left.width,right.width)));
+  return distance-bboxSeparation;
+}
+
+function _buildWorldInternal(str, options = {}) {
+  const optical = _layoutState.mode === 'optical-v2';
+  const locked = optical && _opticalLayoutLock?.text===str && !options.measureOnly;
+  if (!options.measureOnly) {
+  _finishCenterDrag(null, true);
+  if (_centerLayout.text !== str) { _clearCenterHistory(); if (_modulation.running) _stopModulation(false); _centerLayout = { text: str, points: {} }; _persistCenters(); }
+  // A rebuild must not leave pointer handlers referencing detached nodes.
+  if (typeof draggedNode !== 'undefined') { draggedNode = null; _bond = null; _detach = null; }
+  canvas.classList.remove('dragging');
+  }
+  // 통일된 점 간격을 글자 렌더링 SCALE 기준으로 사용
+  const SCALE = Math.max(PARAMS.pointDist, 4);
+  // 자간 — 슬라이더 값 × 0.5 (v1.12b A/B 테스트 결과 — 사용자 결정).
+  //   자동 보정은 randomizeAll에서만 적용.
+  const letterSpacing = PARAMS.letterSpacing * 0.5;
+  const lineHeight = Math.max(40, PARAMS.lineHeight);
+  const spaceWidth = SCALE * (optical ? 0.75 : 1); // 공백 — 글자폭의 절반 (이전 *2의 절반)
+  // 6개 자모별 길이 슬라이더는 buildToken 내부에서 PARAMS 직접 참조
+  const consSub = 0; // 호환용 — 더 이상 사용 안 함
+  const vowSub = 0;  // 호환용 — 더 이상 사용 안 함
+  const extra = PARAMS.randomExtra;
+  const drawW = cssW - panelOffsetX - editorRightOffset;
+  const usableW = Math.max(drawW * 0.80, 200);  // 자동 줄바꿈 기준 = 가용 영역 너비 80%
+
+  // 1) 텍스트 전체 자모/글자 인벤토리 — 한글, 영문, 특수문자 모두 추적
+  // 한글 음절은 cho/jung/jong 슬롯, 그 외는 body 단일 슬롯
+  const charSlots = [];
+  for (const ch of str) {
+    if (ch === ' ' || ch === '\n') continue;
+    const d = decomposeSyllable(ch);
+    if (d) {
+      const slots = { cho: 0, jung: 0 };
+      if (d.jong) slots.jong = 0;
+      charSlots.push({ ch, d, slots, kind: 'hangul' });
+    } else if (PRIMITIVES[ch] || PUNCT[ch]) {
+      charSlots.push({ ch, slots: { body: 0 }, kind: 'other' });
+    }
+  }
+  // 슬롯 평탄화 — 무작위 픽 대상
+  const flatSlots = [];
+  charSlots.forEach(item => {
+    if (item.kind === 'hangul') {
+      flatSlots.push({ item, key: 'cho' });
+      flatSlots.push({ item, key: 'jung' });
+      if ('jong' in item.slots) flatSlots.push({ item, key: 'jong' });
+    } else {
+      flatSlots.push({ item, key: 'body' });
+    }
+  });
+  // 분배 — 매 픽마다 랜덤 슬롯에 +1
+  const totalExtras = extra * flatSlots.length;
+  for (let i = 0; i < totalExtras; i++) {
+    if (flatSlots.length === 0) break;
+    const s = flatSlots[Math.floor(Math.random() * flatSlots.length)];
+    s.item.slots[s.key]++;
+  }
+  // 위치별 매핑 — 인덱스 카운터로 매 글자에 슬롯 짝짓기
+  let csIdx = 0;
+  const tokens = [];
+  for (let ch of str) {
+    let extrasForCh = null;
+    if (ch !== ' ' && ch !== '\n') {
+      const d = decomposeSyllable(ch);
+      if (d || PRIMITIVES[ch] || PUNCT[ch]) {
+        extrasForCh = charSlots[csIdx]?.slots;
+        csIdx++;
+      }
+      // 디자인 없는 글자: ch 유지, extrasForCh null. buildToken 의 _fallbackBoxGlyph 가
+      //   ㅁ + x 합성 글리프를 반환 → 토큰이 정상 출력됨.
+    }
+    const t = buildToken(ch, consSub, vowSub, extrasForCh);
+    if (t) tokens.push(t);
+  }
+
+  const items = tokens.map((t, ti) => {
+    if (t.type === 'space') {
+      if (optical) return { type:'space',width:spaceWidth };
+      // 공백 양옆 글자 종류로 축소 배율 결정 — 한글 양옆=1.0, 한쪽만 한글=0.5, 그 외=0
+      const _prev = tokens[ti - 1];
+      const _next = tokens[ti + 1];
+      const _prevH = !!(_prev && _prev.ch && decomposeSyllable(_prev.ch));
+      const _nextH = !!(_next && _next.ch && decomposeSyllable(_next.ch));
+      let _sideMul = 0;
+      if (_prevH && _nextH) _sideMul = 1.0;
+      else if (_prevH || _nextH) _sideMul = 0.5;
+      // 중력 → 한글 클러스터 강도 (높을수록 공백 줄임). 직접 비례 — 캡 없음.
+      const _gNormSp = Math.min(1, (PARAMS.gravity || 0) / 15);
+      const _shrink = _gNormSp * (PARAMS.spaceShrink || 0) * _sideMul;
+      return { type: 'space', width: spaceWidth * (1 - _shrink) };
+    }
+    if (t.type === 'newline') return { type: 'newline' };
+    if (optical) {
+      const w=Math.max(bbox(t.glyph.nodes).w*SCALE*.5,SCALE*.5);
+      const profile = locked ? {minX:-w/2,maxX:w/2,width:w} : _predictOpticalProfile(t,SCALE);
+      return {type:'glyph',token:t,width:profile.width,profile};
+    }
+    const gB = bbox(t.glyph.nodes);
+    const w = (gB.w) * SCALE * 0.5;
+    // [F7] 비한글 분산 = 점간격 기반. w = bbox너비(그리드칸) × SCALE×0.5 인데 SCALE 은
+    //   점간격(pointDist)에서 도출되므로 w 자체가 "점간격 × 기본디자인 너비(+가로 추가점)".
+    //   → 임의 분산배수(_nhMul, 중력 기반) 폐기. 비한글도 자기 footprint 그대로 advance
+    //   → 한글 자모가 모이는 밀도와 동일하게 떨어짐(점간격 일관). 자간=전역 letterSpacing 공통.
+    //   (요청 "성공 시 모든 자간/행간 동일 계산"의 전역 확대는 후속 단계 — F7 은 비한글 우선)
+    return { type: 'glyph', token: t, width: Math.max(w, SCALE * 0.5) };
+  });
+
+  // [v1.12b] 자간 슬롯 폭 일정 모드 (A/B 테스트 결과 — 사용자 결정).
+  //   모든 글자가 동일 advance 폭 사용 → 글자 BBox 폭 차이로 인한 자간 불균질 인식 해소.
+  //   각 글리프는 슬롯 중앙에 정렬.
+  {
+    let _maxGW = 0;
+    items.forEach(it => { if (it.type === 'glyph' && it.width > _maxGW) _maxGW = it.width; });
+    if (!optical && _maxGW > 0) items.forEach(it => { if (it.type === 'glyph') it.width = _maxGW; });
+  }
+
+  const itemGap = (a,b) => optical && !locked && a?.profile && b?.profile ? letterSpacing + _opticalGap(a.profile,b.profile,SCALE) : letterSpacing;
+  // 단어 단위로 묶기: 공백/줄바꿈이 분리자
+  const units = []; // { type: 'word'|'space'|'newline', items?, width? }
+  let wItems = [];
+  let wW = 0;
+  const flushWord = () => {
+    if (wItems.length > 0) {
+      units.push({ type: 'word', items: wItems, width: wW });
+      wItems = []; wW = 0;
+    }
+  };
+  items.forEach(it => {
+    if (it.type === 'space') { flushWord(); units.push({ type: 'space', width: it.width }); }
+    else if (it.type === 'newline') { flushWord(); units.push({ type: 'newline' }); }
+    else {
+      if (wItems.length > 0) wW += itemGap(wItems[wItems.length-1],it);
+      wItems.push(it);
+      wW += it.width;
+    }
+  });
+  flushWord();
+
+  // 단어 단위 줄바꿈
+  const lines = [];
+  let cur = []; // flat items
+  let curW = 0;
+  const pushLine = () => {
+    // 줄 끝 trailing space 제거
+    while (cur.length > 0 && cur[cur.length-1].type === 'space') { curW -= cur[cur.length-1].width + (cur.length > 1 ? itemGap(cur[cur.length-2],cur[cur.length-1]) : 0); cur.pop(); }
+    lines.push(cur);
+    cur = []; curW = 0;
+  };
+  units.forEach(u => {
+    if (u.type === 'newline') { pushLine(); return; }
+    if (u.type === 'space') {
+      if (cur.length === 0) return;  // 줄 시작 공백 무시
+      cur.push({ type: 'space', width: u.width });
+      curW += letterSpacing + u.width;
+      return;
+    }
+    // word — 모바일: 단어별 행갈이 OFF + 글자별 자동 줄바꿈 ON / 데스크탑: 단어별 행갈이 ON
+    const addW = (cur.length === 0 ? 0 : itemGap(cur[cur.length-1],u.items[0])) + u.width;
+    const _isMobileWrap = (typeof isMobile === 'function') && isMobile();  // 모바일 = 글자별 줄바꿈, PC = 단어별 행갈이
+    if (!_isMobileWrap && cur.length > 0 && curW + addW > usableW) pushLine();
+    if (cur.length > 0) curW += itemGap(cur[cur.length-1],u.items[0]);
+    u.items.forEach((it, i) => {
+      if (i > 0) curW += itemGap(u.items[i-1],it);
+      // 모바일 글자별 줄바꿈: 이 글자를 더하면 가용 폭을 넘으면 새 줄로
+      if (_isMobileWrap && cur.length > 0 && (curW + it.width) > usableW) {
+        pushLine();  // curW = 0, cur = [] 상태가 됨
+      }
+      cur.push(it);
+      curW += it.width;
+    });
+  });
+  if (cur.length > 0) lines.push(cur);
+  if (lines.length === 0) lines.push([]);
+
+  if (options.measureOnly) return {lines:lines.length,height:lines.length*lineHeight,width:Math.max(0,...lines.map(line=>line.reduce((sum,it,i)=>sum+it.width+(i>0?itemGap(line[i-1],it):0),0)))};
+  const totalLinesHeight = lines.length * lineHeight;
+  const startY = ((cssH - _footerOffset()) - totalLinesHeight) / 2 + lineHeight / 2;
+
+  const bodies = [];
+  lines.forEach((line, li) => {
+    const lineY = startY + li * lineHeight;
+    const lineW = line.reduce((s, it, i) => s + it.width + (i > 0 ? itemGap(line[i-1],it) : 0), 0);
+    let cursor = panelOffsetX + (drawW - lineW) / 2;
+    line.forEach((it, idx) => {
+      if (idx > 0) cursor += itemGap(line[idx-1],it);
+      if (it.type === 'space') { cursor += it.width; return; }
+      const t = it.token;
+      const anchorX = cursor + (optical ? -it.profile.minX : it.width / 2);
+      cursor += it.width;
+      const body=_createGlyphBody(t,anchorX,lineY,SCALE);
+      body.layoutColumn=idx-(line.length-1)/2;
+      body.layoutLine=li-(lines.length-1)/2;
+      bodies.push(body);
     });
   });
 
-  const _w = { bodies, lines: lines.length };
+  if (optical && _opticalLayoutLock?.text === str) bodies.forEach((b,i)=>{
+    const old = _opticalLayoutLock.positions[i];
+    if (old && old.ch===b.ch) {
+      // Freeze automatic optical widths/wrapping, while explicit tracking and
+      // line-height edits still move unpinned glyphs in their original rows.
+      const dx=old.column*(PARAMS.letterSpacing-_opticalLayoutLock.spacing)*.5;
+      const dy=old.line*(Math.max(40,PARAMS.lineHeight)-_opticalLayoutLock.lineHeight);
+      _translateBody(b,old.x+dx-b.anchorX,old.y+dy-b.anchorY);
+      b.layoutColumn=old.column;b.layoutLine=old.line;
+    }
+  });
+  bodies.forEach((b, i) => {
+    b.centerKey = i + ':' + b.ch;
+    const pin = _centerLayout.points[b.centerKey];
+    if (pin) _translateBody(b, pin.x - b.anchorX, pin.y - b.anchorY);
+  });
+  const _w = { bodies, lines: locked ? _opticalLayoutLock.lines : lines.length };
   _resetDripsForNewWorld(_w);
   return _w;
 }
 
-function step(dt) {
+function step(dt, simulation = world, predicting = false) {
+  if (!predicting) _stripNodeJitter();
   const G = PARAMS.gravity / 100;
   const R = PARAMS.repulse;
   // [F6] 획 유연성 → 스프링 강도 + 스프링 추가값(관리자) — 당기거나 구부린 상태를
@@ -4032,7 +4280,7 @@ function step(dt) {
   //   원형(점 크기 = 지름) 기준으로 거리 계산. 점 간격은 점 크기·획 굵기 중 더 큰 값의 영향을 받음
   const _visSize = Math.max(PARAMS.nodeR || 0, PARAMS.lineW || 0);
   const MIN_D = Math.max(PARAMS.pointDist, 4, _visSize);
-  const SPEED = PARAMS.speed;
+  const SPEED = predicting ? 1 : PARAMS.speed;
   // msg5 — 앞뒤붙임 인력 계수 (rest 길이 0 스프링 → 태그 노드끼리 끌어당김)
   const MAGF = (PARAMS.magnetForce || 0) / 100 * 0.05;
   // 융합 임계 — 점 크기·획 굵기·점 간격 중 가장 큰 값 기준.
@@ -4051,36 +4299,36 @@ function step(dt) {
   const K_ANGLE_eff = Math.min(FLEX_MAX - K_ANGLE, _stiffnessCap);
   // [v1.10b] 드래그 중에는 회전 탄성 OFF — 마우스 놓는 즉시 자동 복원 (단순히 effective=0 처리).
   //   slider 값(K_ROT) 자체는 건드리지 않음 → 패널 표시값 유지, end-drag 복원 코드 불필요.
-  const K_ROT_eff   = (typeof draggedNode !== 'undefined' && draggedNode)
+  const K_ROT_eff   = (!predicting && typeof draggedNode !== 'undefined' && draggedNode)
     ? 0
     : Math.min(FLEX_MAX - K_ROT, _stiffnessCap);
-  if (!world) return;
-  // ALL_NODES 캐시 — buildWorld가 새 world 객체를 반환하므로 world 교체 시 자동 무효화.
+  if (!simulation) return;
+  // ALL_NODES 캐시 — buildWorld가 새 simulation 객체를 반환하므로 simulation 교체 시 자동 무효화.
   //   노드는 in-place로만 변형(위치)되고 추가/삭제는 buildWorld에서만 → 참조 배열 재사용 안전.
-  let ALL_NODES = world._allNodes;
+  let ALL_NODES = simulation._allNodes;
   if (!ALL_NODES) {
     ALL_NODES = [];
-    world.bodies.forEach(body => body.nodes.forEach(n => ALL_NODES.push(n)));
-    world._allNodes = ALL_NODES;
+    simulation.bodies.forEach(body => body.nodes.forEach(n => ALL_NODES.push(n)));
+    simulation._allNodes = ALL_NODES;
   }
 
   // [자성 보정] 붙임 짓기로 현재 잡혀 있는 partner 노드 — 반발 패스에서 면제.
   //   잡은(드래그) 노드는 별도로 핀 고정되고 partner 는 곧 그 위로 융합되므로,
   //   잡혀 있는 동안만 반발에서 빼 후보가 커서 밖으로 밀려나지 않게 한다.
-  const _bondLockNode = (typeof _bond !== 'undefined' && _bond && _bond._partnerIdx >= 0
+  const _bondLockNode = (!predicting && typeof _bond !== 'undefined' && _bond && _bond._partnerIdx >= 0
       && _bond.body && _bond.body.nodes[_bond._partnerIdx])
     ? _bond.body.nodes[_bond._partnerIdx] : null;
 
   // [항목4] 떼는 중인 붙임 쌍 — 융합 금지 + 약한 자성만(관리자 '떼기 자성 세기').
   //   잡은 노드는 별도로 커서에 핀되므로, 끌면 약한 저항만 받고 떨어짐.
-  const _detActive = (typeof _detach !== 'undefined' && _detach && typeof draggedNode !== 'undefined'
+  const _detActive = (!predicting && typeof _detach !== 'undefined' && _detach && typeof draggedNode !== 'undefined'
       && draggedNode && _detach.body && _detach.body.nodes[_detach.gi] && _detach.body.nodes[_detach.pi]);
   const _detG = _detActive ? _detach.body.nodes[_detach.gi] : null;
   const _detP = _detActive ? _detach.body.nodes[_detach.pi] : null;
   const detachMAGF = ((PARAMS.detachMagnetForce != null) ? PARAMS.detachMagnetForce : 15) / 100 * 0.05;
 
   for (let sub = 0; sub < SPEED; sub++) {
-    world.bodies.forEach(body => {
+    simulation.bodies.forEach(body => {
       body.nodes.forEach(n => {
         // G가 0이어도 곱셈만 일어나므로 효과 없음 (gravityFrozen일 때 G=0)
         n.vx += (body.anchorX - n.x) * G * 0.02 * dt;
@@ -4240,7 +4488,7 @@ function step(dt) {
       });
     }
     // 벽 반발 — PARAMS.wallOn 플래그가 true 일 때만 작동 (실험적 비활성화 가능)
-    if (PARAMS.wallOn) {
+    if (!predicting && PARAMS.wallOn) {
       const WALL_D = MIN_D * 2;
       for (let i = 0; i < ALL_NODES.length; i++) {
         const n = ALL_NODES[i];
@@ -4262,7 +4510,7 @@ function step(dt) {
         }
       }
     }
-    world.bodies.forEach(body => {
+    simulation.bodies.forEach(body => {
       body.nodes.forEach(n => {
         n.vx *= DAMP; n.vy *= DAMP;
         n.x += n.vx * dt; n.y += n.vy * dt;
@@ -4273,7 +4521,7 @@ function step(dt) {
     //   있으면 그 노드 좌표에 딱 스냅(무엇이 선택됐는지 명확). 대상은 커서로
     //   매 이동 재계산되므로 커서를 다른 후보로 옮기면 스냅 대상도 바뀜 →
     //   마우스를 놓기 전까지 자유 변경, 확정은 놓는 순간(endDrag→_bondCommit).
-    if (typeof draggedNode !== 'undefined' && draggedNode) {
+    if (!predicting && typeof draggedNode !== 'undefined' && draggedNode) {
       if (typeof _bond !== 'undefined' && _bond && _bond._partnerIdx >= 0
           && _bond.body && _bond.body.nodes[_bond._partnerIdx]) {
         const _pn = _bond.body.nodes[_bond._partnerIdx];
@@ -4905,14 +5153,15 @@ function drawNodeShape(n, r) {
 // [v1.11b 테스트] iPad/Safari (17.x 이하 + iOS Safari 모두) 의 ctx.filter='blur(...)' 미지원
 //   대응용 JS 박스블러 (분리형 슬라이딩 윈도 × 3패스 ≈ Gaussian). 알파 채널만 처리.
 //   픽셀당 O(1) 슬라이딩 윈도 → 반경 무관 일정 시간. 화면 픽셀 수에만 비례.
+let _blurBuffers = null;
 function _jsBoxBlurAlpha(imgData, radiusPx) {
   const W = imgData.width, H = imgData.height;
   if (W <= 0 || H <= 0) return;
   const r = Math.max(1, Math.round(radiusPx));
   const d = imgData.data;
   const N = W * H;
-  let src = new Float32Array(N);
-  let dst = new Float32Array(N);
+  if (!_blurBuffers || _blurBuffers[0].length !== N) _blurBuffers = [new Float32Array(N), new Float32Array(N)];
+  let [src, dst] = _blurBuffers;
   for (let i = 0, j = 3; i < N; i++, j += 4) src[i] = d[j];
   const div = 2 * r + 1;
   const ITER = 3;
@@ -4961,10 +5210,31 @@ function _jsBoxBlurAlpha(imgData, radiusPx) {
 function smoothedTotalWidth() { return Math.max(0, PARAMS.lineW || 0); }
 
 // 부드럽게 마스크/합성 캔버스 — 매프레임 createElement 대신 캐시 재사용 (GC·재할당 방지)
-let _smMask = null, _smTmp = null;
+let _smMask = null, _smTmp = null, _smBlurPixels = 0;
 // [E3] 테두리 작업 캔버스 (정확한 도형 팽창 = 프리미티브 인플레이션) — 캐시 재사용
 let _bdOuter = null, _bdInner = null, _bdRing = null;
+// Bound the unchanged three-pass blur to occupied pixels plus its full kernel reach.
+function _smoothViewport(bodies, viewport, renderScale, inflation = 0) {
+  const scale = renderScale || Math.max(1, Math.min(4, Math.round(PARAMS.smoothScale || 1)));
+  const radius = Math.max(1, Math.round(PARAMS.cornerR * Math.max(0, PARAMS.blurFactor || 0.5) * scale));
+  const pad = Math.max(PARAMS.nodeR, PARAMS.lineW) / 2 + inflation + 3 * radius / scale + 3;
+  let left = Infinity, top = Infinity, right = -Infinity, bottom = -Infinity;
+  const point = (x, y) => { left = Math.min(left, x); top = Math.min(top, y); right = Math.max(right, x); bottom = Math.max(bottom, y); };
+  bodies.forEach(b => b.nodes.forEach(n => point(n.x, n.y)));
+  const flow = _collectFlowPrimitives();
+  flow.lines.forEach(l => { point(l.x0, l.y0); point(l.x1, l.y1); });
+  flow.ends.forEach(e => point(e.x, e.y));
+  const v = viewport || { x: 0, y: 0, w: cssW, h: cssH };
+  left = Math.max(v.x, Math.floor(left - pad)); top = Math.max(v.y, Math.floor(top - pad));
+  right = Math.min(v.x + v.w, Math.ceil(right + pad)); bottom = Math.min(v.y + v.h, Math.ceil(bottom + pad));
+  if (!(right > left && bottom > top)) return null;
+  return { x: left, y: top, w: right - left, h: bottom - top };
+}
 function drawSmoothedBodies(targetCtx, bodies, fg, bg, viewport) {
+  // Rasterize on the original canvas grid: cropping the native arc rasterizer
+  // changes a few edge pixels on Linux. Crop only the expensive blur readback.
+  const region = _smoothViewport(bodies, viewport);
+  if (!region) return;
   const cornerR = Math.max(0, PARAMS.cornerR || 0);
   if (cornerR <= 0) return;
   // viewport = { x, y, w, h } — 내보내기에서 bbox 전달 시 사용. 미지정이면 화면 전체.
@@ -4985,7 +5255,7 @@ function drawSmoothedBodies(targetCtx, bodies, fg, bg, viewport) {
   if (mask.width !== W * SCALE || mask.height !== H * SCALE) {
     mask.width = W * SCALE; mask.height = H * SCALE;
   }
-  const mctx = mask.getContext('2d');
+  const mctx = mask.getContext('2d', { willReadFrequently: true });
   mctx.setTransform(1, 0, 0, 1, 0, 0);
   mctx.filter = 'none';
   mctx.globalCompositeOperation = 'source-over';
@@ -5052,13 +5322,17 @@ function drawSmoothedBodies(targetCtx, bodies, fg, bg, viewport) {
   if (cornerR > 0) {
     mctx.setTransform(1, 0, 0, 1, 0, 0);  // scale 해제
     const _blurPx = cornerR * BLUR_F * SCALE;
-    const imgData = mctx.getImageData(0, 0, W * SCALE, H * SCALE);
+    const rx = Math.round((region.x-VX)*SCALE), ry = Math.round((region.y-VY)*SCALE);
+    const rw = Math.ceil(region.w*SCALE), rh = Math.ceil(region.h*SCALE);
+    _smBlurPixels = rw*rh;
+    const imgData = mctx.getImageData(rx, ry, rw, rh);
     _jsBoxBlurAlpha(imgData, _blurPx);
     const d = imgData.data;
     for (let i = 0; i < d.length; i += 4) {
       d[i + 3] = d[i + 3] > A_THR ? 255 : 0;
     }
-    mctx.putImageData(imgData, 0, 0);
+    mctx.clearRect(0,0,W*SCALE,H*SCALE);
+    mctx.putImageData(imgData, rx, ry);
   }
 
   // [E3] 테두리는 drawSmoothedBodies 와 무관한 독립 함수 drawBorders 가 처리(부드럽게 비종속).
@@ -5097,6 +5371,8 @@ function drawBorders(targetCtx, bodies, fg, viewport) {
   if (!_bordersOn() || !bodies) return;
   const bW = Math.max(0, PARAMS.borderWidth || 0);
   if (bW <= 0) return;
+  const region = _smoothViewport(bodies, viewport, 2, bW);
+  if (!region) return;
   const _borderColor = fg;
   // viewport = { x, y, w, h } — 내보내기에서 bbox 전달 시 사용. 미지정이면 화면 전체.
   const VX = (viewport && viewport.x) || 0;
@@ -5112,9 +5388,9 @@ function drawBorders(targetCtx, bodies, fg, viewport) {
   if (!_bdInner) _bdInner = document.createElement('canvas');
   if (!_bdRing)  _bdRing  = document.createElement('canvas');
   [_bdOuter, _bdInner, _bdRing].forEach(c => { if (c.width !== MW || c.height !== MH) { c.width = MW; c.height = MH; } });
-  const octx = _bdOuter.getContext('2d');
-  const ictx = _bdInner.getContext('2d');
-  const rctx = _bdRing.getContext('2d');
+  const octx = _bdOuter.getContext('2d', { willReadFrequently: true });
+  const ictx = _bdInner.getContext('2d', { willReadFrequently: true });
+  const rctx = _bdRing.getContext('2d', { willReadFrequently: true });
   // 실루엣을 infl(px)만큼 팽창해 흑색으로 칠함. 획=lineW+2·infl, 점=(r+infl) + 점모양(shape).
   //   viewport 모드: world 좌표를 (-VX, -VY) 만큼 평행이동해 mask 안에 들어오게 함.
   const paintSil = (mctx, infl) => {
@@ -5200,11 +5476,13 @@ function drawBorders(targetCtx, bodies, fg, viewport) {
     const A_THR = Math.max(0, Math.min(255, Math.round(PARAMS.alphaThreshold ?? 128)));
     const _blurPx = cornerR * BLUR_F * S;
     // JS 박스블러로 통합 (v1.12b) — 윤곽 밴드도 동일 처리.
-    const im = rctx.getImageData(0, 0, MW, MH);
+    const rx = Math.round((region.x-VX)*S), ry = Math.round((region.y-VY)*S);
+    const im = rctx.getImageData(rx, ry, Math.ceil(region.w*S), Math.ceil(region.h*S));
     _jsBoxBlurAlpha(im, _blurPx);
     const dd = im.data;
     for (let k = 0; k < dd.length; k += 4) dd[k + 3] = dd[k + 3] > A_THR ? 255 : 0;
-    rctx.putImageData(im, 0, 0);
+    rctx.clearRect(0,0,MW,MH);
+    rctx.putImageData(im, rx, ry);
   }
   rctx.globalCompositeOperation = 'source-in';
   rctx.fillStyle = _borderColor;
@@ -5221,7 +5499,7 @@ function draw() {
   if (!world) return;
   // 매 프레임 흘리기 애니메이션 1회 전진 + 경로 재계산 (모든 렌더 모드 공통).
   //   파이프라인 순서: 흘리기 → 테두리 → 부드럽게 (뒤 단계가 앞을 항상 포함).
-  _advanceFlow();
+  if (!_previewPaused) _advanceFlow(); else _dripsLastT = performance.now();
   const dpr = window.devicePixelRatio || 1;
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   const bg = currentBgColor();
@@ -5279,6 +5557,7 @@ function draw() {
 //   조기 return 직전에도 호출되어, 테두리/부드럽게 모드에서도 인터랙션 피드백 표시.
 //   ctx.save/restore 로 부드럽게 모드의 transform/filter 영향 격리.
 function drawInteractionOverlay() {
+  _drawCenterHandles();
   ctx.save();
   // 부드럽게 모드 등이 변경했을 가능성 있는 transform 을 다시 DPR 기본값으로 강제
   const dpr = window.devicePixelRatio || 1;
@@ -5466,9 +5745,74 @@ document.addEventListener('pointerup',     _endPxMeasure, false);
 document.addEventListener('pointercancel', _endPxMeasure, false);
 window.addEventListener('resize', () => { if (_pxMeasure) _renderPxMeasure(); });
 
-function tick() {
-  step(1);
+let _motionTime = 0, _motionLast = null, _jitterDt = 1 / 60, _jitterPhase = 0;
+function _jitterFrequency(speed=PARAMS.jitterSpeed){const v=Math.max(0,Math.min(100,speed||0));return v===0?0:.03*Math.pow(400,v/100);}
+function _advanceMotion(now) {
+  _jitterDt = _motionLast === null ? 1/60 : Math.max(0, Math.min(0.05, (now-_motionLast)/1000));
+  _motionLast = now; _motionTime += _jitterDt;
+  _jitterPhase=(_jitterPhase+2*Math.PI*_jitterFrequency()*_jitterDt)%(Math.PI*2000);
+}
+// A damped spring per node. Strip its displacement before the base solver, then
+// integrate rapid, zero-mean acceleration and apply it to that node only.
+// Rest displacement is zero; glyph anchors and the original physics remain intact.
+function _stripNodeJitter() {
+  if (!world) return;
+  world.bodies.forEach(b => b.nodes.forEach(n => {
+    if (!n.jitterState) return;
+    if (n.jitterState.applied) { n.x -= n.jitterState.x; n.y -= n.jitterState.y; n.jitterState.applied = false; }
+  }));
+}
+function _applyNodeJitter() {
+  if (!world) return;
+  const strength = Math.max(0,Math.min(100,PARAMS.jitter || 0));
+  const substeps = Math.max(1,Math.ceil(_jitterDt*240)), dt = _jitterDt/substeps;
+  world.bodies.forEach((b,bi) => b.nodes.forEach((n,ni) => {
+    if (!strength && !n.jitterState) return;
+    const w = n.jitterState || (n.jitterState = { x:0,y:0,vx:0,vy:0 });
+    if (n === draggedNode) { delete n.jitterState; return; }
+    if (_centerDrag || draggedNode) { n.x += w.x; n.y += w.y; w.applied = true; return; }
+    const phase = ni*2.39996+bi*1.7;
+    const amplitude = 12*Math.pow(strength/100,1.35)/1.3,omega=2*Math.PI*_jitterFrequency();
+    // Feed-forward compensation preserves displacement amplitude across speed.
+    // At speed zero the phase holds; strength zero still restores the rest pose.
+    const force=(p,w)=>(1900-w*w)*Math.sin(p)+55*w*Math.cos(p);
+    for (let k=0;k<substeps;k++) {
+      const t=_jitterPhase-omega*(_jitterDt-(k+1)*dt);
+      const fx=amplitude*(force(t+phase,omega)+.3*force(t*1.55+phase*1.7,omega*1.55));
+      const fy=amplitude*(force(t*1.2+phase*1.3,omega*1.2)+.3*force(t*1.64+phase,omega*1.64));
+      w.vx += (fx-1900*w.x-55*w.vx)*dt;
+      w.vy += (fy-1900*w.y-55*w.vy)*dt;
+      w.x += w.vx*dt; w.y += w.vy*dt;
+    }
+    if (!strength && Math.hypot(w.x,w.y,w.vx,w.vy)<0.001) { delete n.jitterState; return; }
+    n.x += w.x; n.y += w.y; w.applied = true;
+  }));
+  // Preserve welded junctions when applying the per-node force layer.
+  world.bodies.forEach(b => {
+    if (!b.magnetPairs?.length) return;
+    const parent = b.nodes.map((_,i)=>i);
+    const root = i => { while (parent[i]!==i) i=parent[i]; return i; };
+    (b.magnetPairs || []).forEach(([i,j]) => {
+      const a=b.nodes[i], c=b.nodes[j], aw=a.jitterState, cw=c.jitterState;
+      if (!aw || !cw || a===draggedNode || c===draggedNode) return;
+      if (Math.hypot(a.x-aw.x-c.x+cw.x,a.y-aw.y-c.y+cw.y)<0.001) parent[root(j)]=root(i);
+    });
+    b.nodes.forEach((n,i)=>{
+      const source=b.nodes[root(i)].jitterState, w=n.jitterState;
+      if (root(i)===i || !source || !w) return;
+      n.x += source.x-w.x; n.y += source.y-w.y; Object.assign(w,source);
+    });
+  });
+}
+
+function tick(now = performance.now()) {
+  _advanceModulation(now);
+  if (!_previewPaused) { _advanceMotion(now); step(1); _applyNodeJitter(); }
+  else _motionLast = now;
+  _drawEaseGraph();
   draw();
+  _captureRecordingFrame(now);
+  _finishPlayback();
   updateHUD();
   rafId = requestAnimationFrame(tick);
 }
@@ -5506,6 +5850,9 @@ function rebuild() {
 
 // ── 키보드 단축키 ──
 window.addEventListener('keydown', e => {
+  // Native text/IME undo belongs to its input, even while an editor is open.
+  if ((e.ctrlKey || e.metaKey) && e.code==='KeyZ' &&
+      (e.isComposing || e.keyCode===229 || e.target.isContentEditable || e.target.closest?.('input,textarea,select'))) return;
   // Ctrl/Cmd+S → SVG 저장, Ctrl/Cmd+P → PNG 저장 (브라우저 기본동작 차단, 전역)
   if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey) {
     // e.code 는 키보드 레이아웃·IME 무관 — 한글 IME 활성 상태에서도 동작
@@ -5614,13 +5961,13 @@ window.addEventListener('keydown', e => {
   // Alt+방향키: 자간 ±5 / 행간 ±10 (텍스트 입력 중에도 동작)
   if (e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
     let key = null, delta = 0, lo = 0, hi = 100;
-    if (e.key === 'ArrowLeft')       { key = 'letterSpacing'; delta = -5;  lo = 0;  hi = 150; }
-    else if (e.key === 'ArrowRight') { key = 'letterSpacing'; delta = +5;  lo = 0;  hi = 150; }
+    if (e.key === 'ArrowLeft')       { key = 'letterSpacing'; delta = -5;  lo = -150;  hi = 150; }
+    else if (e.key === 'ArrowRight') { key = 'letterSpacing'; delta = +5;  lo = -150;  hi = 150; }
     else if (e.key === 'ArrowUp')    { key = 'lineHeight';    delta = +10; lo = 40; hi = 300; }
     else if (e.key === 'ArrowDown')  { key = 'lineHeight';    delta = -10; lo = 40; hi = 300; }
     if (key) {
       e.preventDefault();
-      PARAMS[key] = Math.max(lo, Math.min(hi, (PARAMS[key] || 0) + delta));
+      setParamValue(key, Math.max(lo, Math.min(hi, (PARAMS[key] || 0) + delta)));
       if (world) world = buildWorld(currentText());
       sliderUpdaters.forEach(u => u());
       return;
@@ -5709,7 +6056,7 @@ function recalculateRestState(world) {
   world.bodies.forEach(body => {
     // 1) 노드 rest 위치 갱신 (회전 탄성 + shapeBoost 의 기준점)
     if (Array.isArray(body.nodes)) {
-      body.nodes.forEach(n => { n.restX = n.x; n.restY = n.y; });
+      body.nodes.forEach(n => { n.restX = n.x; n.restY = n.y; delete n.jitterState; });
     }
     // 2) 자모 rest 중심 갱신 (회전 탄성의 자모 단위 회전 기준)
     if (Array.isArray(body.jamos)) {
@@ -5939,16 +6286,18 @@ function _bondRestore(snap) {
   if (typeof renderEditorCanvas === 'function') renderEditorCanvas();
 }
 function _bondUndoApply() {
+  if (_centerDrag) { _finishCenterDrag(null, true); return true; }
   if (!_bondUndo.length) return false;
   const e = _bondUndo.pop();
-  _bondRestore(e.before);
+  if (e.kind==='center') _restoreCenterHistory(e,'before'); else _bondRestore(e.before);
   _bondRedo.push(e);
   return true;
 }
 function _bondRedoApply() {
+  if (_centerDrag) { _finishCenterDrag(null, true); return true; }
   if (!_bondRedo.length) return false;
   const e = _bondRedo.pop();
-  _bondRestore(e.after);
+  if (e.kind==='center') _restoreCenterHistory(e,'after'); else _bondRestore(e.after);
   _bondUndo.push(e);
   return true;
 }
@@ -6294,6 +6643,17 @@ canvas.addEventListener('pointerdown', e => {
 
 canvas.addEventListener('pointerdown', e => {
   if (!world) return;
+  if (_centerDrag) return;
+  if (e.button === 0) {
+    const p = canvasCoords(e);
+    const hit = _hoverCenterBody(p);
+    const b = hit && Math.abs(p.x-hit.anchorX) + Math.abs(p.y-hit.anchorY) <= _centerRadius() + 2 ? hit : null;
+    if (b) {
+      e.preventDefault(); e.stopPropagation();
+      _centerDrag = { body: b, id: e.pointerId, x: p.x, y: p.y, startX: b.anchorX, startY: b.anchorY, beforePin: _centerLayout.points[b.centerKey] ? {..._centerLayout.points[b.centerKey]} : null };
+      canvas.classList.add('dragging'); canvas.setPointerCapture(e.pointerId); return;
+    }
+  }
   // [v1.10b] 드래그(붙이기/떼기/이동) 는 좌클릭 전용. 우클릭은 컨텍스트 메뉴(편집 메뉴) 만 띄움.
   //   button: 0=좌, 1=중, 2=우. 터치 입력은 button=0 으로 들어오므로 정상 동작.
   if (e.button !== 0) return;
@@ -6491,6 +6851,13 @@ canvas.addEventListener('contextmenu', e => {
 });
 canvas.addEventListener('pointermove', e => {
   const p = canvasCoords(e);
+  _centerPointer = p;
+  if (_centerDrag) {
+    if (e.pointerId !== _centerDrag.id) return;
+    const d = _centerDrag;
+    _translateBody(d.body, d.startX + p.x - d.x - d.body.anchorX, d.startY + p.y - d.y - d.body.anchorY);
+    e.stopPropagation(); return;
+  }
   if (draggedNode) {
     dragX = p.x; dragY = p.y;
     // [항목4] 떼기 모드에서 실제로 끌었는지 표시(클릭과 구분). 노드 크기 이상
@@ -6739,9 +7106,13 @@ function endDrag(e) {
   canvas.classList.remove('dragging');
   try { if (e && e.pointerId != null) canvas.releasePointerCapture(e.pointerId); } catch(_){}
 }
+canvas.addEventListener('pointerup', e => _finishCenterDrag(e));
+canvas.addEventListener('pointercancel', e => _finishCenterDrag(e, true));
+canvas.addEventListener('lostpointercapture', e => _finishCenterDrag(e, true));
 canvas.addEventListener('pointerup', endDrag);
 canvas.addEventListener('pointercancel', endDrag);
 canvas.addEventListener('pointerleave', endDrag);
+canvas.addEventListener('pointerleave', () => { _centerPointer = null; _hoverJamo = null; });
 
 // ── 설정 패널 (미니멀) ──
 //   STRUCTURAL_KEYS: 슬라이더 변경 시 world 재구성이 필요한 키들
@@ -6867,6 +7238,241 @@ function setupPcTextBar() {
   window.addEventListener('resize', _adjustTaHeight);
 }
 
+let _recordMode = false, _recordOpener = null, _previewPaused = false, _transportPlaying = false;
+const _recordRanges = new Map();
+let _recordPeriod = 4, _recordRepeats = 1;
+const _modulation = { running:false, tracks:[], period:4, repeats:1, elapsed:0, last:null, lastUI:0, lastStructural:-Infinity, complete:false };
+function _setRecordMode(on) {
+  if (on === _recordMode) return;
+  _recordMode=on;
+  document.getElementById('recordModeBtn')?.setAttribute('aria-pressed',String(on));
+  if (!on) {
+    _stopRecording(true); _stopModulation(); _previewPaused=false; _transportPlaying=false;
+    document.getElementById('recordDialog')?.remove(); _recordOpener?.focus();
+  } else { _recordOpener=document.activeElement; _buildRecordingPopup(); }
+  sliderUpdaters.forEach(u=>u());
+}
+function _bezierEase(t) { return MHCurve.evaluate(_easePoints,t); }
+function _modulationValue(phase,from,to) {
+  const t=1-Math.abs(2*((phase%1+1)%1)-1);
+  return from+(to-from)*_bezierEase(t);
+}
+function _modStatus(text) { const el=document.getElementById('modStatus');if(el)el.textContent=text; }
+function _stopModulation(restore=true) {
+  const m=_modulation; if(!m.running)return;
+  if(_recording?.linked&&!_recording.stopping){_recording.linked=false;_recordStatus('변조 정지 · 수동 녹화 중');}
+  m.running=false;m.complete=false;_opticalLayoutLock=null;
+  let rebuild=false;
+  if(restore) for(const track of m.tracks) {
+    setParamValue(track.key,track.base,{modulated:true,silent:true});
+    rebuild ||= STRUCTURAL_KEYS.has(track.key);
+  }
+  if(m.fgAuto!==undefined)_fgAuto=m.fgAuto;
+  if(rebuild)resetWorld();
+  _transportPlaying=false; _recordButtons(!!_recording); sliderUpdaters.forEach(u=>u());_drawEaseGraph();
+}
+function _startModulation() {
+  _stopModulation();
+  if(!_recordRanges.size)return false;
+  const tracks=[];
+  for(const range of _recordRanges.values()) {
+    const item=PANEL_GROUPS.flatMap(g=>g.items).find(i=>i[0]===range.key);
+    if(range.count===0)continue;
+    if(!item || range.count!==2 || ![range.from,range.to].every(Number.isFinite) || Math.min(range.from,range.to)<item[2] || Math.max(range.from,range.to)>item[3]) {
+      _modStatus('선택한 슬라이더의 시작과 끝을 지정하세요.');return false;
+    }
+    tracks.push({...range,base:getParamValue(range.key),step:item[4]});
+  }
+  if(!tracks.length)return false;
+  if(!Number.isFinite(_recordPeriod)||_recordPeriod<0.2||_recordPeriod>60||!Number.isInteger(_recordRepeats)||_recordRepeats<1||_recordRepeats>100) {
+    _modStatus('왕복 시간 0.2~60초, 반복 1~100회로 입력하세요.');return false;
+  }
+  _modulation.fgAuto=_fgAuto;if(tracks.some(t=>t.key.startsWith('_fg')))_fgAuto=false;
+  _opticalLayoutLock={text:currentText(),lines:world.lines,spacing:PARAMS.letterSpacing,lineHeight:Math.max(40,PARAMS.lineHeight),positions:world.bodies.map(b=>({ch:b.ch,x:b.anchorX,y:b.anchorY,column:b.layoutColumn??0,line:b.layoutLine??0}))};
+  Object.assign(_modulation,{running:true,tracks,period:_recordPeriod,repeats:_recordRepeats,elapsed:0,last:null,lastUI:-Infinity,lastStructural:-Infinity,complete:false});
+  if(_recording&&!_recording.stopping)_recording.linked=true;
+  _transportPlaying=true;_previewPaused=false;_modStatus('');_recordButtons(!!_recording);return true;
+}
+function _advanceModulation(now) {
+  const m=_modulation;if(!m.running)return;
+  const dt=m.last===null?0:Math.max(0,(now-m.last)/1000);m.last=now;
+  if(_previewPaused||_centerDrag||draggedNode)return;
+  m.elapsed=Math.min(m.period*m.repeats,m.elapsed+dt);
+  const done=m.elapsed+1e-9>=m.period*m.repeats;
+  if(done)m.elapsed=m.period*m.repeats;
+  let rebuild=false;
+  for(const track of m.tracks) {
+    const structural=STRUCTURAL_KEYS.has(track.key), quantized=structural||track.key==='flow';
+    if(quantized&&!done&&now-m.lastStructural<100)continue;
+    const raw=done?track.from:_modulationValue(m.elapsed/m.period,track.from,track.to);
+    const value=quantized?Math.round(raw/track.step)*track.step:raw;
+    if(Math.abs(getParamValue(track.key)-value)>0.0001) {
+      setParamValue(track.key,value,{modulated:true,silent:true});
+      rebuild ||= structural;
+      if(track.key==='flow'&&world)_syncDripsToWorld(world);
+    }
+  }
+  if(rebuild)resetWorld();
+  if(now-m.lastStructural>=100)m.lastStructural=now;
+  if(now-m.lastUI>=100){m.lastUI=now;sliderUpdaters.forEach(u=>u());_renderRangePositions();}
+  m.complete=done;
+}
+function _finishPlayback() {
+  if(!_modulation.complete)return;
+  _previewPaused=true;_transportPlaying=false;
+  if(_recording?.linked)_stopRecording(false); else _stopModulation();
+  _recordButtons(!!_recording);
+}
+function _togglePlayback() {
+  if(_transportPlaying) {_previewPaused=!_previewPaused;_recordButtons(!!_recording);return;}
+  if([..._recordRanges.values()].some(r=>r.count>0)) {if(!_startModulation())return;}
+  else {_transportPlaying=true;_previewPaused=false;}
+  _recordButtons(!!_recording);
+}
+function _stopTransport() {
+  _previewPaused=true;_transportPlaying=false;
+  if(_recording)_stopRecording(false);else _stopModulation();
+  _recordButtons(!!_recording);
+}
+function _renderRangePositions() {
+  const dialog=document.getElementById('recordDialog');if(!dialog)return;
+  for(const range of _recordRanges.values()) {
+    const row=dialog.querySelector('[data-record-key="'+range.key+'"]');if(!row)continue;
+    const item=PANEL_GROUPS.flatMap(g=>g.items).find(i=>i[0]===range.key),pct=v=>Math.max(0,Math.min(100,100*(v-item[2])/(item[3]-item[2])));
+    const fill=row.querySelector('.rangeFill');fill.hidden=range.count!==2;fill.style.left=Math.min(pct(range.from),pct(range.to))+'%';fill.style.width=Math.abs(pct(range.from)-pct(range.to))+'%';
+    ['from','to'].forEach((side,i)=>{
+      const handle=row.querySelector('[data-side="'+side+'"]');handle.hidden=range.count<i+1;handle.style.left=pct(range[side])+'%';handle.style.background=_bondInvColor();
+      handle.setAttribute('aria-valuenow',String(range[side]??item[2]));
+      row.querySelector('[data-value="'+side+'"]').textContent=range.count>=i+1?Number(range[side].toFixed(2)):'—';
+    });
+  }
+}
+function _renderRecordTracks() {
+  const dialog=document.getElementById('recordDialog');if(!dialog)return;
+  const list=dialog.querySelector('#recordTracks');list.replaceChildren();
+  for(const range of _recordRanges.values()) {
+    const item=PANEL_GROUPS.flatMap(g=>g.items).find(i=>i[0]===range.key);if(!item)continue;
+    const row=document.createElement('div');row.className='recordRangeRow';row.dataset.recordKey=range.key;
+    row.innerHTML='<div class="rangeCaption"><span></span><span><button class="rangeValue" data-value="from" type="button">—</button> → <button class="rangeValue" data-value="to" type="button">—</button></span></div><div class="recordBar"><i class="rangeFill" hidden></i><span class="rangeHandle" data-side="from" role="slider" tabindex="0" hidden></span><span class="rangeHandle" data-side="to" role="slider" tabindex="0" hidden></span></div>';
+    const group=PANEL_GROUPS.find(g=>g.items.some(i=>i[0]===range.key));
+    row.querySelector('.rangeCaption>span').textContent=group.title+' · '+item[1];
+    const bar=row.querySelector('.recordBar');let drag=null;
+    const quantize=v=>Math.max(item[2],Math.min(item[3],Math.round(v/item[4])*item[4]));
+    const at=e=>{const rect=bar.getBoundingClientRect();return quantize(item[2]+(e.clientX-rect.left)/rect.width*(item[3]-item[2]));};
+    const finish=(e,cancel)=>{if(!drag||drag.id!==e.pointerId)return;if(cancel)Object.assign(range,drag.before);drag=null;try{bar.releasePointerCapture(e.pointerId);}catch(_){} _renderRangePositions();};
+    bar.addEventListener('pointerdown',e=>{
+      if(e.button!==0)return;e.preventDefault();_stopModulation();
+      const h=e.target.closest('.rangeHandle');
+      if(h){drag={id:e.pointerId,side:h.dataset.side,before:{...range}};h.focus();bar.setPointerCapture(e.pointerId);}
+      else {if(range.count!==1){range.from=at(e);range.to=null;range.count=1;}else {range.to=at(e);range.count=2;}}
+      _renderRangePositions();
+    });
+    bar.addEventListener('pointermove',e=>{if(!drag||e.pointerId!==drag.id)return;range[drag.side]=at(e);_renderRangePositions();});
+    bar.addEventListener('pointerup',e=>finish(e,false));bar.addEventListener('pointercancel',e=>finish(e,true));bar.addEventListener('lostpointercapture',e=>finish(e,true));
+    row.querySelectorAll('.rangeHandle').forEach(h=>{
+      h.setAttribute('aria-label',item[1]+' '+(h.dataset.side==='from'?'시작':'끝'));h.setAttribute('aria-valuemin',item[2]);h.setAttribute('aria-valuemax',item[3]);
+      h.addEventListener('keydown',e=>{if(!['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home','End'].includes(e.key))return;e.preventDefault();e.stopPropagation();_stopModulation();const side=h.dataset.side;range[side]=e.key==='Home'?item[2]:e.key==='End'?item[3]:quantize(range[side]+(['ArrowRight','ArrowUp'].includes(e.key)?1:-1)*item[4]*(e.shiftKey?10:1));_renderRangePositions();});
+    });
+    row.querySelectorAll('.rangeValue').forEach(el=>el.onclick=()=>showSliderValueInput(el,range[el.dataset.value]??getParamValue(range.key),item[4],v=>{_stopModulation();range[el.dataset.value]=quantize(v);const other=el.dataset.value==='from'?'to':'from';if(range[other]===null)range[other]=quantize(getParamValue(range.key));range.count=2;_renderRangePositions();}));
+    list.append(row);
+  }
+  dialog.querySelector('#modulationPanel').hidden=!_recordRanges.size;
+  dialog.querySelector('.recordControls').hidden=!_recordRanges.size;
+  _renderRangePositions();_drawEaseGraph();_recordButtons(!!_recording);
+  const rect=dialog.getBoundingClientRect();dialog.style.top=Math.max(8,Math.min(rect.top,innerHeight-rect.height-8))+'px';_recordPopupBase(dialog);
+}
+let _activePopup = null, _easePoints = MHCurve.defaults(), _easePast = [], _easeFuture = [];
+const _easeSnapshot=()=>MHCurve.copy(_easePoints);
+function _easeCommit(before){if(JSON.stringify(before)===JSON.stringify(_easePoints))return;_easePast.push(before);if(_easePast.length>100)_easePast.shift();_easeFuture=[];}
+function _easeUndo(redo=false){const from=redo?_easeFuture:_easePast,to=redo?_easePast:_easeFuture;if(!from.length)return;to.push(_easeSnapshot());_easePoints=from.pop();_drawEaseGraph();}
+for(const type of ['pointerdown','focusin'])document.addEventListener(type,e=>{
+  if(e.target.closest?.('.sliderValuePrompt'))return;
+  _activePopup=e.target.closest?.('.mhDialog,.editor .stage,.editor .sidebar,#panel')||null;
+},true);
+function _drawEaseGraph() {
+  if(!_recordMode)return;const graph=document.getElementById('easeGraph');if(!graph)return;
+  const x=t=>16+232*t,y=t=>56-48*t,signature=JSON.stringify(_easePoints);
+  graph.querySelector('.easeGeometry').style.setProperty('--ease-accent',_bondInvColor());
+  if(graph._signature!==signature){
+    graph._signature=signature;
+    const focus=document.activeElement?.closest?.('#easeGraph [data-curve-key]')?.dataset.curveKey;
+    let path=`M${x(_easePoints[0].x)} ${y(_easePoints[0].y)}`,arms='',handles='',points='';
+    const diamond=(a,i,side)=>{const px=x(a.x),py=y(a.y),anchor=side==='point';return `<polygon class="${anchor?'easePoint':'easeHandle'}" data-curve-key="${i}-${side}" data-point="${i}" data-side="${side}" points="${px},${py-5} ${px+5},${py} ${px},${py+5} ${px-5},${py}" tabindex="0" role="button" aria-label="${i+1}번 ${anchor?'곡선 점':side==='in'?'들어오는 핸들':'나가는 핸들'}"/>`;};
+    _easePoints.forEach((p,i)=>{
+      if(i){const prev=_easePoints[i-1];path+=` C${x(prev.out.x)} ${y(prev.out.y)} ${x(p.in.x)} ${y(p.in.y)} ${x(p.x)} ${y(p.y)}`;}
+      for(const side of ['in','out'])if(p[side]){const h=p[side];arms+=`M${x(p.x)} ${y(p.y)} L${x(h.x)} ${y(h.y)} `;if(Math.hypot(x(h.x)-x(p.x),y(h.y)-y(p.y))>3)handles+=diamond(h,i,side);}
+      points+=diamond(p,i,'point');
+    });
+    graph.querySelector('.easeGeometry').innerHTML=`<path class="easeArms" d="${arms}"/><path class="easeCurve" d="${path}"/>${handles}${points}`;
+    if(focus)graph.querySelector(`[data-curve-key="${focus}"]`)?.focus({preventScroll:true});
+  }
+  const phase=_modulation.running?1-Math.abs(2*((_modulation.elapsed/_modulation.period)%1)-1):0;
+  const head=graph.querySelector('.easePlayhead');head.setAttribute('cx',x(phase));head.setAttribute('cy',y(_bezierEase(phase)));
+}
+function _wireEaseGraph(graph){
+  let drag=null;
+  const at=e=>{const p=new DOMPoint(e.clientX,e.clientY).matrixTransform(graph.getScreenCTM().inverse());return{x:(p.x-16)/232,y:(56-p.y)/48};};
+  const finish=(e,cancel)=>{if(!drag||e.pointerId!==drag.id)return;const old=drag;drag=null;if(cancel)_easePoints=old.before;else _easeCommit(old.before);try{graph.releasePointerCapture(e.pointerId);}catch(_){} _drawEaseGraph();};
+  graph._cancelCurveDrag=()=>{if(!drag)return false;finish({pointerId:drag.id},true);return true;};
+  graph.addEventListener('pointerdown',e=>{
+    if(e.button!==0)return;e.preventDefault();const p=at(e),h=e.target.closest('[data-curve-key]');
+    if(h){h.focus();drag={id:e.pointerId,index:Number(h.dataset.point),side:h.dataset.side,pull:e.shiftKey&&h.dataset.side==='point',before:_easeSnapshot()};graph.setPointerCapture(e.pointerId);}
+    else if(p.x>0&&p.x<1&&p.y>=0&&p.y<=1){const before=_easeSnapshot();const close=Math.abs(_bezierEase(p.x)-p.y)*48<=5;_easePoints=MHCurve.insert(_easePoints,p.x,close?undefined:p.y);_easeCommit(before);_drawEaseGraph();const i=_easePoints.findIndex(a=>Math.abs(a.x-p.x)<.001);graph.querySelector(`[data-curve-key="${i}-point"]`)?.focus();}
+  });
+  graph.addEventListener('pointermove',e=>{
+    if(!drag||e.pointerId!==drag.id)return;const p=at(e),a=drag.before[drag.index];
+    if(drag.pull)_easePoints=MHCurve.pull(drag.before,drag.index,p.x-a.x,p.y-a.y);
+    else if(drag.side==='point')_easePoints=MHCurve.movePoint(drag.before,drag.index,p.x,p.y);
+    else {const collapse=Math.hypot((p.x-a.x)*232,(p.y-a.y)*48)<4;_easePoints=MHCurve.moveHandle(drag.before,drag.index,drag.side,collapse?a.x:p.x,collapse?a.y:p.y);}
+    _drawEaseGraph();
+  });
+  graph.addEventListener('pointerup',e=>finish(e,false));graph.addEventListener('pointercancel',e=>finish(e,true));graph.addEventListener('lostpointercapture',e=>finish(e,true));
+  graph.addEventListener('keydown',e=>{
+    const h=e.target.closest('[data-curve-key]');if(!h||e.isComposing||e.ctrlKey||e.metaKey||e.altKey)return;
+    if(!['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Delete','Backspace','Enter','Escape'].includes(e.key))return;
+    e.preventDefault();e.stopPropagation();const i=Number(h.dataset.point),side=h.dataset.side,before=_easeSnapshot(),a=_easePoints[i];
+    if(e.key==='Escape'&&drag){finish({pointerId:drag.id},true);return;}
+    if(e.key==='Delete'||e.key==='Backspace'){if(side==='point')_easePoints=MHCurve.remove(_easePoints,i);else _easePoints=MHCurve.moveHandle(_easePoints,i,side,a.x,a.y);}
+    else if(e.key==='Enter'&&side==='point'){const folded=['in','out'].some(s=>a[s]&&Math.hypot(a[s].x-a.x,a[s].y-a.y)<1e-6);_easePoints=folded?MHCurve.pull(_easePoints,i,.12,0):MHCurve.corner(_easePoints,i);}
+    else if(e.key.startsWith('Arrow')){const q=side==='point'?a:a[side],step=e.shiftKey?.1:.01,x=q.x+(e.key==='ArrowRight'?step:e.key==='ArrowLeft'?-step:0),y=q.y+(e.key==='ArrowUp'?step:e.key==='ArrowDown'?-step:0);_easePoints=side==='point'?MHCurve.movePoint(_easePoints,i,x,y):MHCurve.moveHandle(_easePoints,i,side,x,y);}
+    _easeCommit(before);_drawEaseGraph();
+  });
+}
+function _buildRecordingPopup() {
+  const box=document.createElement('div');box.id='recordDialog';box.className='mhDialog';box.setAttribute('role','dialog');box.setAttribute('aria-label','MOV');box.tabIndex=-1;
+  box.innerHTML='<div class="mhMeta"><span class="mhDialogTitle">MOV</span><span class="stageBtn dragHandle" title="드래그해서 위치 이동">▩</span><button class="stageBtn closeX" type="button" aria-label="MOV 창 닫기">✕</button></div>'+
+    '<div class="mhActions recordTransport"><button class="pillBtn" id="recordStart" title="투명 MOV · 최대 30초·64MiB·1920px">녹화</button><button class="pillBtn" id="modToggle" type="button">재생</button><button class="pillBtn" id="recordStop" type="button">정지</button></div><div id="modStatus" class="mhMsg" role="status"></div><div id="recordStatus" class="mhMsg" role="status"></div>'+
+    '<div class="recordContent recordSelectors" aria-label="변조 항목"></div><div class="recordContent recordControls" hidden><div id="recordTracks"></div><div id="modulationPanel" hidden><div class="recordTiming"><label>왕복 시간 <input id="modPeriod" class="mhAdminInput" type="number" min="0.2" max="60" step="0.1"> 초</label><label>반복 <input id="modRepeats" class="mhAdminInput" type="number" min="1" max="100" step="1"> 회</label></div>'+
+    '<svg id="easeGraph" viewBox="0 0 264 68" aria-label="시간과 진행률 곡선"><path d="M16 8 V56 H248" class="easeAxes"/><text x="16" y="7">진행률</text><text x="228" y="68">시간</text><g class="easeGeometry"></g><circle class="easePlayhead" r="2" fill="currentColor"/></svg><div class="mhActions"><button id="easeReset" class="pillBtn" type="button">곡선 초기화</button></div></div></div>';
+  const selectors=box.querySelector('.recordSelectors');
+  for(const group of PANEL_GROUPS.filter(g=>!g.hidden)){
+    const label=document.createElement('label'),check=document.createElement('input');check.type='checkbox';check.dataset.recordGroup=group.id;check.checked=group.items.some(i=>_recordRanges.has(i[0]));
+    label.append(check,document.createTextNode(group.title));selectors.append(label);
+    check.onchange=()=>{_stopModulation();for(const [key] of group.items){if(check.checked&&!_recordRanges.has(key))_recordRanges.set(key,{key,from:null,to:null,count:0});if(!check.checked)_recordRanges.delete(key);}_renderRecordTracks();};
+  }
+  box.append(_buildGuideList([['재생·일시정지','Space'],['범위 지정','시작·끝 클릭 / 마름모 끌기'],['곡선 점 추가','그래프 클릭'],['점·핸들 이동','끌기 / 방향키'],['핸들 꺼내기','Shift + 점 끌기'],['곡선·직선 전환','점 선택 후 Enter'],['점 삭제','점 선택 후 Delete'],['실행취소·다시실행','Ctrl Z / Ctrl Shift Z'],['저장','녹화 후 정지'],['취소·닫기','Esc']]));
+  document.body.append(box);box.style.width=Math.max(280,_panelInputWidthPx())+'px';_placeSettingsDialog(box,{anchor:document.getElementById('recordModeBtn')});_makeDialogDraggable(box);
+  box.querySelector('.closeX').onclick=()=>_setRecordMode(false);box.querySelector('#recordStart').onclick=_startRecording;box.querySelector('#recordStop').onclick=_stopTransport;box.querySelector('#modToggle').onclick=_togglePlayback;
+  box.querySelector('#modPeriod').value=_recordPeriod;box.querySelector('#modRepeats').value=_recordRepeats;
+  for(const id of ['modPeriod','modRepeats'])box.querySelector('#'+id).onchange=()=>{_stopModulation();if(id==='modPeriod')_recordPeriod=Number(box.querySelector('#'+id).value);else _recordRepeats=Number(box.querySelector('#'+id).value);};
+  box.querySelector('#easeReset').onclick=()=>{const before=_easeSnapshot();_easePoints=MHCurve.defaults();_easeCommit(before);_drawEaseGraph();};
+  _wireEaseGraph(box.querySelector('#easeGraph'));_renderRecordTracks();box.focus();_activePopup=box;
+}
+document.addEventListener('keydown',e=>{
+  if(!_recordMode||_activePopup?.id!=='recordDialog'||e.defaultPrevented)return;
+  if(e.isComposing||e.keyCode===229){e.stopImmediatePropagation();return;}
+  const target=e.target,editing=target.isContentEditable||target.closest?.('input,textarea,select');
+  if(editing){
+    if((e.ctrlKey||e.metaKey)&&e.code==='KeyZ')e.stopImmediatePropagation();
+    if(e.key==='Escape'&&!target.closest?.('.sliderValuePrompt')){e.preventDefault();e.stopImmediatePropagation();_setRecordMode(false);}
+    return;
+  }
+  if((e.ctrlKey||e.metaKey)&&!e.altKey&&e.code==='KeyZ'){e.preventDefault();e.stopImmediatePropagation();if(!e.repeat&&!document.getElementById('easeGraph')?._cancelCurveDrag())_easeUndo(e.shiftKey);return;}
+  if(e.ctrlKey||e.metaKey||e.altKey||e.repeat)return;
+  if(e.code==='Space'||e.key===' '){e.preventDefault();e.stopImmediatePropagation();_togglePlayback();}
+  else if(e.key==='Escape'){e.preventDefault();e.stopImmediatePropagation();_setRecordMode(false);}
+},true);
+
 function buildPanel() {
   const body = document.getElementById('panel-body');
   body.innerHTML = '';
@@ -6898,6 +7504,7 @@ function buildPanel() {
     _groupRandomizers[group.id] = makeGroupRandomizer(group);
   });
 
+
   // 액션 버튼 (SVG / PNG / SAVE / LOAD)  — 의견·커피는 좌하단 HUD로 이동
   const btnRow = document.createElement('div');
   btnRow.className = 'btnRow';
@@ -6911,19 +7518,24 @@ function buildPanel() {
   pngBtn.textContent = 'PNG';
   pngBtn.addEventListener('click', () => savePNG());
   btnRow.appendChild(pngBtn);
+  const recordBtn = document.createElement('button'); recordBtn.className = 'pillBtn'; recordBtn.textContent = '녹화';
+  recordBtn.id = 'recordModeBtn'; recordBtn.setAttribute('aria-pressed',String(_recordMode));
+  recordBtn.onclick = () => _setRecordMode(!_recordMode);
+  btnRow.appendChild(recordBtn);
+  const fileRow = document.createElement('div'); fileRow.className = 'btnRow';
   const saveBtn = document.createElement('button');
   saveBtn.className = 'pillBtn';
   saveBtn.textContent = 'SAVE';
   saveBtn.title = '현재 설정값(슬라이더·색·문구)을 JSON 파일로 저장';
   saveBtn.addEventListener('click', () => saveSettings());
-  btnRow.appendChild(saveBtn);
+  fileRow.appendChild(saveBtn);
   const loadBtn = document.createElement('button');
   loadBtn.className = 'pillBtn';
   loadBtn.textContent = 'LOAD';
   loadBtn.title = '저장된 설정값 JSON을 불러오기';
   loadBtn.addEventListener('click', () => triggerSettingsLoad());
-  btnRow.appendChild(loadBtn);
-  body.appendChild(btnRow);
+  fileRow.appendChild(loadBtn);
+  body.append(btnRow,fileRow);
 
   // [G1] 의견 보내기 / 커피 사주기 = 속성 패널에서 제거 → 크레딧 바로 위 우하단 고정
   //   클러스터(#mhBottomBtns)로 이동. btnRow2 가 빠진 만큼 아래 가이드가 자연히 위로 올라감.
@@ -6992,7 +7604,10 @@ function makeGroupRandomizer(group) {
       setParamValue('cornerR', (Math.random() < 0.2) ? randInt(0, 20) : 0, { silent: true });
     } else {
       group.items.forEach(([key, _label, mn, mx, _step]) => {
-        setParamValue(key, randInt(mn, mx), { silent: true });
+        const lower = key === 'letterSpacing' ? 0 : mn; // Auto spacing keeps its original recommendation range.
+        const step = _step || 1;
+        const value = lower + Math.floor(Math.random() * (Math.floor((mx - lower) / step) + 1)) * step;
+        setParamValue(key, Math.min(mx, value), { silent: true });
       });
     }
     // 글자색 그룹: 자동 매칭 해제 (사용자가 RGB 의도)
@@ -7191,7 +7806,7 @@ function makeBarRow(label, mn, mx, step, getter, setter, opts) {
   const render = () => {
     const v = getter();
     // step 이 분수면 소수점 표시 (label + ' ' + v 그대로 — JS toFixed는 step 추정으로)
-    const _vd = (step && step < 1) ? Number(v).toFixed(2) : v;
+    const _vd = (step && step < 1) ? Number(v).toFixed(2) : (Number.isFinite(v) ? Number(v.toFixed(2)) : v);
     lbvLabel.textContent = label;
     lbvVal.textContent = _vd;
     const p = (mx === mn) ? 0 : Math.max(0, Math.min(1, (v - mn) / (mx - mn)));
@@ -7205,7 +7820,8 @@ function makeBarRow(label, mn, mx, step, getter, setter, opts) {
     showSliderValueInput(lbvVal, getter(), step, (v) => {
       if (step) v = Math.round(v / step) * step;
       // 음수만 차단 — 슬라이더 min보다 작은 양수(0 포함)도 사용자가 직접 입력하면 그 값을 사용
-      if (v < 0) v = 0;
+      if (!Number.isFinite(v)) return;
+      v = Math.max(opts?.dataKey === 'letterSpacing' ? -150 : 0, v);
       setter(v);
       render();
     });
@@ -7228,6 +7844,7 @@ function makeBarRow(label, mn, mx, step, getter, setter, opts) {
   };
   bar.addEventListener('pointerdown', e => {
     e.preventDefault();
+
     dragging = true;
     try { bar.setPointerCapture(e.pointerId); } catch(_){}
     onMove(e);
@@ -7584,9 +8201,11 @@ const DERIVED_KEYS = new Set([
 //   4) K_ROT·K_SPRING 가까이, K_ANGLE은 자유로 다채로움 유지
 //   5) 색상: 70% 풍부한 색, 30% 차분한 톤 (안전 대비)
 function randomizeAll() {
+  if (_layoutState.mode==='optical-v2') {_layoutState.seed=(_layoutState.seed+1)>>>0;_persistLayoutState();}
+  _stopModulation();
   // 0) 자유 슬라이더 (gravity 등): 그대로 풀 범위 — DERIVED_KEYS는 아래에서 별도 처리
   PANEL_GROUPS.forEach(group => group.items.forEach(([key, label, mn, mx, step]) => {
-    if (DERIVED_KEYS.has(key)) return;
+    if (DERIVED_KEYS.has(key) || ['jitter','jitterSpeed'].includes(key)) return;
     setParamValue(key, randInt(mn, mx), { silent: true });
   }));
   // 흘리기 — 랜덤 트리거 시 노드+길이 재추첨 (슬라이더 개수는 유지). 잔상도 비움.
@@ -7751,6 +8370,16 @@ function randomizeAll() {
 //   2단계: 행간(lh)을 40까지 점진적 축소
 //   3단계: 점 간격(pd)을 4까지 축소 — 마지막 수단(글자 자체가 작아짐)
 function ensureFits() {
+  if (_layoutState.mode==='optical-v2') {
+    const limit=Math.max(200,cssH-_footerOffset())*(PARAMS.fitsThreshold||.75);
+    for(let i=0;i<12;i++) {
+      const metrics=buildWorld(currentText(),{measureOnly:true});if(metrics.height<=limit)break;
+      if(PARAMS.letterSpacing>0)PARAMS.letterSpacing=Math.max(0,Math.round(PARAMS.letterSpacing*.8)-1);
+      else if(PARAMS.lineHeight>40)PARAMS.lineHeight=Math.max(40,Math.round(PARAMS.lineHeight*.8));
+      else break;
+    }
+    return;
+  }
   let pd = PARAMS.pointDist;
   let ls = PARAMS.letterSpacing;
   let lh = PARAMS.lineHeight;
@@ -9015,23 +9644,88 @@ function saveSVG() {
 
 // PNG 저장 — 배경 투명. 캔버스 크기 = 글자+흘리기 경계상자 + 사방 50px (화면 크기 무시).
 //   파이프라인: 흘리기 → 테두리 → 부드럽게 (drawBorders/drawSmoothedBodies 내부에 흘리기 포함됨).
-function savePNG() {
-  if (!world) return;
-  _track('PNG 다운로드');
-  // 에디터·자모 선택창이 열려있으면 닫기
-  const _ed = document.getElementById('editor');
-  if (_ed && _ed.classList.contains('open')) closeEditor();
-  const dpr = (window.devicePixelRatio || 1) * 2;  // 해상도 2배
-  const bbox = _computeExportBBox() || { x: 0, y: 0, w: cssW, h: cssH };
-  const X = bbox.x, Y = bbox.y, W = bbox.w, H = bbox.h;
-  const off = document.createElement('canvas');
-  off.width = W * dpr;
-  off.height = H * dpr;
-  const octx = off.getContext('2d');
-  octx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  // bbox 시작점만큼 시프트 — world 좌표를 그대로 그리면 (X,Y)→(0,0) 정렬됨.
-  octx.translate(-X, -Y);
-  // 배경 채우지 않음 → 투명
+let _recording = null;
+function _recordStatus(text) { const el = document.getElementById('recordStatus'); if (el) el.textContent = text; }
+function _recordButtons(active) {
+  const box=document.getElementById('recordDialog');if(!box)return;
+  box.querySelector('#recordStart').disabled=active;
+  box.querySelector('#recordStop').disabled=!active&&!_transportPlaying&&!_modulation.running;
+  box.querySelector('#modToggle').textContent=_transportPlaying&&!_previewPaused?'일시정지':'재생';
+  for(const id of ['modPeriod','modRepeats'])box.querySelector('#'+id).disabled=active;
+}
+
+function _downloadRecording(blob, ext) {
+  const url = URL.createObjectURL(blob), a = document.createElement('a');
+  a.href = url; a.download = '뭉친한글_' + _tsName() + '.' + ext;
+  document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 30000);
+}
+function _startRecording() {
+  if (_recording || !world || !_recordMode) return;
+  const duration = 30; // Safety ceiling for manual recording; no persistent length input.
+  const linked = [..._recordRanges.values()].some(r=>r.count>0);
+  if (linked && _recordPeriod*_recordRepeats>30) {_recordStatus('녹화할 왕복 시간 × 반복은 30초 이내로 설정하세요.');return;}
+  if (linked && !_startModulation()) { _recordStatus('왕복 변조 구간을 확인하세요.'); return; }
+  _previewPaused=false;_transportPlaying=true;
+  const off = document.createElement('canvas'), scale = Math.min(1, 1920 / Math.max(cssW, cssH));
+  off.width = Math.max(2, Math.floor(cssW * scale / 2) * 2); off.height = Math.max(2, Math.floor(cssH * scale / 2) * 2);
+  const rec = { canvas: off, ctx: off.getContext('2d'), viewport: { x: 0, y: 0, w: cssW, h: cssH }, started: performance.now(), duration: duration * 1000, frames: [], times: [], bytes: 0, last: -Infinity, busy: null, linked, stopping: false, cancelled: false, format: 'mov' };
+  _recording = rec; _recordButtons(true);
+  try {
+    if (linked) _advanceModulation(rec.started);
+    _captureRecordingFrame(rec.started);
+    if (rec.stopping || _recording !== rec) return;
+
+    rec.timer = setTimeout(() => _stopRecording(false, '30초 한도에 도달해 저장했습니다.'), rec.duration);
+    _recordStatus('녹화 중 · MOV');
+    _captureRecordingFrame(rec.started);
+  } catch (error) { _stopRecording(true, error.message); }
+}
+function _captureRecordingFrame(now) {
+  const rec = _recording;
+  if (!rec || rec.stopping || rec.busy || now - rec.last < 1000 / 15) return;
+  rec.last = now;
+  try {
+    const c = rec.ctx, off = rec.canvas, v = rec.viewport;
+    c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, off.width, off.height);
+    c.setTransform(off.width / v.w, 0, 0, off.height / v.h, 0, 0);
+    _renderArtwork(c, v);
+    rec.busy = new Promise(resolve => { off.toBlob(resolve, 'image/png'); });
+    rec.busy.then(blob => {
+      if (rec.cancelled || _recording !== rec) return;
+      if (!blob || blob.type !== 'image/png') { _stopRecording(true, 'PNG 프레임 생성에 실패했습니다.'); return; }
+      if (rec.bytes + blob.size > 64 * 1024 * 1024) { _stopRecording(false, '64MiB 한도에 도달해 저장했습니다.'); return; }
+      rec.frames.push(blob); rec.times.push(Math.max(0, Math.round(now - rec.started))); rec.bytes += blob.size;
+    }).finally(() => { rec.busy = null; });
+  } catch (error) { _stopRecording(true, error.message); }
+}
+async function _stopRecording(cancel = false, message = '') {
+  const rec = _recording;
+  if (!rec) return;
+  if (cancel) rec.cancelled = true;
+  if (rec.stopping) return;
+  rec.stopping = true; clearTimeout(rec.timer);
+  const end = Math.min(rec.duration, Math.max(1, Math.round(performance.now() - rec.started)));
+  try {
+    if (rec.busy) await rec.busy;
+    if (!rec.cancelled && rec.frames.length) {
+        const durations = rec.times.map((t, i) => Math.max(1, (rec.times[i + 1] ?? end) - t));
+        const blob = MHMedia.makePngMov(rec.frames, rec.canvas.width, rec.canvas.height, durations);
+        _downloadRecording(blob, 'mov');
+      _recordStatus(message || ('영상을 저장했습니다.' + (rec.format === 'mov' ? ' ' + rec.frames.length + '프레임 · 평균 ' + (rec.frames.length / (end / 1000)).toFixed(1) + 'fps' : '')));
+    } else _recordStatus(message || (rec.cancelled ? '녹화를 취소했습니다.' : '저장할 프레임이 없습니다.'));
+  } catch (error) { _recordStatus('녹화 실패: ' + error.message); }
+  finally {
+    rec.frames.length = 0;
+    if (rec.linked) _stopModulation();
+    _transportPlaying=false;_previewPaused=_recordMode;
+    if (_recording === rec) _recording = null;
+    _recordButtons(false);
+  }
+}
+document.addEventListener('visibilitychange', () => { if (document.hidden) _stopRecording(false, '탭이 숨겨져 녹화를 종료했습니다.'); });
+window.addEventListener('pagehide', () => _stopRecording(true));
+
+function _renderArtwork(octx, bbox) {
   const fg = currentFgColor();
   drawBorders(octx, world.bodies, fg, bbox);
   if (_bordersOn()) {
@@ -9088,6 +9782,25 @@ function savePNG() {
   // 일반 모드: 흘리기 라인을 글자 위에 추가로 솔리드 렌더 (_flowStyle() 사용).
   _drawFlowItemsCanvas(octx, _collectFlowPrimitives(), _flowStyle());
   }
+}
+function savePNG() {
+  if (!world) return;
+  _track('PNG 다운로드');
+  // 에디터·자모 선택창이 열려있으면 닫기
+  const _ed = document.getElementById('editor');
+  if (_ed && _ed.classList.contains('open')) closeEditor();
+  const dpr = (window.devicePixelRatio || 1) * 2;  // 해상도 2배
+  const bbox = _computeExportBBox() || { x: 0, y: 0, w: cssW, h: cssH };
+  const X = bbox.x, Y = bbox.y, W = bbox.w, H = bbox.h;
+  const off = document.createElement('canvas');
+  off.width = W * dpr;
+  off.height = H * dpr;
+  const octx = off.getContext('2d');
+  octx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  // bbox 시작점만큼 시프트 — world 좌표를 그대로 그리면 (X,Y)→(0,0) 정렬됨.
+  octx.translate(-X, -Y);
+  // 배경 채우지 않음 → 투명
+  _renderArtwork(octx, bbox);
   off.toBlob(blob => {
     if (!blob) return;
     const url = URL.createObjectURL(blob);
@@ -10937,7 +11650,9 @@ function triggerJamoLoad() {
 function saveSettings() {
   _track('설정 저장');
   const settings = {
-    schema: 'mungchin-hangul-settings-v1',
+    schema: 'mungchin-hangul-settings-v2',
+    layout: {..._layoutState},
+    centers: deepClone(_centerLayout),
     params: Object.assign({}, PARAMS),
     elasticity: { K_ANGLE: K_ANGLE, K_ROT: K_ROT, K_SPRING: K_SPRING, FLEX_MAX: FLEX_MAX },
     color: { bgR: bgR, bgG: bgG, bgB: bgB, fgR: fgR, fgG: fgG, fgB: fgB, fgAuto: _fgAuto },
@@ -10963,6 +11678,8 @@ function triggerSettingsLoad() {
       try {
         const data = JSON.parse(reader.result);
         if (data && data.schema && data.schema.indexOf('mungchin-hangul-settings') === 0) {
+          const restoredLayout = _parseLayoutState(data.layout);
+          _stopModulation(); _layoutState = restoredLayout; _persistLayoutState();
           // [v1.10b] text 도 복원 (사용자 요청). 입력바 UI 도 함께 동기화.
           if (typeof data.text === 'string') {
             TEXT = data.text;
@@ -10974,8 +11691,13 @@ function triggerSettingsLoad() {
             if (_mta) _mta.value = _show;
           }
           if (data.params && typeof data.params === 'object') {
-            Object.keys(data.params).forEach(k => { if (k in PARAMS) PARAMS[k] = data.params[k]; });
+            Object.keys(data.params).forEach(k => {
+              const value = data.params[k];
+              if (Object.hasOwn(PARAMS, k) && typeof value === typeof PARAMS[k] && (typeof value !== 'number' || Number.isFinite(value))) PARAMS[k] = value;
+            });
           }
+          if (data.params && !Object.hasOwn(data.params,'jitter')) PARAMS.jitter=Number.isFinite(data.params.wind)?Math.max(0,Math.min(100,data.params.wind)):0;
+          if (!data.params || !Object.hasOwn(data.params,'jitterSpeed')) PARAMS.jitterSpeed=PARAMS.jitter>0?100:30;
           if (data.elasticity) {
             if (typeof data.elasticity.K_ANGLE  === 'number') K_ANGLE  = data.elasticity.K_ANGLE;
             if (typeof data.elasticity.K_ROT    === 'number') K_ROT    = data.elasticity.K_ROT;
@@ -11006,6 +11728,8 @@ function triggerSettingsLoad() {
             _moimkkolYShiftReplaceAll(data.moimkkolYShift);
             _moimkkolYShiftPersist();
           }
+          _finishCenterDrag(null, true); _clearCenterHistory();
+          _loadCenterLayout(data.centers); _persistCenters();
           // [항목3] tagLabelOffsets 복원 제거 — 앞/뒤붙임 라벨 표시 폐기
           if (world) world = buildWorld(currentText());
           sliderUpdaters.forEach(u => u());
