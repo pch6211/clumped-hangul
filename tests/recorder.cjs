@@ -9,6 +9,9 @@ const {chromium}=require('playwright');
     await page.goto(`http://127.0.0.1:${server.address().port}`);await page.waitForFunction(()=>typeof world!=='undefined'&&world);
     await page.evaluate(()=>{cancelAnimationFrame(rafId);window._dismissIntro?.();TEXT='한글 AB';Object.assign(PARAMS,{nodeR:15,lineW:10,flow:0,cornerR:0,borderWidth:0,jitter:0});world=buildWorld(TEXT);togglePanel();draw();});
     await page.locator('#recordModeBtn').click();
+    const initial=await page.locator('#recordDialog').boundingBox(),grab=await page.locator('#recordDialog .dragHandle').boundingBox();
+    await page.mouse.move(grab.x+grab.width/2,grab.y+grab.height/2);await page.mouse.down();await page.mouse.move(grab.x+grab.width/2+20,grab.y+grab.height/2-10);await page.mouse.up();
+    const shifted=await page.locator('#recordDialog').boundingBox();assert.ok(Math.abs(shifted.x-initial.x-20)<1);
     assert.equal(await page.locator('#recordDialog').isVisible(),true);assert.equal(await page.locator('#recordDuration').count(),0);assert.equal(await page.locator('#panel .sliderCurrent').count(),0);
     assert.equal(await page.locator('#modulationPanel').isVisible(),false);
     const smallHeight=await page.locator('#recordDialog').evaluate(el=>el.offsetHeight);
@@ -37,9 +40,14 @@ const {chromium}=require('playwright');
     const before=await page.evaluate(()=>_easeCurve.slice()),hb=await handle.boundingBox();await page.mouse.move(hb.x+hb.width/2,hb.y+hb.height/2);await page.mouse.down();await page.mouse.move(hb.x+30,hb.y-20);await page.evaluate(()=>document.getElementById('easeGraph').dispatchEvent(new PointerEvent('pointercancel',{pointerId:1})));await page.mouse.up();assert.deepEqual(await page.evaluate(()=>_easeCurve),before);
     await page.locator('#easeReset').click();
     const rangeHandle=page.locator('[data-record-key="nodeR"] [data-side="from"]');await rangeHandle.focus();await page.keyboard.press('ArrowLeft');assert.equal(await page.evaluate(()=>_recordRanges.get('nodeR').from),24);
+    const rh=await rangeHandle.boundingBox();await page.mouse.move(rh.x+rh.width/2,rh.y+rh.height/2);await page.mouse.down();await page.mouse.move(rh.x-20,rh.y+rh.height/2);
+    await page.evaluate(()=>document.querySelector('[data-record-key="nodeR"] .recordBar').dispatchEvent(new PointerEvent('pointercancel',{pointerId:1})));await page.mouse.up();assert.equal(await page.evaluate(()=>_recordRanges.get('nodeR').from),24);
     // A close cancels recording and returns focus; reopen retains selected tracks.
     let downloads=0;page.on('download',()=>downloads++);
+    await page.setViewportSize({width:640,height:480});await page.waitForFunction(()=>cssW===640&&cssH===480);
     await page.evaluate(()=>{_previewPaused=false;rafId=requestAnimationFrame(tick);});await page.locator('#recordStart').click();await page.waitForFunction(()=>_recording?.frames.length>=1);
+    await page.evaluate(()=>setParamValue('nodeR',17));assert.equal(await page.evaluate(()=>_modulation.running),false);assert.equal(await page.evaluate(()=>_recording.linked),false);
+    await page.locator('#modToggle').click();assert.equal(await page.evaluate(()=>_recording.linked&&_modulation.running),true);
     await page.locator('#recordDialog').focus();await page.keyboard.press('Escape');await page.waitForFunction(()=>!_recording);assert.equal(downloads,0);assert.equal(await page.locator('#recordDialog').count(),0);assert.equal(await page.locator('#recordModeBtn').evaluate(el=>document.activeElement===el),true);
     await page.locator('#recordModeBtn').click();assert.equal(await page.locator('.recordRangeRow').count(),2);
     // Record exact finite cycles; first frame must equal the artwork preview.
@@ -50,10 +58,12 @@ const {chromium}=require('playwright');
     assert.equal(alpha.diff,0);assert.ok(alpha.transparent>1000&&alpha.visible>100);
     const movie=await moviePromise;fs.mkdirSync('test-results',{recursive:true});await movie.saveAs('test-results/transparent.mov');await page.waitForFunction(()=>!_recording);assert.equal(await page.evaluate(()=>_modulation.running),false);
     // Deselect all: recorder transport only, manual stop/save and resize work.
+    await page.setViewportSize({width:1280,height:720});await page.waitForFunction(()=>cssW===1280&&cssH===720);
     await title('nodeR').click();await title('lineW').click();assert.equal(await page.locator('#modulationPanel').isVisible(),false);
+    await page.setViewportSize({width:640,height:480});await page.waitForFunction(()=>cssW===640&&cssH===480);
     const manual=page.waitForEvent('download');await page.locator('#recordStart').click();await page.waitForFunction(()=>_recording?.frames.length>=2);
     await page.evaluate(()=>{PARAMS.cornerR=5;PARAMS.borderWidth=2;PARAMS.jitter=70;for(let i=0;i<10;i++)resetWorld();});
-    await page.setViewportSize({width:1024,height:768});assert.deepEqual(await page.evaluate(()=>[_recording.canvas.width,_recording.canvas.height]),[1280,720]);await page.locator('#recordStop').click();await manual;await page.waitForFunction(()=>!_recording);
+    await page.setViewportSize({width:800,height:600});assert.deepEqual(await page.evaluate(()=>[_recording.canvas.width,_recording.canvas.height]),[640,480]);await page.locator('#recordStop').click();await manual;await page.waitForFunction(()=>!_recording);
     const count=downloads;await page.locator('#recordStart').click();await page.locator('.closeX[aria-label="녹화 창 닫기"]').click();await page.waitForFunction(()=>!_recording);assert.equal(downloads,count);
     await page.setViewportSize({width:1280,height:720});await page.locator('#recordModeBtn').click();await title('nodeR').click();await choose('nodeR',8,24);await page.locator('#recordDialog').screenshot({path:'test-results/recorder-popup.png'});
     await page.evaluate(()=>cancelAnimationFrame(rafId));assert.deepEqual(errors,[]);console.log('PASS: independent recorder popup, multiple tracks, 3 exact cycles, reverse values, unchanged main sliders, keyboard/IME/focus, curve cancel, MOV alpha snapshot, finite and manual recording, resize/reset/cancel',alpha);

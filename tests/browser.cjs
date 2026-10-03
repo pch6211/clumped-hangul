@@ -20,6 +20,8 @@ const { chromium } = require('playwright');
     await page.route('**/*', route => route.request().url().startsWith('http://127.0.0.1:') ? route.continue() : route.abort());
     await page.goto(`http://127.0.0.1:${server.address().port}`);
     await page.waitForFunction(() => typeof world !== 'undefined' && world?.bodies.length);
+    // Compare the blur benchmark on the same layout as the pre-feature baseline.
+    await page.evaluate(() => { if (typeof _layoutState !== 'undefined') _layoutState.mode = 'legacy-uniform'; });
     await page.evaluate(() => { cancelAnimationFrame(rafId); window._dismissIntro?.(); TEXT = '뭉친 한글'; Object.assign(PARAMS, { pointDist: 16, letterSpacing: 10, lineHeight: 60, choHoriz: 0, choVert: 0, jungHoriz: 0, jungVert: 0, jongHoriz: 0, jongVert: 0, randomExtra: 0, nodeR: 20, lineW: 12, flow: 0, cornerR: 5, borderWidth: 0, shape: 0, smoothScale: 2, blurFactor: 0.4, alphaThreshold: 128 }); world = buildWorld(TEXT); });
     const metrics = await page.evaluate(() => {
       const samples = [];

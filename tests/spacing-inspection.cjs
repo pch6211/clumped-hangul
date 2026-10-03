@@ -1,4 +1,4 @@
-// Investigation only: reports current layout; deliberately does not change it.
+// Reproduce the original uniform-layout measurements in SPACING-RESEARCH.md.
 const fs=require('node:fs');
 const http=require('node:http');
 const {chromium}=require('playwright');
@@ -16,6 +16,7 @@ const {chromium}=require('playwright');
     await page.waitForFunction(()=>typeof world!=='undefined'&&world);
     const report=await page.evaluate(()=>{
       cancelAnimationFrame(rafId);let seed=42;Math.random=()=>((seed=(1664525*seed+1013904223)>>>0)/4294967296);
+      _layoutState.mode='legacy-uniform';
       Object.assign(PARAMS,{pointDist:16,gravity:8,letterSpacing:10,lineHeight:100,choHoriz:0,choVert:0,jungHoriz:0,jungVert:0,jongHoriz:0,jongVert:0,randomExtra:0,nodeR:10,lineW:6,cornerR:0,borderWidth:0,flow:0,wind:0});
       const samples=[];
       for(const text of ['한글 ABC 한글','ABC한글','abc123., 한글','AV To OO','한글\nABC','한글  ABC','한글 ABC 한글','가','가','é','é','العربية','漢字','🙂']) {
