@@ -1522,6 +1522,9 @@ var _viewFocused = true;
 document.addEventListener('pointerdown', (e) => {
   _viewFocused = !!(e.target && e.target.id === 'universe');
 }, true);
+document.addEventListener('focusin', e => {
+  if (e.target !== canvas) _viewFocused = false;
+});
 let _moimkkolChar = null;         // 현재 시각화 중인 음절
 let _moimkkolBoxes = [];          // [{kind, x, y, w, h, jamo, design, selected}]
 let _moimkkolSelected = -1;       // 주(主) 선택 박스 인덱스 (리사이즈·커서 기준; 단일)
@@ -3568,13 +3571,13 @@ const ctx = canvas.getContext('2d');
 let world = null;
 // Per-document, per-occurrence anchors. Repeated letters have independent positions.
 let _centerLayout = { text: '', points: {} };
-let _showCenters = false, _centerDrag = null;
+let _centerDrag = null, _centerPointer = null;
 try { _loadCenterLayout(JSON.parse(localStorage.getItem('mh_centers') || 'null')); } catch (_) {}
 function _loadCenterLayout(value) {
   const points = {};
   if (value && typeof value.text === 'string' && value.points && typeof value.points === 'object') {
     Object.entries(value.points).slice(0, 10000).forEach(([key, p]) => {
-      if (p && Number.isFinite(p.x) && Number.isFinite(p.y) && Math.abs(p.x) <= 100000 && Math.abs(p.y) <= 100000) points[key] = { x: p.x, y: p.y };
+      if (/^\d+:/.test(key) && p && Number.isFinite(p.x) && Number.isFinite(p.y) && Math.abs(p.x) <= 100000 && Math.abs(p.y) <= 100000) points[key] = { x: p.x, y: p.y };
     });
     _centerLayout = { text: value.text, points };
   } else _centerLayout = { text: '', points };
@@ -3591,26 +3594,61 @@ function _finishCenterDrag(e, cancel = false) {
   const drag = _centerDrag;
   if (cancel) {
     _translateBody(drag.body, drag.startX - drag.body.anchorX, drag.startY - drag.body.anchorY);
-  } else {
-    _centerLayout.points[drag.body.centerKey] = { x: drag.body.anchorX, y: drag.body.anchorY };
+  } else if (Math.hypot(drag.body.anchorX-drag.startX, drag.body.anchorY-drag.startY) > 0.01) {
+    const pin = { x: drag.body.anchorX, y: drag.body.anchorY };
+    _centerLayout.points[drag.body.centerKey] = pin;
     _persistCenters();
+    _bondUndo.push({ kind:'center', text:_centerLayout.text, key:drag.body.centerKey,
+      before:{ pin:drag.beforePin, x:drag.startX, y:drag.startY },
+      after:{ pin:{...pin}, ...pin } });
+    if (_bondUndo.length > 50) _bondUndo.shift();
+    _bondRedo.length = 0;
   }
   _centerDrag = null;
   canvas.classList.remove('dragging');
   try { canvas.releasePointerCapture(drag.id); } catch (_) {}
 }
-function _drawCenterHandles() {
-  if (!_showCenters || !world) return;
-  ctx.save(); ctx.lineWidth = 2;
-  world.bodies.forEach(b => {
-    const x = b.anchorX, y = b.anchorY;
-    ctx.beginPath(); ctx.moveTo(x, y - 7); ctx.lineTo(x + 7, y);
-    ctx.lineTo(x, y + 7); ctx.lineTo(x - 7, y); ctx.closePath();
-    ctx.fillStyle = '#ff8a24'; ctx.strokeStyle = '#fff'; ctx.fill(); ctx.stroke();
-    ctx.fillStyle = '#222'; ctx.fillRect(x - 1, y - 1, 2, 2);
-  });
-  ctx.restore();
+function _clearCenterHistory() {
+  for (const stack of [_bondUndo, _bondRedo]) {
+    if (!stack) continue;
+    for (let i=stack.length-1;i>=0;i--) if (stack[i].kind==='center') stack.splice(i,1);
+  }
 }
+function _restoreCenterHistory(entry, side) {
+  if (entry.text !== _centerLayout.text) return;
+  const state=entry[side];
+  if (state.pin) _centerLayout.points[entry.key]={...state.pin};
+  else delete _centerLayout.points[entry.key];
+  const body=world?.bodies.find(b=>b.centerKey===entry.key);
+  if (body) _translateBody(body,state.x-body.anchorX,state.y-body.anchorY);
+  _persistCenters();
+}
+function _centerRadius() { return 1.5*Math.max((PARAMS.nodeR || 0)/2, 3); }
+function _hoverCenterBody(p = _centerPointer) {
+  if (!p || !world) return null;
+  let best = null, distance = Infinity;
+  const pad = Math.max(_centerRadius(), (PARAMS.lineW || 0) / 2);
+  for (const b of world.bodies) {
+    let minX = b.anchorX, maxX = minX, minY = b.anchorY, maxY = minY;
+    for (const n of b.nodes) if (!n.inv) {
+      minX = Math.min(minX,n.x); maxX = Math.max(maxX,n.x);
+      minY = Math.min(minY,n.y); maxY = Math.max(maxY,n.y);
+    }
+    if (p.x < minX-pad || p.x > maxX+pad || p.y < minY-pad || p.y > maxY+pad) continue;
+    const d = Math.hypot(p.x-b.anchorX,p.y-b.anchorY);
+    if (d < distance) { best = b; distance = d; }
+  }
+  return best;
+}
+function _drawCenterHandles() {
+  const b = _centerDrag?.body || (!draggedNode && _hoverCenterBody());
+  if (!b || !world.bodies.includes(b)) return;
+  const x = b.anchorX, y = b.anchorY, r = _centerRadius();
+  ctx.save(); ctx.fillStyle = _bondInvColor();
+  ctx.beginPath(); ctx.moveTo(x,y-r); ctx.lineTo(x+r,y);
+  ctx.lineTo(x,y+r); ctx.lineTo(x-r,y); ctx.closePath(); ctx.fill(); ctx.restore();
+}
+
 // 픽셀 거리 측정 도구 상태 — 배경(빈 영역) 좌클릭 드래그 시 활성. 수직/수평만 그려짐.
 //   { sx, sy, cx, cy, axis: 'h'|'v'|null }  좌표는 client(viewport) px.
 let _pxMeasure = null;
@@ -3777,182 +3815,7 @@ function _computeMagnetPairs(nodes, nodeJamos, ch) {
   return out;
 }
 
-function buildWorld(str) {
-  _finishCenterDrag(null, true);
-  if (_centerLayout.text !== str) { _centerLayout = { text: str, points: {} }; _persistCenters(); }
-  // A rebuild must not leave pointer handlers referencing detached nodes.
-  if (typeof draggedNode !== 'undefined') { draggedNode = null; _bond = null; _detach = null; }
-  canvas.classList.remove('dragging');
-  // 통일된 점 간격을 글자 렌더링 SCALE 기준으로 사용
-  const SCALE = Math.max(PARAMS.pointDist, 4);
-  // 자간 — 슬라이더 값 × 0.5 (v1.12b A/B 테스트 결과 — 사용자 결정).
-  //   자동 보정은 randomizeAll에서만 적용.
-  const letterSpacing = PARAMS.letterSpacing * 0.5;
-  const lineHeight = Math.max(40, PARAMS.lineHeight);
-  const spaceWidth = SCALE * 1; // 공백 — 글자폭의 절반 (이전 *2의 절반)
-  // 6개 자모별 길이 슬라이더는 buildToken 내부에서 PARAMS 직접 참조
-  const consSub = 0; // 호환용 — 더 이상 사용 안 함
-  const vowSub = 0;  // 호환용 — 더 이상 사용 안 함
-  const extra = PARAMS.randomExtra;
-  const drawW = cssW - panelOffsetX - editorRightOffset;
-  const usableW = Math.max(drawW * 0.80, 200);  // 자동 줄바꿈 기준 = 가용 영역 너비 80%
-
-  // 1) 텍스트 전체 자모/글자 인벤토리 — 한글, 영문, 특수문자 모두 추적
-  // 한글 음절은 cho/jung/jong 슬롯, 그 외는 body 단일 슬롯
-  const charSlots = [];
-  for (const ch of str) {
-    if (ch === ' ' || ch === '\n') continue;
-    const d = decomposeSyllable(ch);
-    if (d) {
-      const slots = { cho: 0, jung: 0 };
-      if (d.jong) slots.jong = 0;
-      charSlots.push({ ch, d, slots, kind: 'hangul' });
-    } else if (PRIMITIVES[ch] || PUNCT[ch]) {
-      charSlots.push({ ch, slots: { body: 0 }, kind: 'other' });
-    }
-  }
-  // 슬롯 평탄화 — 무작위 픽 대상
-  const flatSlots = [];
-  charSlots.forEach(item => {
-    if (item.kind === 'hangul') {
-      flatSlots.push({ item, key: 'cho' });
-      flatSlots.push({ item, key: 'jung' });
-      if ('jong' in item.slots) flatSlots.push({ item, key: 'jong' });
-    } else {
-      flatSlots.push({ item, key: 'body' });
-    }
-  });
-  // 분배 — 매 픽마다 랜덤 슬롯에 +1
-  const totalExtras = extra * flatSlots.length;
-  for (let i = 0; i < totalExtras; i++) {
-    if (flatSlots.length === 0) break;
-    const s = flatSlots[Math.floor(Math.random() * flatSlots.length)];
-    s.item.slots[s.key]++;
-  }
-  // 위치별 매핑 — 인덱스 카운터로 매 글자에 슬롯 짝짓기
-  let csIdx = 0;
-  const tokens = [];
-  for (let ch of str) {
-    let extrasForCh = null;
-    if (ch !== ' ' && ch !== '\n') {
-      const d = decomposeSyllable(ch);
-      if (d || PRIMITIVES[ch] || PUNCT[ch]) {
-        extrasForCh = charSlots[csIdx]?.slots;
-        csIdx++;
-      }
-      // 디자인 없는 글자: ch 유지, extrasForCh null. buildToken 의 _fallbackBoxGlyph 가
-      //   ㅁ + x 합성 글리프를 반환 → 토큰이 정상 출력됨.
-    }
-    const t = buildToken(ch, consSub, vowSub, extrasForCh);
-    if (t) tokens.push(t);
-  }
-
-  const items = tokens.map((t, ti) => {
-    if (t.type === 'space') {
-      // 공백 양옆 글자 종류로 축소 배율 결정 — 한글 양옆=1.0, 한쪽만 한글=0.5, 그 외=0
-      const _prev = tokens[ti - 1];
-      const _next = tokens[ti + 1];
-      const _prevH = !!(_prev && _prev.ch && decomposeSyllable(_prev.ch));
-      const _nextH = !!(_next && _next.ch && decomposeSyllable(_next.ch));
-      let _sideMul = 0;
-      if (_prevH && _nextH) _sideMul = 1.0;
-      else if (_prevH || _nextH) _sideMul = 0.5;
-      // 중력 → 한글 클러스터 강도 (높을수록 공백 줄임). 직접 비례 — 캡 없음.
-      const _gNormSp = Math.min(1, (PARAMS.gravity || 0) / 15);
-      const _shrink = _gNormSp * (PARAMS.spaceShrink || 0) * _sideMul;
-      return { type: 'space', width: spaceWidth * (1 - _shrink) };
-    }
-    if (t.type === 'newline') return { type: 'newline' };
-    const gB = bbox(t.glyph.nodes);
-    const w = (gB.w) * SCALE * 0.5;
-    // [F7] 비한글 분산 = 점간격 기반. w = bbox너비(그리드칸) × SCALE×0.5 인데 SCALE 은
-    //   점간격(pointDist)에서 도출되므로 w 자체가 "점간격 × 기본디자인 너비(+가로 추가점)".
-    //   → 임의 분산배수(_nhMul, 중력 기반) 폐기. 비한글도 자기 footprint 그대로 advance
-    //   → 한글 자모가 모이는 밀도와 동일하게 떨어짐(점간격 일관). 자간=전역 letterSpacing 공통.
-    //   (요청 "성공 시 모든 자간/행간 동일 계산"의 전역 확대는 후속 단계 — F7 은 비한글 우선)
-    return { type: 'glyph', token: t, width: Math.max(w, SCALE * 0.5) };
-  });
-
-  // [v1.12b] 자간 슬롯 폭 일정 모드 (A/B 테스트 결과 — 사용자 결정).
-  //   모든 글자가 동일 advance 폭 사용 → 글자 BBox 폭 차이로 인한 자간 불균질 인식 해소.
-  //   각 글리프는 슬롯 중앙에 정렬.
-  {
-    let _maxGW = 0;
-    items.forEach(it => { if (it.type === 'glyph' && it.width > _maxGW) _maxGW = it.width; });
-    if (_maxGW > 0) items.forEach(it => { if (it.type === 'glyph') it.width = _maxGW; });
-  }
-
-  // 단어 단위로 묶기: 공백/줄바꿈이 분리자
-  const units = []; // { type: 'word'|'space'|'newline', items?, width? }
-  let wItems = [];
-  let wW = 0;
-  const flushWord = () => {
-    if (wItems.length > 0) {
-      units.push({ type: 'word', items: wItems, width: wW });
-      wItems = []; wW = 0;
-    }
-  };
-  items.forEach(it => {
-    if (it.type === 'space') { flushWord(); units.push({ type: 'space', width: it.width }); }
-    else if (it.type === 'newline') { flushWord(); units.push({ type: 'newline' }); }
-    else {
-      if (wItems.length > 0) wW += letterSpacing;
-      wItems.push(it);
-      wW += it.width;
-    }
-  });
-  flushWord();
-
-  // 단어 단위 줄바꿈
-  const lines = [];
-  let cur = []; // flat items
-  let curW = 0;
-  const pushLine = () => {
-    // 줄 끝 trailing space 제거
-    while (cur.length > 0 && cur[cur.length-1].type === 'space') { curW -= cur[cur.length-1].width + (cur.length > 1 ? letterSpacing : 0); cur.pop(); }
-    lines.push(cur);
-    cur = []; curW = 0;
-  };
-  units.forEach(u => {
-    if (u.type === 'newline') { pushLine(); return; }
-    if (u.type === 'space') {
-      if (cur.length === 0) return;  // 줄 시작 공백 무시
-      cur.push({ type: 'space', width: u.width });
-      curW += letterSpacing + u.width;
-      return;
-    }
-    // word — 모바일: 단어별 행갈이 OFF + 글자별 자동 줄바꿈 ON / 데스크탑: 단어별 행갈이 ON
-    const addW = (cur.length === 0 ? 0 : letterSpacing) + u.width;
-    const _isMobileWrap = (typeof isMobile === 'function') && isMobile();  // 모바일 = 글자별 줄바꿈, PC = 단어별 행갈이
-    if (!_isMobileWrap && cur.length > 0 && curW + addW > usableW) pushLine();
-    if (cur.length > 0) curW += letterSpacing;
-    u.items.forEach((it, i) => {
-      if (i > 0) curW += letterSpacing;
-      // 모바일 글자별 줄바꿈: 이 글자를 더하면 가용 폭을 넘으면 새 줄로
-      if (_isMobileWrap && cur.length > 0 && (curW + it.width) > usableW) {
-        pushLine();  // curW = 0, cur = [] 상태가 됨
-      }
-      cur.push(it);
-      curW += it.width;
-    });
-  });
-  if (cur.length > 0) lines.push(cur);
-  if (lines.length === 0) lines.push([]);
-
-  const totalLinesHeight = lines.length * lineHeight;
-  const startY = ((cssH - _footerOffset()) - totalLinesHeight) / 2 + lineHeight / 2;
-
-  const bodies = [];
-  lines.forEach((line, li) => {
-    const lineY = startY + li * lineHeight;
-    const lineW = line.reduce((s, it, i) => s + it.width + (i > 0 ? letterSpacing : 0), 0);
-    let cursor = panelOffsetX + (drawW - lineW) / 2;
-    line.forEach((it, idx) => {
-      if (idx > 0) cursor += letterSpacing;
-      if (it.type === 'space') { cursor += it.width; return; }
-      const t = it.token;
-      const anchorX = cursor + it.width / 2;
-      cursor += it.width;
+function _createGlyphBody(t,anchorX,lineY,SCALE,random=Math.random) {
       const gB = bbox(t.glyph.nodes);
       const cx = (gB.minX + gB.maxX) / 2;
       const cy = (gB.minY + gB.maxY) / 2;
@@ -3969,8 +3832,8 @@ function buildWorld(str) {
       const bodyAnchorY = lineY + yShift * SCALE * 0.5;
       const initNodes = t.glyph.nodes.map(n => {
         const o = {
-          x: anchorX + (n.x - cx) * SCALE * 0.5 + (Math.random() - 0.5) * 4,
-          y: bodyAnchorY + (n.y - cy) * SCALE * 0.5 + (Math.random() - 0.5) * 4,
+          x: anchorX + (n.x - cx) * SCALE * 0.5 + (random() - 0.5) * 4,
+          y: bodyAnchorY + (n.y - cy) * SCALE * 0.5 + (random() - 0.5) * 4,
           vx: 0, vy: 0,
           restX: (n.x - cx) * SCALE * 0.5,
           restY: (n.y - cy) * SCALE * 0.5,
@@ -4055,13 +3918,286 @@ function buildWorld(str) {
         // 구두점은 일단 'cons'로 취급 (글자 점만 있어 minD 작아도 무방)
         initNodes.forEach(n => { n.jamoType = 'cons'; });
       }
-      bodies.push({
+      return {
         ch: t.ch, anchorX, anchorY: bodyAnchorY,
         nodes: initNodes, edges, angleTriples, jamos,
         magnetPairs,
         strokes: t.glyph.strokes,
         isPunct: !!t.isPunct
-      });
+      };
+}
+
+// Versioned layout: legacy files retain their uniform slots and absolute pins.
+let _layoutState = {version:2,mode:'optical-v2',seed:20261003,anchorSpace:'absolute-css-px',anchorKeyVersion:1};
+const _opticalCache = new Map();
+function _parseLayoutState(value) {
+  if(value==null)return {..._layoutState,mode:'legacy-uniform'};
+  if(value.version!==2 || !['legacy-uniform','optical-v2'].includes(value.mode) || (value.anchorSpace!=null&&value.anchorSpace!=='absolute-css-px') || (value.anchorKeyVersion!=null&&value.anchorKeyVersion!==1))throw Error('지원하지 않는 배치 버전입니다.');
+  return {version:2,mode:value.mode,seed:Number.isInteger(value.seed)?value.seed>>>0:20261003,anchorSpace:'absolute-css-px',anchorKeyVersion:1};
+}
+try {
+  const saved=localStorage.getItem('mh_layout_v2');
+  if(saved)_layoutState=_parseLayoutState(JSON.parse(saved));
+  else if(['jeomgureum_text_v1','mh_centers','mh_admin_defaults','mh_moimkkol_positions_v6','mh_moimkkol_baseline_v4','jeomgureum_editor_defs_v6','mh_design_baseline_v3'].some(key=>localStorage.getItem(key)!==null))_layoutState.mode='legacy-uniform';
+}catch(_){_layoutState.mode='legacy-uniform';}
+_persistLayoutState();
+function _persistLayoutState(){try{localStorage.setItem('mh_layout_v2',JSON.stringify(_layoutState));}catch(_){}}
+function _setLayoutMode(mode) {
+  _layoutState.mode=mode;_persistLayoutState();resetWorld();
+}
+function _layoutHash(text) {let hash=_layoutState.seed;for(const ch of text)hash=Math.imul(hash^ch.codePointAt(0),16777619)>>>0;return hash;}
+function _layoutRandom(seed) {return()=>((seed=(Math.imul(seed,1664525)+1013904223)>>>0)/4294967296);}
+function buildWorld(str,options) {
+  if(_layoutState.mode!=='optical-v2')return _buildWorldInternal(str,options);
+  // Keep random subdivision stable for this document. This synchronous scope
+  // restores the caller's RNG before any event or animation callback can run.
+  const random=Math.random;Math.random=_layoutRandom(_layoutHash(str));
+  try{return _buildWorldInternal(str,options);}finally{Math.random=random;}
+}
+function _predictOpticalProfile(token,scale) {
+  const settings=[scale,PARAMS.gravity,PARAMS.repulse,PARAMS.shapeBoost,PARAMS.damping,PARAMS.pointDist,PARAMS.nodeR,PARAMS.lineW,PARAMS.shape,PARAMS.borderWidth,PARAMS.springBoost,PARAMS.magnetForce,PARAMS.magnetMergeFactor,PARAMS.choHoriz,PARAMS.choVert,PARAMS.jungHoriz,PARAMS.jungVert,PARAMS.jongHoriz,PARAMS.jongVert,PARAMS.randomExtra,K_SPRING,K_ANGLE,K_ROT,poseLockOn,angleSpringOn];
+  const key=JSON.stringify([token.ch,token.glyph,settings,_moimkkolYShift[_moimkkolPatternKey(token.ch)]||0]);
+  if(_opticalCache.has(key))return _opticalCache.get(key);
+  const body=_createGlyphBody(token,0,0,scale,_layoutRandom(1337));
+  // Independent, fixed-step forecast. Never mutate the displayed world or use
+  // live animation bounds; stop after a bounded work budget in node operations.
+  const count=body.nodes.length,iterations=count<=160?96:count<=512?32:0;
+  for(let i=0;i<iterations;i++)step(1,{bodies:[body]},true);
+  if(body.nodes.some(n=>!Number.isFinite(n.x)||!Number.isFinite(n.y)||Math.abs(n.x)>4096||Math.abs(n.y)>4096))body.nodes.forEach(n=>{n.x=n.designX;n.y=body.anchorY+n.designY;});
+  const profile=_rasterOpticalProfile(body,scale);
+  if(_opticalCache.size>=256)_opticalCache.delete(_opticalCache.keys().next().value);
+  _opticalCache.set(key,profile);return profile;
+}
+function _rasterOpticalProfile(body,scale) {
+  const border=Math.max(0,PARAMS.borderWidth||0),radius=Math.max(0,PARAMS.nodeR/2),line=Math.max(0,PARAMS.lineW);
+  const visible=body.nodes.filter(n=>!n.inv),edgePoints=[];
+  body.edges.forEach(e=>{if(!e.transparent)edgePoints.push(body.nodes[e.a],body.nodes[e.b]);});
+  const points=visible.concat(edgePoints),bb=bbox(points),pad=Math.max(radius,line/2)+border+2;
+  const minX=Math.floor(bb.minX-pad),minY=Math.floor(bb.minY-pad),width=Math.max(1,Math.ceil(bb.w+2*pad)),height=Math.max(1,Math.ceil(bb.h+2*pad));
+  // At most 256x256 pixels per cached forecast, independent of screen size.
+  const resolution=Math.min(2,256/width,256/height),canvas=document.createElement('canvas');
+  canvas.width=Math.max(1,Math.ceil(width*resolution));canvas.height=Math.max(1,Math.ceil(height*resolution));
+  const c=canvas.getContext('2d',{willReadFrequently:true});c.scale(resolution,resolution);c.translate(-minX,-minY);c.lineWidth=line+2*border;c.lineCap='round';c.lineJoin='round';
+  if(line+2*border>0)body.edges.forEach(e=>{if(e.transparent)return;const a=body.nodes[e.a],b=body.nodes[e.b];c.beginPath();c.moveTo(a.x,a.y);c.lineTo(b.x,b.y);c.stroke();});
+  const connected=new Set();body.edges.forEach(e=>{if(!e.transparent){connected.add(e.a);connected.add(e.b);}});
+  body.nodes.forEach((n,i)=>{
+    if(n.inv)return;const r=(connected.has(i)?radius:radius>0?radius:line/2)+border;if(r<=0)return;
+    const corner=Math.max(0,Math.min(r,r*(100-(PARAMS.shape||0))/100));c.beginPath();
+    if(corner>=r-.5)c.arc(n.x,n.y,r,0,Math.PI*2);else c.roundRect(n.x-r,n.y-r,2*r,2*r,corner);c.fill();
+  });
+  const data=c.getImageData(0,0,canvas.width,canvas.height).data,bands=[];let left=Infinity,right=-Infinity,top=Infinity,bottom=-Infinity;
+  for(let y=0;y<canvas.height;y++){
+    let l=Infinity,r=-Infinity;for(let x=0;x<canvas.width;x++)if(data[(y*canvas.width+x)*4+3]>32){l=Math.min(l,x);r=x+1;}
+    if(r<l){bands.push(null);continue;}
+    l=minX+l/resolution;r=minX+r/resolution;bands.push([l,r]);left=Math.min(left,l);right=Math.max(right,r);top=Math.min(top,minY+y/resolution);bottom=Math.max(bottom,minY+(y+1)/resolution);
+  }
+  if(!Number.isFinite(left))return{minX:-scale/4,maxX:scale/4,minY:0,maxY:0,width:scale/2,bands:[],originY:0,resolution:1};
+  return{minX:left,maxX:right,minY:top,maxY:bottom,width:Math.max(scale/4,right-left),bands,originY:minY,resolution};
+}
+function _opticalGap(left,right,scale) {
+  const target=Math.max(2,scale*.25),bboxSeparation=left.maxX-right.minX;
+  const top=Math.max(left.minY,right.minY),bottom=Math.min(left.maxY,right.maxY),separations=[];
+  for(let i=0;i<48;i++){
+    const y=top+(i+.5)*(bottom-top)/48;
+    const a=left.bands[Math.floor((y-left.originY)*left.resolution)],b=right.bands[Math.floor((y-right.originY)*right.resolution)];
+    if(a&&b)separations.push(a[1]-b[0]);
+  }
+  if(bottom-top<Math.max(left.maxY-left.minY,right.maxY-right.minY)*.3 || separations.length<8)return target;
+  const mean=separations.reduce((a,b)=>a+b,0)/separations.length,max=Math.max(...separations);
+  // A whitespace target plus a collision floor; cap interlocking to 35% of the
+  // narrower glyph so punctuation and isolated protrusions cannot over-tighten.
+  const distance=Math.min(bboxSeparation+target,Math.max(max+.5,mean+target,bboxSeparation+target-.35*Math.min(left.width,right.width)));
+  return distance-bboxSeparation;
+}
+
+function _buildWorldInternal(str, options = {}) {
+  const optical = _layoutState.mode === 'optical-v2';
+  if (!options.measureOnly) {
+  _finishCenterDrag(null, true);
+  if (_centerLayout.text !== str) { _clearCenterHistory(); _centerLayout = { text: str, points: {} }; _persistCenters(); }
+  // A rebuild must not leave pointer handlers referencing detached nodes.
+  if (typeof draggedNode !== 'undefined') { draggedNode = null; _bond = null; _detach = null; }
+  canvas.classList.remove('dragging');
+  }
+  // 통일된 점 간격을 글자 렌더링 SCALE 기준으로 사용
+  const SCALE = Math.max(PARAMS.pointDist, 4);
+  // 자간 — 슬라이더 값 × 0.5 (v1.12b A/B 테스트 결과 — 사용자 결정).
+  //   자동 보정은 randomizeAll에서만 적용.
+  const letterSpacing = PARAMS.letterSpacing * 0.5;
+  const lineHeight = Math.max(40, PARAMS.lineHeight);
+  const spaceWidth = SCALE * (optical ? 0.75 : 1); // 공백 — 글자폭의 절반 (이전 *2의 절반)
+  // 6개 자모별 길이 슬라이더는 buildToken 내부에서 PARAMS 직접 참조
+  const consSub = 0; // 호환용 — 더 이상 사용 안 함
+  const vowSub = 0;  // 호환용 — 더 이상 사용 안 함
+  const extra = PARAMS.randomExtra;
+  const drawW = cssW - panelOffsetX - editorRightOffset;
+  const usableW = Math.max(drawW * 0.80, 200);  // 자동 줄바꿈 기준 = 가용 영역 너비 80%
+
+  // 1) 텍스트 전체 자모/글자 인벤토리 — 한글, 영문, 특수문자 모두 추적
+  // 한글 음절은 cho/jung/jong 슬롯, 그 외는 body 단일 슬롯
+  const charSlots = [];
+  for (const ch of str) {
+    if (ch === ' ' || ch === '\n') continue;
+    const d = decomposeSyllable(ch);
+    if (d) {
+      const slots = { cho: 0, jung: 0 };
+      if (d.jong) slots.jong = 0;
+      charSlots.push({ ch, d, slots, kind: 'hangul' });
+    } else if (PRIMITIVES[ch] || PUNCT[ch]) {
+      charSlots.push({ ch, slots: { body: 0 }, kind: 'other' });
+    }
+  }
+  // 슬롯 평탄화 — 무작위 픽 대상
+  const flatSlots = [];
+  charSlots.forEach(item => {
+    if (item.kind === 'hangul') {
+      flatSlots.push({ item, key: 'cho' });
+      flatSlots.push({ item, key: 'jung' });
+      if ('jong' in item.slots) flatSlots.push({ item, key: 'jong' });
+    } else {
+      flatSlots.push({ item, key: 'body' });
+    }
+  });
+  // 분배 — 매 픽마다 랜덤 슬롯에 +1
+  const totalExtras = extra * flatSlots.length;
+  for (let i = 0; i < totalExtras; i++) {
+    if (flatSlots.length === 0) break;
+    const s = flatSlots[Math.floor(Math.random() * flatSlots.length)];
+    s.item.slots[s.key]++;
+  }
+  // 위치별 매핑 — 인덱스 카운터로 매 글자에 슬롯 짝짓기
+  let csIdx = 0;
+  const tokens = [];
+  for (let ch of str) {
+    let extrasForCh = null;
+    if (ch !== ' ' && ch !== '\n') {
+      const d = decomposeSyllable(ch);
+      if (d || PRIMITIVES[ch] || PUNCT[ch]) {
+        extrasForCh = charSlots[csIdx]?.slots;
+        csIdx++;
+      }
+      // 디자인 없는 글자: ch 유지, extrasForCh null. buildToken 의 _fallbackBoxGlyph 가
+      //   ㅁ + x 합성 글리프를 반환 → 토큰이 정상 출력됨.
+    }
+    const t = buildToken(ch, consSub, vowSub, extrasForCh);
+    if (t) tokens.push(t);
+  }
+
+  const items = tokens.map((t, ti) => {
+    if (t.type === 'space') {
+      if (optical) return { type:'space',width:spaceWidth };
+      // 공백 양옆 글자 종류로 축소 배율 결정 — 한글 양옆=1.0, 한쪽만 한글=0.5, 그 외=0
+      const _prev = tokens[ti - 1];
+      const _next = tokens[ti + 1];
+      const _prevH = !!(_prev && _prev.ch && decomposeSyllable(_prev.ch));
+      const _nextH = !!(_next && _next.ch && decomposeSyllable(_next.ch));
+      let _sideMul = 0;
+      if (_prevH && _nextH) _sideMul = 1.0;
+      else if (_prevH || _nextH) _sideMul = 0.5;
+      // 중력 → 한글 클러스터 강도 (높을수록 공백 줄임). 직접 비례 — 캡 없음.
+      const _gNormSp = Math.min(1, (PARAMS.gravity || 0) / 15);
+      const _shrink = _gNormSp * (PARAMS.spaceShrink || 0) * _sideMul;
+      return { type: 'space', width: spaceWidth * (1 - _shrink) };
+    }
+    if (t.type === 'newline') return { type: 'newline' };
+    if (optical) {
+      const profile = _predictOpticalProfile(t,SCALE);
+      return {type:'glyph',token:t,width:profile.width,profile};
+    }
+    const gB = bbox(t.glyph.nodes);
+    const w = (gB.w) * SCALE * 0.5;
+    // [F7] 비한글 분산 = 점간격 기반. w = bbox너비(그리드칸) × SCALE×0.5 인데 SCALE 은
+    //   점간격(pointDist)에서 도출되므로 w 자체가 "점간격 × 기본디자인 너비(+가로 추가점)".
+    //   → 임의 분산배수(_nhMul, 중력 기반) 폐기. 비한글도 자기 footprint 그대로 advance
+    //   → 한글 자모가 모이는 밀도와 동일하게 떨어짐(점간격 일관). 자간=전역 letterSpacing 공통.
+    //   (요청 "성공 시 모든 자간/행간 동일 계산"의 전역 확대는 후속 단계 — F7 은 비한글 우선)
+    return { type: 'glyph', token: t, width: Math.max(w, SCALE * 0.5) };
+  });
+
+  // [v1.12b] 자간 슬롯 폭 일정 모드 (A/B 테스트 결과 — 사용자 결정).
+  //   모든 글자가 동일 advance 폭 사용 → 글자 BBox 폭 차이로 인한 자간 불균질 인식 해소.
+  //   각 글리프는 슬롯 중앙에 정렬.
+  {
+    let _maxGW = 0;
+    items.forEach(it => { if (it.type === 'glyph' && it.width > _maxGW) _maxGW = it.width; });
+    if (!optical && _maxGW > 0) items.forEach(it => { if (it.type === 'glyph') it.width = _maxGW; });
+  }
+
+  const itemGap = (a,b) => optical && a?.profile && b?.profile ? letterSpacing + _opticalGap(a.profile,b.profile,SCALE) : letterSpacing;
+  // 단어 단위로 묶기: 공백/줄바꿈이 분리자
+  const units = []; // { type: 'word'|'space'|'newline', items?, width? }
+  let wItems = [];
+  let wW = 0;
+  const flushWord = () => {
+    if (wItems.length > 0) {
+      units.push({ type: 'word', items: wItems, width: wW });
+      wItems = []; wW = 0;
+    }
+  };
+  items.forEach(it => {
+    if (it.type === 'space') { flushWord(); units.push({ type: 'space', width: it.width }); }
+    else if (it.type === 'newline') { flushWord(); units.push({ type: 'newline' }); }
+    else {
+      if (wItems.length > 0) wW += itemGap(wItems[wItems.length-1],it);
+      wItems.push(it);
+      wW += it.width;
+    }
+  });
+  flushWord();
+
+  // 단어 단위 줄바꿈
+  const lines = [];
+  let cur = []; // flat items
+  let curW = 0;
+  const pushLine = () => {
+    // 줄 끝 trailing space 제거
+    while (cur.length > 0 && cur[cur.length-1].type === 'space') { curW -= cur[cur.length-1].width + (cur.length > 1 ? itemGap(cur[cur.length-2],cur[cur.length-1]) : 0); cur.pop(); }
+    lines.push(cur);
+    cur = []; curW = 0;
+  };
+  units.forEach(u => {
+    if (u.type === 'newline') { pushLine(); return; }
+    if (u.type === 'space') {
+      if (cur.length === 0) return;  // 줄 시작 공백 무시
+      cur.push({ type: 'space', width: u.width });
+      curW += letterSpacing + u.width;
+      return;
+    }
+    // word — 모바일: 단어별 행갈이 OFF + 글자별 자동 줄바꿈 ON / 데스크탑: 단어별 행갈이 ON
+    const addW = (cur.length === 0 ? 0 : itemGap(cur[cur.length-1],u.items[0])) + u.width;
+    const _isMobileWrap = (typeof isMobile === 'function') && isMobile();  // 모바일 = 글자별 줄바꿈, PC = 단어별 행갈이
+    if (!_isMobileWrap && cur.length > 0 && curW + addW > usableW) pushLine();
+    if (cur.length > 0) curW += itemGap(cur[cur.length-1],u.items[0]);
+    u.items.forEach((it, i) => {
+      if (i > 0) curW += itemGap(u.items[i-1],it);
+      // 모바일 글자별 줄바꿈: 이 글자를 더하면 가용 폭을 넘으면 새 줄로
+      if (_isMobileWrap && cur.length > 0 && (curW + it.width) > usableW) {
+        pushLine();  // curW = 0, cur = [] 상태가 됨
+      }
+      cur.push(it);
+      curW += it.width;
+    });
+  });
+  if (cur.length > 0) lines.push(cur);
+  if (lines.length === 0) lines.push([]);
+
+  if (options.measureOnly) return {lines:lines.length,height:lines.length*lineHeight,width:Math.max(0,...lines.map(line=>line.reduce((sum,it,i)=>sum+it.width+(i>0?itemGap(line[i-1],it):0),0)))};
+  const totalLinesHeight = lines.length * lineHeight;
+  const startY = ((cssH - _footerOffset()) - totalLinesHeight) / 2 + lineHeight / 2;
+
+  const bodies = [];
+  lines.forEach((line, li) => {
+    const lineY = startY + li * lineHeight;
+    const lineW = line.reduce((s, it, i) => s + it.width + (i > 0 ? itemGap(line[i-1],it) : 0), 0);
+    let cursor = panelOffsetX + (drawW - lineW) / 2;
+    line.forEach((it, idx) => {
+      if (idx > 0) cursor += itemGap(line[idx-1],it);
+      if (it.type === 'space') { cursor += it.width; return; }
+      const t = it.token;
+      const anchorX = cursor + (optical ? -it.profile.minX : it.width / 2);
+      cursor += it.width;
+      const body=_createGlyphBody(t,anchorX,lineY,SCALE);
+      bodies.push(body);
     });
   });
 
@@ -4075,7 +4211,7 @@ function buildWorld(str) {
   return _w;
 }
 
-function step(dt) {
+function step(dt, simulation = world, predicting = false) {
   const G = PARAMS.gravity / 100;
   const R = PARAMS.repulse;
   // [F6] 획 유연성 → 스프링 강도 + 스프링 추가값(관리자) — 당기거나 구부린 상태를
@@ -4087,7 +4223,7 @@ function step(dt) {
   //   원형(점 크기 = 지름) 기준으로 거리 계산. 점 간격은 점 크기·획 굵기 중 더 큰 값의 영향을 받음
   const _visSize = Math.max(PARAMS.nodeR || 0, PARAMS.lineW || 0);
   const MIN_D = Math.max(PARAMS.pointDist, 4, _visSize);
-  const SPEED = PARAMS.speed;
+  const SPEED = predicting ? 1 : PARAMS.speed;
   // msg5 — 앞뒤붙임 인력 계수 (rest 길이 0 스프링 → 태그 노드끼리 끌어당김)
   const MAGF = (PARAMS.magnetForce || 0) / 100 * 0.05;
   // 융합 임계 — 점 크기·획 굵기·점 간격 중 가장 큰 값 기준.
@@ -4106,36 +4242,36 @@ function step(dt) {
   const K_ANGLE_eff = Math.min(FLEX_MAX - K_ANGLE, _stiffnessCap);
   // [v1.10b] 드래그 중에는 회전 탄성 OFF — 마우스 놓는 즉시 자동 복원 (단순히 effective=0 처리).
   //   slider 값(K_ROT) 자체는 건드리지 않음 → 패널 표시값 유지, end-drag 복원 코드 불필요.
-  const K_ROT_eff   = (typeof draggedNode !== 'undefined' && draggedNode)
+  const K_ROT_eff   = (!predicting && typeof draggedNode !== 'undefined' && draggedNode)
     ? 0
     : Math.min(FLEX_MAX - K_ROT, _stiffnessCap);
-  if (!world) return;
-  // ALL_NODES 캐시 — buildWorld가 새 world 객체를 반환하므로 world 교체 시 자동 무효화.
+  if (!simulation) return;
+  // ALL_NODES 캐시 — buildWorld가 새 simulation 객체를 반환하므로 simulation 교체 시 자동 무효화.
   //   노드는 in-place로만 변형(위치)되고 추가/삭제는 buildWorld에서만 → 참조 배열 재사용 안전.
-  let ALL_NODES = world._allNodes;
+  let ALL_NODES = simulation._allNodes;
   if (!ALL_NODES) {
     ALL_NODES = [];
-    world.bodies.forEach(body => body.nodes.forEach(n => ALL_NODES.push(n)));
-    world._allNodes = ALL_NODES;
+    simulation.bodies.forEach(body => body.nodes.forEach(n => ALL_NODES.push(n)));
+    simulation._allNodes = ALL_NODES;
   }
 
   // [자성 보정] 붙임 짓기로 현재 잡혀 있는 partner 노드 — 반발 패스에서 면제.
   //   잡은(드래그) 노드는 별도로 핀 고정되고 partner 는 곧 그 위로 융합되므로,
   //   잡혀 있는 동안만 반발에서 빼 후보가 커서 밖으로 밀려나지 않게 한다.
-  const _bondLockNode = (typeof _bond !== 'undefined' && _bond && _bond._partnerIdx >= 0
+  const _bondLockNode = (!predicting && typeof _bond !== 'undefined' && _bond && _bond._partnerIdx >= 0
       && _bond.body && _bond.body.nodes[_bond._partnerIdx])
     ? _bond.body.nodes[_bond._partnerIdx] : null;
 
   // [항목4] 떼는 중인 붙임 쌍 — 융합 금지 + 약한 자성만(관리자 '떼기 자성 세기').
   //   잡은 노드는 별도로 커서에 핀되므로, 끌면 약한 저항만 받고 떨어짐.
-  const _detActive = (typeof _detach !== 'undefined' && _detach && typeof draggedNode !== 'undefined'
+  const _detActive = (!predicting && typeof _detach !== 'undefined' && _detach && typeof draggedNode !== 'undefined'
       && draggedNode && _detach.body && _detach.body.nodes[_detach.gi] && _detach.body.nodes[_detach.pi]);
   const _detG = _detActive ? _detach.body.nodes[_detach.gi] : null;
   const _detP = _detActive ? _detach.body.nodes[_detach.pi] : null;
   const detachMAGF = ((PARAMS.detachMagnetForce != null) ? PARAMS.detachMagnetForce : 15) / 100 * 0.05;
 
   for (let sub = 0; sub < SPEED; sub++) {
-    world.bodies.forEach(body => {
+    simulation.bodies.forEach(body => {
       body.nodes.forEach(n => {
         // G가 0이어도 곱셈만 일어나므로 효과 없음 (gravityFrozen일 때 G=0)
         n.vx += (body.anchorX - n.x) * G * 0.02 * dt;
@@ -4295,7 +4431,7 @@ function step(dt) {
       });
     }
     // 벽 반발 — PARAMS.wallOn 플래그가 true 일 때만 작동 (실험적 비활성화 가능)
-    if (PARAMS.wallOn) {
+    if (!predicting && PARAMS.wallOn) {
       const WALL_D = MIN_D * 2;
       for (let i = 0; i < ALL_NODES.length; i++) {
         const n = ALL_NODES[i];
@@ -4317,7 +4453,7 @@ function step(dt) {
         }
       }
     }
-    world.bodies.forEach(body => {
+    simulation.bodies.forEach(body => {
       body.nodes.forEach(n => {
         n.vx *= DAMP; n.vy *= DAMP;
         n.x += n.vx * dt; n.y += n.vy * dt;
@@ -4328,7 +4464,7 @@ function step(dt) {
     //   있으면 그 노드 좌표에 딱 스냅(무엇이 선택됐는지 명확). 대상은 커서로
     //   매 이동 재계산되므로 커서를 다른 후보로 옮기면 스냅 대상도 바뀜 →
     //   마우스를 놓기 전까지 자유 변경, 확정은 놓는 순간(endDrag→_bondCommit).
-    if (typeof draggedNode !== 'undefined' && draggedNode) {
+    if (!predicting && typeof draggedNode !== 'undefined' && draggedNode) {
       if (typeof _bond !== 'undefined' && _bond && _bond._partnerIdx >= 0
           && _bond.body && _bond.body.nodes[_bond._partnerIdx]) {
         const _pn = _bond.body.nodes[_bond._partnerIdx];
@@ -5562,6 +5698,9 @@ function rebuild() {
 
 // ── 키보드 단축키 ──
 window.addEventListener('keydown', e => {
+  // Native text/IME undo belongs to its input, even while an editor is open.
+  if ((e.ctrlKey || e.metaKey) && e.code==='KeyZ' &&
+      (e.isComposing || e.keyCode===229 || e.target.isContentEditable || e.target.closest?.('input,textarea,select'))) return;
   // Ctrl/Cmd+S → SVG 저장, Ctrl/Cmd+P → PNG 저장 (브라우저 기본동작 차단, 전역)
   if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey) {
     // e.code 는 키보드 레이아웃·IME 무관 — 한글 IME 활성 상태에서도 동작
@@ -5995,16 +6134,18 @@ function _bondRestore(snap) {
   if (typeof renderEditorCanvas === 'function') renderEditorCanvas();
 }
 function _bondUndoApply() {
+  if (_centerDrag) { _finishCenterDrag(null, true); return true; }
   if (!_bondUndo.length) return false;
   const e = _bondUndo.pop();
-  _bondRestore(e.before);
+  if (e.kind==='center') _restoreCenterHistory(e,'before'); else _bondRestore(e.before);
   _bondRedo.push(e);
   return true;
 }
 function _bondRedoApply() {
+  if (_centerDrag) { _finishCenterDrag(null, true); return true; }
   if (!_bondRedo.length) return false;
   const e = _bondRedo.pop();
-  _bondRestore(e.after);
+  if (e.kind==='center') _restoreCenterHistory(e,'after'); else _bondRestore(e.after);
   _bondUndo.push(e);
   return true;
 }
@@ -6351,12 +6492,13 @@ canvas.addEventListener('pointerdown', e => {
 canvas.addEventListener('pointerdown', e => {
   if (!world) return;
   if (_centerDrag) return;
-  if (_showCenters && e.button === 0) {
+  if (e.button === 0) {
     const p = canvasCoords(e);
-    const b = [...world.bodies].reverse().find(b => Math.hypot(p.x - b.anchorX, p.y - b.anchorY) <= 10);
+    const hit = _hoverCenterBody(p);
+    const b = hit && Math.abs(p.x-hit.anchorX) + Math.abs(p.y-hit.anchorY) <= _centerRadius() + 2 ? hit : null;
     if (b) {
       e.preventDefault(); e.stopPropagation();
-      _centerDrag = { body: b, id: e.pointerId, x: p.x, y: p.y, startX: b.anchorX, startY: b.anchorY };
+      _centerDrag = { body: b, id: e.pointerId, x: p.x, y: p.y, startX: b.anchorX, startY: b.anchorY, beforePin: _centerLayout.points[b.centerKey] ? {..._centerLayout.points[b.centerKey]} : null };
       canvas.classList.add('dragging'); canvas.setPointerCapture(e.pointerId); return;
     }
   }
@@ -6557,6 +6699,7 @@ canvas.addEventListener('contextmenu', e => {
 });
 canvas.addEventListener('pointermove', e => {
   const p = canvasCoords(e);
+  _centerPointer = p;
   if (_centerDrag) {
     if (e.pointerId !== _centerDrag.id) return;
     const d = _centerDrag;
@@ -6817,6 +6960,7 @@ canvas.addEventListener('lostpointercapture', e => _finishCenterDrag(e, true));
 canvas.addEventListener('pointerup', endDrag);
 canvas.addEventListener('pointercancel', endDrag);
 canvas.addEventListener('pointerleave', endDrag);
+canvas.addEventListener('pointerleave', () => { _centerPointer = null; _hoverJamo = null; });
 
 // ── 설정 패널 (미니멀) ──
 //   STRUCTURAL_KEYS: 슬라이더 변경 시 world 재구성이 필요한 키들
@@ -6972,16 +7116,6 @@ function buildPanel() {
     });
     _groupRandomizers[group.id] = makeGroupRandomizer(group);
   });
-
-  const centers = document.createElement('button');
-  centers.className = 'pillBtn'; centers.id = 'centerHandles';
-  centers.textContent = '중심 핸들'; centers.setAttribute('aria-pressed', String(_showCenters));
-  centers.title = '주황 마름모로 글자 전체 이동. 끄면 기존 획 드래그. B 리셋에도 배치 유지.';
-  centers.onclick = () => { _finishCenterDrag(null, true); _showCenters = !_showCenters; centers.setAttribute('aria-pressed', String(_showCenters)); };
-  const clearCenters = document.createElement('button');
-  clearCenters.className = 'pillBtn'; clearCenters.textContent = '배치 초기화';
-  clearCenters.onclick = () => { _finishCenterDrag(null, true); _centerLayout.points = {}; _persistCenters(); resetWorld(); };
-  body.append(centers, clearCenters);
 
   // 액션 버튼 (SVG / PNG / SAVE / LOAD)  — 의견·커피는 좌하단 HUD로 이동
   const btnRow = document.createElement('div');
@@ -7670,6 +7804,7 @@ const DERIVED_KEYS = new Set([
 //   4) K_ROT·K_SPRING 가까이, K_ANGLE은 자유로 다채로움 유지
 //   5) 색상: 70% 풍부한 색, 30% 차분한 톤 (안전 대비)
 function randomizeAll() {
+  if (_layoutState.mode==='optical-v2') {_layoutState.seed=(_layoutState.seed+1)>>>0;_persistLayoutState();}
   // 0) 자유 슬라이더 (gravity 등): 그대로 풀 범위 — DERIVED_KEYS는 아래에서 별도 처리
   PANEL_GROUPS.forEach(group => group.items.forEach(([key, label, mn, mx, step]) => {
     if (DERIVED_KEYS.has(key)) return;
@@ -7837,6 +7972,16 @@ function randomizeAll() {
 //   2단계: 행간(lh)을 40까지 점진적 축소
 //   3단계: 점 간격(pd)을 4까지 축소 — 마지막 수단(글자 자체가 작아짐)
 function ensureFits() {
+  if (_layoutState.mode==='optical-v2') {
+    const limit=Math.max(200,cssH-_footerOffset())*(PARAMS.fitsThreshold||.75);
+    for(let i=0;i<12;i++) {
+      const metrics=buildWorld(currentText(),{measureOnly:true});if(metrics.height<=limit)break;
+      if(PARAMS.letterSpacing>0)PARAMS.letterSpacing=Math.max(0,Math.round(PARAMS.letterSpacing*.8)-1);
+      else if(PARAMS.lineHeight>40)PARAMS.lineHeight=Math.max(40,Math.round(PARAMS.lineHeight*.8));
+      else break;
+    }
+    return;
+  }
   let pd = PARAMS.pointDist;
   let ls = PARAMS.letterSpacing;
   let lh = PARAMS.lineHeight;
@@ -11023,7 +11168,8 @@ function triggerJamoLoad() {
 function saveSettings() {
   _track('설정 저장');
   const settings = {
-    schema: 'mungchin-hangul-settings-v1',
+    schema: 'mungchin-hangul-settings-v2',
+    layout: {..._layoutState},
     centers: deepClone(_centerLayout),
     params: Object.assign({}, PARAMS),
     elasticity: { K_ANGLE: K_ANGLE, K_ROT: K_ROT, K_SPRING: K_SPRING, FLEX_MAX: FLEX_MAX },
@@ -11050,6 +11196,8 @@ function triggerSettingsLoad() {
       try {
         const data = JSON.parse(reader.result);
         if (data && data.schema && data.schema.indexOf('mungchin-hangul-settings') === 0) {
+          const restoredLayout = _parseLayoutState(data.layout);
+          _layoutState = restoredLayout; _persistLayoutState();
           // [v1.10b] text 도 복원 (사용자 요청). 입력바 UI 도 함께 동기화.
           if (typeof data.text === 'string') {
             TEXT = data.text;
@@ -11093,6 +11241,7 @@ function triggerSettingsLoad() {
             _moimkkolYShiftReplaceAll(data.moimkkolYShift);
             _moimkkolYShiftPersist();
           }
+          _finishCenterDrag(null, true); _clearCenterHistory();
           _loadCenterLayout(data.centers); _persistCenters();
           // [항목3] tagLabelOffsets 복원 제거 — 앞/뒤붙임 라벨 표시 폐기
           if (world) world = buildWorld(currentText());
