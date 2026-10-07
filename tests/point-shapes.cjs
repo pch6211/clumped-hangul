@@ -18,7 +18,15 @@ run(async page=>{
     return{junction,end,before,after,polygons};
   });assert.equal(geometry.junction.width,7);assert.ok(Math.abs(geometry.junction.a.x-geometry.junction.b.x)<1e-8);assert.ok(Math.abs(geometry.end.a.x-geometry.end.b.x)<1e-8);assert.equal(geometry.before,geometry.after);for(const p of geometry.polygons){assert.equal(p.count,p.sides);assert.ok(p.radii.every(r=>Math.abs(r-20)<1e-8));}
   const exports=[];
-  const download=async(fn,name)=>{const event=page.waitForEvent('download');await page.evaluate(fn);await(await event).saveAs('test-results/'+name);};
+  const download=async(fn,name)=>{
+    const event=page.waitForEvent('download');
+    if(/\.(svg|png)$/.test(name))await page.getByRole('button',{name:name.endsWith('.svg')?'SVG':'PNG',exact:true}).click();
+    else await page.evaluate(fn);
+    await(await event).saveAs('test-results/'+name);
+    // Chromium throttles bursts of automatic downloads. Exercise real export
+    // buttons and pace this batch instead of changing browser permissions.
+    await page.waitForTimeout(150);
+  };
   for(const sides of [2,3,4,12,24]){
     await configure(page);await page.evaluate(sides=>{
       setParamValue('shape',sides);PARAMS.nodeR=36;PARAMS.lineW=6;PARAMS.chase=60;PARAMS.jitter=40;for(let i=0;i<90;i++){_advanceMotion(i*1000/60);_advanceChase();step(1);_applyNodeJitter();}
