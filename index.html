@@ -2216,7 +2216,7 @@ const PANEL_GROUPS = [
     ['randomExtra', '임의 획 추가', 0, 10, 1]
   ]},
   { id: 'spacing', title: '간격', items: [
-    ['pointDist',    '점 간격',   4,  60, 1],
+    ['pointDist',    '점 간격',   0, 120, 1],
     ['letterSpacing','글자 간격', -150, 150, 1],
     ['lineHeight',   '행 간격',   0, 300, 1]
   ]},
@@ -3647,9 +3647,14 @@ function _drawCenterHandles() {
   const b = _centerDrag?.body || (!draggedNode && _hoverCenterBody());
   if (!b || !world.bodies.includes(b)) return;
   const x = b.anchorX, y = b.anchorY, r = _centerRadius();
-  ctx.save(); ctx.fillStyle = _bondInvColor();
+  ctx.save();
+  const dpr = window.devicePixelRatio || 1;
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.filter = 'none'; ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
+  ctx.setLineDash([]); ctx.lineJoin = 'miter'; ctx.lineWidth = 1;
+  ctx.fillStyle = currentFgColor(); ctx.strokeStyle = currentBgColor();
   ctx.beginPath(); ctx.moveTo(x,y-r); ctx.lineTo(x+r,y);
-  ctx.lineTo(x,y+r); ctx.lineTo(x-r,y); ctx.closePath(); ctx.fill(); ctx.restore();
+  ctx.lineTo(x,y+r); ctx.lineTo(x-r,y); ctx.closePath(); ctx.fill(); ctx.stroke(); ctx.restore();
 }
 
 // 픽셀 거리 측정 도구 상태 — 배경(빈 영역) 좌클릭 드래그 시 활성. 수직/수평만 그려짐.
@@ -5486,7 +5491,6 @@ function draw() {
 //   조기 return 직전에도 호출되어, 테두리/부드럽게 모드에서도 인터랙션 피드백 표시.
 //   ctx.save/restore 로 부드럽게 모드의 transform/filter 영향 격리.
 function drawInteractionOverlay() {
-  _drawCenterHandles();
   ctx.save();
   // 부드럽게 모드 등이 변경했을 가능성 있는 transform 을 다시 DPR 기본값으로 강제
   const dpr = window.devicePixelRatio || 1;
@@ -5544,6 +5548,8 @@ function drawInteractionOverlay() {
     }
   }
   ctx.restore();
+  // Keep the handle above both the artwork and the hover/bond highlights.
+  _drawCenterHandles();
 }
 
 // ── 각도 유연성 — 슬라이더 값↑이면 탄성↓ ──
@@ -7662,9 +7668,12 @@ function _drawHudCenterPreview() {
   const c=document.getElementById('hudCenterPreview');if(!c)return;
   const dpr=window.devicePixelRatio||1;
   if(c.width!==15*dpr){c.width=15*dpr;c.height=12*dpr;}
-  const cc=c.getContext('2d'),r=Math.max(3,Math.min(5,_centerRadius()/3));
-  cc.setTransform(dpr,0,0,dpr,0,0);cc.clearRect(0,0,15,12);cc.fillStyle=_bondInvColor();
-  cc.beginPath();cc.moveTo(7.5,6-r);cc.lineTo(7.5+r,6);cc.lineTo(7.5,6+r);cc.lineTo(7.5-r,6);cc.closePath();cc.fill();
+  const cc=c.getContext('2d'),r=Math.max(3,Math.min(4.5,_centerRadius()/3));
+  cc.setTransform(dpr,0,0,dpr,0,0);cc.clearRect(0,0,15,12);
+  cc.fillStyle=currentFgColor();cc.strokeStyle=currentBgColor();
+  // The guide's CSS scale is 1.5: keep its visible outline at 1 CSS px.
+  cc.lineWidth=1/1.5;cc.lineJoin='miter';
+  cc.beginPath();cc.moveTo(7.5,6-r);cc.lineTo(7.5+r,6);cc.lineTo(7.5,6+r);cc.lineTo(7.5-r,6);cc.closePath();cc.fill();cc.stroke();
 }
 function _drawHudHlPreview() {
   _drawHudCenterPreview();
