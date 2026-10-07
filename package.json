@@ -1,12 +1,12 @@
 {
   "name": "clumped-hangul",
   "private": true,
-  "version": "1.12.0",
+  "version": "1.13.0",
   "packageManager": "pnpm@11.25.0",
   "scripts": {
     "lint": "node tests/lint.cjs",
     "check": "node tests/syntax.cjs && node --check media-export.js",
-    "test": "node tests/media.cjs && node tests/browser.cjs && node tests/layout.cjs && node tests/recorder.cjs && node tests/recording-colors.cjs && node tests/scope.cjs && node tests/polish.cjs && node tests/files.cjs && node tests/guides.cjs && node tests/corner.cjs && node tests/junctions.cjs && node tests/point-diamond.cjs && node tests/chase.cjs && node tests/motion-popup.cjs"
+    "test": "node tests/media.cjs && node tests/browser.cjs && node tests/layout.cjs && node tests/recorder.cjs && node tests/recording-colors.cjs && node tests/scope.cjs && node tests/polish.cjs && node tests/files.cjs && node tests/guides.cjs && node tests/corner.cjs && node tests/junctions.cjs && node tests/point-diamond.cjs && node tests/chase.cjs && node tests/motion-popup.cjs && node tests/point-shapes.cjs && node tests/live-motion.cjs"
   },
   "devDependencies": {
     "eslint": "^10.11.0",

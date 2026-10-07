@@ -40,3 +40,19 @@ if movie.exists():
 
 Path('test-results/decoder.json').write_text(json.dumps({'MOV': report, 'PNG': {'transparent': alpha.count(0), 'opaque': alpha.count(255)}}, indent=2), encoding='utf8')
 print('PASS: independently decoded 7 MOV frames preserve captured RGB exactly and include an opaque background; PNG transparency preserved')
+
+if Path('test-results/point-shapes.json').exists():
+    shapes = []
+    for sides in [2, 3, 4, 12, 24]:
+        actual = decode(f'test-results/shape-{sides}.mov')
+        expected = decode(f'test-results/shape-{sides}-frame.png', first=True)
+        assert actual == expected, f'MOV polygon frame differs: {sides}'
+        assert actual[3::4] == bytes([255]) * (len(actual) // 4)
+        shapes.append({'sides': sides, 'pixelDifferences': 0, 'opaquePixels': len(actual) // 4})
+    # The popup recording exercises chase, range playback and pause/resume.
+    for movie in ['popup-chase.mov', 'live-motion.mov']:
+        # Keep the MOV's millisecond time base when decoding variable-rate frames.
+        result = subprocess.run([ffmpeg, '-v', 'error', '-i', f'test-results/{movie}', '-fps_mode', 'passthrough', '-enc_time_base', '1:1000', '-f', 'null', '-'], capture_output=True, check=True)
+        assert not result.stderr.strip(), result.stderr.decode(errors='replace')
+    Path('test-results/shape-decoder.json').write_text(json.dumps(shapes, indent=2), encoding='utf8')
+    print('PASS: five polygon/segment MOVs decode exactly to their captured PNG frames; popup chase recording decodes')

@@ -719,7 +719,7 @@ const MH_CFG = {
     lineHeight: 60,      // 행 간격
     nodeR: 4,            // 점 크기
     lineW: 4,            // 획 굵기
-    shape: 0,            // 점 모양: 0=원, 50=라운드, 100=사각
+    shape: 24,           // 점 모양: 2=직교 선분, 3~24=정다각형
     borderWidth: 0,      // [E3] 테두리 — 글자를 채우지 않고 윤곽선(두께=이 값)으로 감쌈 (0=없음 ~ 30)
     flow: 0,             // 흘리기 — 현재 노드 중 N 개(고정값) 골라 아래로 흘러내리는 선. localStorage('mh_flow') 영속. 0 = 비활성.
     jitter: 0,
@@ -2202,11 +2202,14 @@ function moimkkolReset() {
 //   미구현 no-op 스캐폴드였음. 앞붙임/뒤붙임은 현재 감상모드 물리 인력(magnetForce)으로
 //   처리됨(검색 → "magnetForce" / "_computeMagnetPairs"). 필요 시 git/이전 버전 참고.
 
+// Files without an explicit point-shape version retain the old roundness model.
+let _pointShapeMode='sides';
 // 관리자 모드 — 저장된 기본값을 PARAMS 에 반영
 try {
   const _savedAdmin = localStorage.getItem('mh_admin_defaults');
   if (_savedAdmin) {
     const _adminS = JSON.parse(_savedAdmin);
+    if(Number.isFinite(_adminS.shape))_pointShapeMode='legacy-roundness';
     Object.keys(_adminS).forEach(k => {
       if (typeof _adminS[k] === 'number') PARAMS[k] = _adminS[k];
     });
@@ -2241,7 +2244,7 @@ const PANEL_GROUPS = [
     ['_invK_ROT',    '회전 탄성', 0, 700, 5]
   ]},
   { id: 'decor', title: '꾸밈', items: [
-    ['shape',       '점 모양',   0, 100, 1],
+    ['shape',       '점 모양',   2, 24, 1],
     ['nodeR',       '점 크기',   0,  30, 1],
     ['lineW',       '획 굵기',   0,  30, 1],
     ['borderWidth', '테두리', 0, 30, 1],
@@ -2309,6 +2312,7 @@ function getParamValue(key) {
 }
 function setParamValue(key, v, opts) {
   opts = opts || {};
+  if(key==='shape'){_pointShapeMode='sides';PARAMS.shape=Math.max(2,Math.min(24,Math.round(v)));return;}
   if(key==='chase'){PARAMS.chase=Math.max(0,Math.min(100,v));return;}
   if (key === '_invK_ANGLE')  { K_ANGLE = FLEX_MAX - v;  return; }
   if (key === '_invK_ROT')    { K_ROT = FLEX_MAX - v;    return; }
@@ -3987,7 +3991,7 @@ function buildWorld(str,options) {
 }
 function _predictOpticalProfile(token,scale) {
   const settings=[scale,PARAMS.gravity,PARAMS.repulse,PARAMS.shapeBoost,PARAMS.damping,PARAMS.pointDist,PARAMS.nodeR,PARAMS.lineW,PARAMS.shape,PARAMS.borderWidth,PARAMS.springBoost,PARAMS.magnetForce,PARAMS.magnetMergeFactor,PARAMS.choHoriz,PARAMS.choVert,PARAMS.jungHoriz,PARAMS.jungVert,PARAMS.jongHoriz,PARAMS.jongVert,PARAMS.randomExtra,K_SPRING,K_ANGLE,K_ROT,poseLockOn,angleSpringOn];
-  const key=JSON.stringify([token.ch,token.glyph,settings,_moimkkolYShift[_moimkkolPatternKey(token.ch)]||0]);
+  const key=JSON.stringify([token.ch,token.glyph,settings,_pointShapeMode,_moimkkolYShift[_moimkkolPatternKey(token.ch)]||0]);
   if(_opticalCache.has(key))return _opticalCache.get(key);
   const body=_createGlyphBody(token,0,0,scale,_layoutRandom(1337));
   // Independent, fixed-step forecast. Never mutate the displayed world or use
@@ -4013,6 +4017,7 @@ function _rasterOpticalProfile(body,scale) {
   const connected=new Set();body.edges.forEach(e=>{if(!e.transparent){connected.add(e.a);connected.add(e.b);}});
   body.nodes.forEach((n,i)=>{
     if(n.inv)return;const r=(connected.has(i)?radius:radius>0?radius:line/2)+border;if(r<=0)return;
+    if(_pointShapeMode==='sides'){_paintPointShape(c,n,r-border,body,i,border);return;}
     const corner=Math.max(0,Math.min(r,r*(100-(PARAMS.shape||0))/100));c.beginPath();
     if(corner>=r-.5)c.arc(n.x,n.y,r,0,Math.PI*2);else c.roundRect(n.x-r,n.y-r,2*r,2*r,corner);c.fill();
   });
@@ -5063,7 +5068,8 @@ function _collectFlowPrimitives() {
     }
     if (d.curAnchorBI >= 0 && d.drawnSegs.length > 0) {
       const head = _headWorld(d);
-      out.ends.push({ x: head.x, y: head.y });
+      const tail=d.drawnSegs[d.drawnSegs.length-1];
+      out.ends.push({ x: head.x, y: head.y, tangent:Math.atan2(tail.dy1-tail.dy0,tail.dx1-tail.dx0) });
     }
   });
   return out;
@@ -5094,6 +5100,7 @@ function _drawFlowItemsCanvas(targetCtx, items, style, extraLine, extraEnd) {
       ? finalEndR
       : Math.max(0, Math.min(finalEndR, finalEndR * (100 - (PARAMS.shape || 0)) / 100));
     items.ends.forEach(e => {
+      if(_pointShapeMode==='sides'&&style.endShape!=='circle'){_paintPointShape(targetCtx,e,style.endR,null,null,_extraE);return;}
       targetCtx.beginPath();
       if (sCornerR >= finalEndR - 0.5) {
         targetCtx.arc(e.x, e.y, finalEndR, 0, Math.PI * 2);
@@ -5115,7 +5122,45 @@ function _drawFlowItemsCanvas(targetCtx, items, style, extraLine, extraEnd) {
   }
 }
 
-function drawNodeShape(n, r) {
+function _nodeTangent(body,index) {
+  if(!body||index==null)return 0;
+  if(!body._pointAdj){body._pointAdj=body.nodes.map(()=>[]);body.edges.forEach(e=>{if(!e.transparent){body._pointAdj[e.a].push(e.b);body._pointAdj[e.b].push(e.a);}});}
+  const n=body.nodes[index];let xx=0,xy=0,yy=0,first=null;
+  for(const i of body._pointAdj[index]){
+    const b=body.nodes[i];let dx=b.x-n.x-(b.jitterState?.applied?b.jitterState.x:0)+(n.jitterState?.applied?n.jitterState.x:0),dy=b.y-n.y-(b.jitterState?.applied?b.jitterState.y:0)+(n.jitterState?.applied?n.jitterState.y:0);
+    if(Math.hypot(dx,dy)<.01){dx=b.designX-n.designX;dy=b.designY-n.designY;}
+    const len=Math.hypot(dx,dy);if(!Number.isFinite(len)||len<.01)continue;
+    dx/=len;dy/=len;if(first===null)first=Math.atan2(dy,dx);xx+=dx*dx;xy+=dx*dy;yy+=dy*dy;
+  }
+  if(first===null)return 0;
+  // The undirected principal axis cannot flip a segment. Near-isotropic junctions
+  // use the first visible incident edge in stable topology order.
+  return Math.hypot(xx-yy,2*xy)<.15*(xx+yy)?first:.5*Math.atan2(2*xy,xx-yy);
+}
+function _pointShapeGeometry(n,r,body,index,width=PARAMS.lineW) {
+  const sides=Math.max(2,Math.min(24,Math.round(PARAMS.shape)));
+  if(sides===2){const angle=n.tangent??_nodeTangent(body,index),dx=-Math.sin(angle)*r,dy=Math.cos(angle)*r;return{kind:'segment',a:{x:n.x-dx,y:n.y-dy},b:{x:n.x+dx,y:n.y+dy},width:Math.max(0,width)};}
+  const angle=sides===4?Math.PI/4:-Math.PI/2;
+  return{kind:'polygon',points:Array.from({length:sides},(_,i)=>({x:n.x+r*Math.cos(angle+2*Math.PI*i/sides),y:n.y+r*Math.sin(angle+2*Math.PI*i/sides)}))};
+}
+function _paintPointShape(c,n,r,body,index,inflate=0,width=PARAMS.lineW) {
+  if(r<=0)return;
+  const shape=_pointShapeGeometry(n,r,body,index,width);c.save();c.beginPath();
+  if(shape.kind==='segment'){
+    if(shape.width<=0){c.restore();return;}
+    const {a,b}=shape,dx=(b.x-a.x)/(2*r)*shape.width/2,dy=(b.y-a.y)/(2*r)*shape.width/2;
+    c.moveTo(a.x-dy,a.y+dx);c.lineTo(b.x-dy,b.y+dx);c.lineTo(b.x+dy,b.y-dx);c.lineTo(a.x+dy,a.y-dx);
+  }else shape.points.forEach((p,i)=>i?c.lineTo(p.x,p.y):c.moveTo(p.x,p.y));
+  c.closePath();c.fill();if(inflate>0){c.strokeStyle=c.fillStyle;c.lineWidth=2*inflate;c.lineJoin='round';c.stroke();}c.restore();
+}
+function _pointShapeSVG(n,r,body,index,width=PARAMS.lineW) {
+  if(r<=0)return '';
+  const shape=_pointShapeGeometry(n,r,body,index,width),f=v=>Number(v.toFixed(4));
+  if(shape.kind==='segment')return shape.width>0?'<line x1="'+f(shape.a.x)+'" y1="'+f(shape.a.y)+'" x2="'+f(shape.b.x)+'" y2="'+f(shape.b.y)+'" stroke-width="'+f(shape.width)+'" stroke-linecap="butt"/>':'';
+  return '<polygon points="'+shape.points.map(p=>f(p.x)+','+f(p.y)).join(' ')+'" stroke="none"/>';
+}
+function drawNodeShape(n, r, body, index) {
+  if(_pointShapeMode==='sides'){_paintPointShape(ctx,n,r,body,index);return;}
   ctx.beginPath();
   const shape = PARAMS.shape || 0;
   const cornerR = Math.max(0, Math.min(r, r * (100 - shape) / 100));
@@ -5258,6 +5303,7 @@ function drawSmoothedBodies(targetCtx, bodies, fg, bg, viewport) {
       const r = _connSm.has(ni) ? nodeR : (nodeR > 0 ? nodeR : _lineHalfSm);
       if (r <= 0) return;
       // shape를 점에 반영 — drawNodeShape와 동일한 cornerR 공식
+      if(_pointShapeMode==='sides'){_paintPointShape(mctx,n,r,body,ni);return;}
       const sCornerR = Math.max(0, Math.min(r, r * (100 - _shape) / 100));
       mctx.beginPath();
       if (sCornerR >= r - 0.5) {
@@ -5385,6 +5431,7 @@ function drawBorders(targetCtx, bodies, fg, viewport) {
         const base = conn.has(ni) ? nodeR : (nodeR > 0 ? nodeR : lineW / 2);
         const r = base + infl;
         if (r <= 0) return;
+        if(_pointShapeMode==='sides'){_paintPointShape(mctx,n,base,body,ni,infl);return;}
         // [v1.09] 점 외접원이 획 반너비(라인 캡 반경) 안에 완전히 들어가면 점 모양(사각형 등) 무시,
         //   강제로 원형 처리 — 점이 획 윤곽에 어떤 영향도 못 주므로 사각형 모서리가 테두리 밖으로
         //   튀어나오는 '뾰족뾰족' 외관 제거. (예: lineW=13, nodeR=7, shape=100 → 점 무시.)
@@ -5502,7 +5549,7 @@ function draw() {
     body.nodes.forEach((n, ni) => {
       if (n.inv) return;
       const r = _connected.has(ni) ? nodeR : Math.max(nodeR, _lineHalf);
-      if (r > 0) drawNodeShape(n, r);
+      if (r > 0) drawNodeShape(n, r, body, ni);
     });
   });
   // 흘리기 — 일반 모드에서는 글자 위에 솔리드로 그려짐 (테두리/부드럽게 OFF 일 때만 이 경로).
@@ -5532,15 +5579,15 @@ function drawInteractionOverlay() {
     const _selIdx = (_bond._partnerIdx != null) ? _bond._partnerIdx : -1;
     _bond.cands.forEach(c => {
       if (c.idx === _selIdx) return;
-      const n = _bond.body.nodes[c.idx]; if (n) drawNodeShape(n, _r);
+      const n = _bond.body.nodes[c.idx]; if (n) drawNodeShape(n, _r, _bond.body, c.idx);
     });
     const _sn = _bond.body.nodes[_bond.srcIdx];
-    if (_sn && _bond.srcIdx !== _selIdx) drawNodeShape(_sn, _r);
+    if (_sn && _bond.srcIdx !== _selIdx) drawNodeShape(_sn, _r, _bond.body, _bond.srcIdx);
     if (_selIdx >= 0) {
       const _selN = _bond.body.nodes[_selIdx];
       if (_selN) {
         ctx.fillStyle = currentFgColor();
-        drawNodeShape(_selN, _r * 1.25);
+        drawNodeShape(_selN, _r * 1.25, _bond.body, _selIdx);
       }
     }
   }
@@ -5567,7 +5614,7 @@ function drawInteractionOverlay() {
       });
       _hbest.forEach(c => {
         const n = _hb.nodes[c.idx];
-        if (n) drawNodeShape(n, _hr);
+        if (n) drawNodeShape(n, _hr, _hb, c.idx);
       });
     }
   }
@@ -7353,10 +7400,11 @@ function _snapGuideBoxWidths() {
 function makeGroupRandomizer(group) {
   return () => {
     if (group.id === 'decor') {
-      setParamValue('shape', randInt(0, 100), { silent: true });
+      setParamValue('shape', randInt(2, 12), { silent: true });
       // 둘 다 0이면 글자 안 보임 — nodeR 최소 1 보장
       setParamValue('nodeR', randInt(1, 30), { silent: true });
       setParamValue('lineW', randInt(0, 30), { silent: true });
+      if(PARAMS.shape===2&&PARAMS.lineW===0)PARAMS.lineW=1;
       setParamValue('cornerR', (Math.random() < 0.2) ? randInt(0, 20) : 0, { silent: true });
     } else if (group.id === 'motion') {
       _randomizeJitter();
@@ -7563,7 +7611,7 @@ function makeBarRow(label, mn, mx, step, getter, setter, opts) {
     const v = getter();
     // step 이 분수면 소수점 표시 (label + ' ' + v 그대로 — JS toFixed는 step 추정으로)
     const _vd = (step && step < 1) ? Number(v).toFixed(2) : v;
-    lbvLabel.textContent = label;
+    lbvLabel.textContent = opts?.dataKey==='shape'&&_pointShapeMode==='legacy-roundness'?label+'(이전)':label;
     lbvVal.textContent = _vd;
     const p = (mx === mn) ? 0 : Math.max(0, Math.min(1, (v - mn) / (mx - mn)));
     fill.style.width = (Math.max(0, Math.min(1, p)) * 100) + '%';
@@ -7704,6 +7752,7 @@ function _drawHudLinePreview() {
     cc.fillStyle = fg;
     const cx = W / 2, cy = H / 2;
     const r = Math.max(2, Math.min(H / 2 - 1, nodeR * 0.35));
+    if(_pointShapeMode==='sides'){_paintPointShape(cc,{x:cx,y:cy},r,null,null,0,Math.max(1,Math.min(5,lineW*.25)));return;}
     const shape = PARAMS.shape || 0;
     const cornerR = Math.max(0, Math.min(r, r * (100 - shape) / 100));
     cc.beginPath();
@@ -7762,6 +7811,7 @@ function _drawHudHlPreview() {
   let r = Math.max(2, Math.min(H / 2 - 1, nodeR * 0.35));
   const cx = W / 2, cy = H / 2;
   // 모양 — drawNodeShape 와 동일한 공식
+  if(_pointShapeMode==='sides'){_paintPointShape(cc,{x:cx,y:cy},r,null,null,0,Math.max(1,Math.min(5,PARAMS.lineW*.25)));return;}
   const shape = PARAMS.shape || 0;
   const cornerR = Math.max(0, Math.min(r, r * (100 - shape) / 100));
   cc.beginPath();
@@ -8075,12 +8125,9 @@ function randomizeAll() {
     PARAMS.randomExtra
   );
 
-  // 5) 점 모양 — 극단 가중: 30% 원, 20% 사각, 25% 라운드, 25% 자유
-  const shR = Math.random();
-  if      (shR < 0.30) PARAMS.shape = 0;
-  else if (shR < 0.50) PARAMS.shape = 100;
-  else if (shR < 0.75) PARAMS.shape = 50;
-  else                 PARAMS.shape = randInt(0, 100);
+  // 5) 점 모양 — 변의 수. 랜덤 2~12, 수동 슬라이더 2~24.
+  setParamValue('shape',randInt(2,12));
+  if(PARAMS.shape===2&&PARAMS.lineW===0)PARAMS.lineW=1;
 
   // 6) 자간 / 행간 — 베이스 + 가로/세로 획 분할 보정만 (jitter 다양성 제거)
   let _ls = pd * 1.0;   // 자간 최적 베이스 1.0·pd
@@ -9279,7 +9326,7 @@ function _computeExportBBox() {
   const nR = (PARAMS.nodeR || 0) / 2;
   const bW = (PARAMS.borderWidth || 0);
   const sm = (PARAMS.cornerR || 0);
-  const pad = Math.max(lineH, nR) + bW + sm;
+  const pad = (_pointShapeMode==='sides'&&PARAMS.shape===2?Math.hypot(lineH,nR):Math.max(lineH,nR)) + bW + sm;
   let xmin = Infinity, ymin = Infinity, xmax = -Infinity, ymax = -Infinity;
   world.bodies.forEach(body => body.nodes.forEach(n => {
     if (n.inv) return;
@@ -9327,6 +9374,12 @@ function saveSVG() {
   const bg = currentBgColor();
   const lineW = PARAMS.lineW;
   const nodeR = PARAMS.nodeR / 2;
+  // Raster-only effects use the same renderer inside SVG, preserving their exact silhouette.
+  if(_pointShapeMode==='sides'&&(_bordersOn()||PARAMS.cornerR>0)){
+    const off=document.createElement('canvas');off.width=Math.ceil(W);off.height=Math.ceil(H);const c=off.getContext('2d');c.translate(-X,-Y);_renderArtwork(c,bbox);
+    const svg='<svg xmlns="http://www.w3.org/2000/svg" viewBox="'+[X,Y,W,H].join(' ')+'" width="'+W+'" height="'+H+'"><rect x="'+X+'" y="'+Y+'" width="'+W+'" height="'+H+'" fill="'+bg+'"/><image x="'+X+'" y="'+Y+'" width="'+off.width+'" height="'+off.height+'" href="'+off.toDataURL('image/png')+'"/></svg>';
+    _downloadBlob(new Blob([svg],{type:'image/svg+xml'}),'뭉친한글_'+_tsName()+'.svg');_finishFileAction('main',token,'SVG를 저장했습니다.');return;
+  }
   // [v1.12b] SVG 부드럽게 — 캔버스의 JS 박스블러 + 알파 임계값 파이프라인을
   //   SVG feGaussianBlur + feComponentTransfer(linear, steep slope) + feFlood + feComposite 로 근사.
   const _smR = Math.max(0, PARAMS.cornerR || 0);
@@ -9367,6 +9420,7 @@ function saveSVG() {
   _flowSvg.ends.forEach(e => {
     const r = _flowSty.endR;
     if (r <= 0) return;
+    if(_pointShapeMode==='sides'&&_flowSty.endShape!=='circle'){parts.push(_pointShapeSVG(e,r));return;}
     const cornerR = (_flowSty.endShape === 'circle')
       ? r
       : Math.max(0, Math.min(r, r * (100 - (PARAMS.shape || 0)) / 100));
@@ -9389,6 +9443,7 @@ function saveSVG() {
     body.nodes.forEach((n, ni) => {
       if (n.inv) return;
       const r = _connSvg.has(ni) ? nodeR : (nodeR > 0 ? nodeR : _lineHalfSvg);
+      if(_pointShapeMode==='sides'){parts.push(_pointShapeSVG(n,r,body,ni));return;}
       const cornerR = Math.max(0, Math.min(r, r * (100 - (PARAMS.shape || 0)) / 100));
       parts.push('<rect x="' + (n.x - r).toFixed(2) + '" y="' + (n.y - r).toFixed(2) +
                  '" width="' + (r * 2) + '" height="' + (r * 2) +
@@ -9412,6 +9467,7 @@ function _recordRangeItems(){return PANEL_GROUPS.filter(g=>!g.hidden&&g.id!=='fo
 function _recordRangeDefinition(key){return _recordRangeItems().flatMap(g=>g.items).find(item=>item[0]===key);}
 function _rangeValue(key,value){
   const item=_recordRangeDefinition(key);if(!item||!Number.isFinite(value))return null;
+  if(key==='shape')return Math.max(2,Math.min(24,Math.round(value)));
   return Math.max(item[2],key==='chase'?Math.min(100,value):value);
 }
 function _loadMotionSettings(value){
@@ -9452,7 +9508,7 @@ function _applyRangePosition(t){
   for(const [key,range] of entries){
     const item=_recordRangeDefinition(key);if(!item)continue;
     const value=Math.round((range.start+(range.end-range.start)*t)/item[4])*item[4];
-    if(value===getParamValue(key))continue;
+    if(value===getParamValue(key)&&!(key==='shape'&&_pointShapeMode==='legacy-roundness'))continue;
     setParamValue(key,value);spacing ||= ['pointDist','letterSpacing','lineHeight'].includes(key);flow ||= key==='flow';
   }
   if(spacing)_refreshAnimatedSpacing(oldScale);
@@ -9485,6 +9541,7 @@ function _toggleRangePlay(){
   _updateRecordDialog();
 }
 function _recordFromDialog(){
+  if(_recording?.stopping)return;
   if(_recording){if(_recording.paused){_resumeRecording();if(Object.keys(_rangePlayback.ranges).length){_rangePlayback.status='playing';_rangePlayback.last=performance.now();}}return;}
   const p=_rangePlayback;p.elapsed=0;p.last=performance.now();p.status=Object.keys(p.ranges).length?'playing':'idle';
   if(p.status==='playing')_applyRangePosition(0);
@@ -9503,7 +9560,7 @@ function _updateRecordDialog(){
   const box=document.getElementById('recordDialog');if(!box)return;
   const p=_rangePlayback,advanced=Object.keys(p.ranges).length>0;
   box.querySelector('.recordOptions').hidden=!advanced;
-  box.querySelector('#recordStart').disabled=!!_recording&&!_recording.paused;
+  box.querySelector('#recordStart').disabled=!!_recording?.stopping||(!!_recording&&!_recording.paused);
   box.querySelector('#recordStart').textContent=_recording?.paused?'녹화 계속':'녹화';
   box.querySelector('#recordPause').disabled=(!_recording||_recording.paused||_recording.stopping)&&p.status!=='playing';
   box.querySelector('#recordSave').disabled=!_recording||_recording.stopping;
@@ -9723,6 +9780,7 @@ function _renderArtwork(octx, bbox) {
     body.nodes.forEach((n, ni) => {
       if (n.inv) return;
       const r = _connPng.has(ni) ? nodeR : (nodeR > 0 ? nodeR : _lineHalfPng);
+      if(_pointShapeMode==='sides'){_paintPointShape(octx,n,r,body,ni);return;}
       octx.save();
       const cornerR = Math.max(0, Math.min(r, r * (100 - (PARAMS.shape || 0)) / 100));
       const x = n.x - r, y = n.y - r;
@@ -11630,7 +11688,8 @@ function saveSettings() {
   try {
   _track('설정 저장');
   const settings = {
-    schema: 'mungchin-hangul-settings-v2',
+    schema: 'mungchin-hangul-settings-v3',
+    pointShape: {version:2,mode:_pointShapeMode},
     layout: {..._layoutState},
     centers: deepClone(_centerLayout),
     params: Object.assign({}, PARAMS),
@@ -11667,6 +11726,8 @@ function triggerSettingsLoad() {
       try {
         const data = JSON.parse(reader.result);
         if (data && data.schema && data.schema.indexOf('mungchin-hangul-settings') === 0) {
+          const shapeMode=data.pointShape==null?'legacy-roundness':data.pointShape?.version===2&&['sides','legacy-roundness'].includes(data.pointShape.mode)?data.pointShape.mode:null;
+          if(!shapeMode)throw Error('지원하지 않는 점 모양 버전입니다.');
           const restoredLayout = _parseLayoutState(data.layout);
           _layoutState = restoredLayout; _persistLayoutState();
           // [v1.10b] text 도 복원 (사용자 요청). 입력바 UI 도 함께 동기화.
@@ -11690,6 +11751,8 @@ function triggerSettingsLoad() {
           PARAMS.jitter=Math.max(0,Math.min(100,PARAMS.jitter));
           PARAMS.jitterSpeed=Math.max(0,Math.min(100,PARAMS.jitterSpeed));
           PARAMS.chase=Number.isFinite(data.params?.chase)?Math.max(0,Math.min(100,data.params.chase)):0;
+          _pointShapeMode=shapeMode;
+          if(shapeMode==='sides')PARAMS.shape=Math.max(2,Math.min(24,Math.round(PARAMS.shape)));
           _loadMotionSettings(data.motion);
           if (data.elasticity) {
             if (typeof data.elasticity.K_ANGLE  === 'number') K_ANGLE  = data.elasticity.K_ANGLE;
@@ -11726,6 +11789,7 @@ function triggerSettingsLoad() {
           // [항목3] tagLabelOffsets 복원 제거 — 앞/뒤붙임 라벨 표시 폐기
           if (world) world = buildWorld(currentText());
           sliderUpdaters.forEach(u => u());
+          if(data.pointShape==null)_finishFileAction('main',token,'설정값을 불러왔습니다. 이전 점 모양을 유지합니다. 점 모양 조절 시 다각형으로 바뀝니다.');
         } else {
           throw Error('이 파일은 설정 파일이 아니에요');
         }
