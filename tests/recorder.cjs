@@ -3,8 +3,8 @@ run(async page=>{
   await page.setViewportSize({width:640,height:480});await page.waitForFunction(()=>cssW===640);await configure(page);await page.evaluate(()=>togglePanel());
   const button=page.locator('#recordMov');assert.equal(await button.innerText(),'MOV');assert.equal(await page.locator('#recordDialog,#easeGraph,[data-record-group]').count(),0);
   let downloads=0;page.on('download',()=>downloads++);
-  const start=async()=>{await button.click();await page.waitForFunction(()=>_recording?.frames.length>0&&!_recording.busy);assert.equal(await button.innerText(),'정지');};
-  await page.evaluate(()=>document.getElementById('recordMov').addEventListener('click',()=>{
+  const start=async()=>{if(!await page.locator('#recordDialog').count())await button.click();await page.locator('#recordStart').click();await page.waitForFunction(()=>_recording?.frames.length>0&&!_recording.busy);assert.equal(await button.innerText(),'MOV');};
+  await button.click();await page.evaluate(()=>document.getElementById('recordStart').addEventListener('click',()=>{
     if(!_recording || _recording.stopping)return;
     const c=document.createElement('canvas');c.width=640;c.height=480;const x=c.getContext('2d');x.fillStyle=currentBgColor();x.fillRect(0,0,640,480);_renderArtwork(x,{x:0,y:0,w:640,h:480});window.reference=x.getImageData(0,0,640,480).data;
   }));
@@ -12,19 +12,18 @@ run(async page=>{
   const alpha=await page.evaluate(async()=>{const bitmap=await createImageBitmap(_recording.frames[0]),c=document.createElement('canvas');c.width=640;c.height=480;const x=c.getContext('2d');x.drawImage(bitmap,0,0);bitmap.close();const d=x.getImageData(0,0,640,480).data;let transparent=0,visible=0,diff=0;for(let i=0;i<d.length;i++){if(d[i]!==reference[i])diff++;if(i%4===3){if(d[i]!==255)transparent++;else visible++;}}return{transparent,visible,diff};});assert.equal(alpha.diff,0);assert.equal(alpha.transparent,0);assert.equal(alpha.visible,640*480);
   // Capture another frame after real artwork changes. Resolution stays locked.
   await page.evaluate(()=>{PARAMS.jitter=70;PARAMS.jitterSpeed=30;PARAMS.nodeR=18;_advanceMotion(performance.now());step(1);_applyNodeJitter();_captureRecordingFrame(performance.now()+70);});await page.waitForFunction(()=>_recording.frames.length>=2);
-  const mov=page.waitForEvent('download');await button.click();await(await mov).saveAs('test-results/colored.mov');await page.waitForFunction(()=>!_recording);assert.equal(await button.innerText(),'MOV');
+  const mov=page.waitForEvent('download');await page.locator('#recordSave').click();await(await mov).saveAs('test-results/colored.mov');await page.waitForFunction(()=>!_recording);assert.equal(await button.innerText(),'MOV');
   // Pending encoding + duplicate stops finalize one file; cancellation wins.
   const pending=await page.evaluate(()=>{const original=HTMLCanvasElement.prototype.toBlob;window.realToBlob=original;HTMLCanvasElement.prototype.toBlob=function(cb,type){setTimeout(()=>original.call(this,cb,type),120);};_startRecording();const first=_recording;_startRecording();return first===_recording;});assert.ok(pending);
   const count=downloads,quick=page.waitForEvent('download');await page.evaluate(()=>{void _stopRecording();void _stopRecording();});await quick;await page.waitForFunction(()=>!_recording);assert.equal(downloads,count+1);
   await page.evaluate(()=>{_startRecording();void _stopRecording();void _stopRecording(true);});await page.waitForFunction(()=>!_recording);assert.equal(downloads,count+1);await page.evaluate(()=>{HTMLCanvasElement.prototype.toBlob=window.realToBlob;});
   await start();const oldSize=await page.evaluate(()=>[_recording.canvas.width,_recording.canvas.height]);await page.evaluate(()=>{for(let i=0;i<12;i++)resetWorld();TEXT='새 글자';world=buildWorld(TEXT);PARAMS.cornerR=3;PARAMS.borderWidth=2;});
   await page.setViewportSize({width:800,height:600});await page.waitForFunction(()=>cssW===800);assert.deepEqual(await page.evaluate(()=>[_recording.canvas.width,_recording.canvas.height]),oldSize);
-  await page.evaluate(()=>_captureRecordingFrame(performance.now()+80));await page.waitForFunction(()=>!_recording.busy);const resize=page.waitForEvent('download');await button.click();await resize;await page.waitForFunction(()=>!_recording);
-  await start();const beforeEscape=downloads;await page.keyboard.press('Escape');assert.equal(await page.evaluate(()=>!!_recording&&!_recording.stopping),true);assert.equal(await button.innerText(),'정지');assert.equal(downloads,beforeEscape);
-  // Existing Escape closes the settings panel; reopening must retain recording state.
-  assert.equal(await page.locator('#panel').isVisible(),false);await page.evaluate(()=>togglePanel());assert.equal(await button.innerText(),'정지');
+  await page.evaluate(()=>_captureRecordingFrame(performance.now()+80));await page.waitForFunction(()=>!_recording.busy);const resize=page.waitForEvent('download');await page.locator('#recordSave').click();await resize;await page.waitForFunction(()=>!_recording);
+  await start();const beforeEscape=downloads;await page.locator('#recordDialog').focus();await page.keyboard.press('Escape');assert.equal(await page.evaluate(()=>!!_recording?.paused),true);assert.equal(downloads,beforeEscape);
+  assert.equal(await page.locator('#recordDialog').count(),0);await button.click();assert.equal(await page.locator('#recordStart').innerText(),'녹화 계속');
   await page.locator('[data-key="nodeR"] .lbvVal').click();await page.locator('.sliderValuePrompt').press('Escape');assert.equal(await page.locator('.sliderValuePrompt').count(),0);assert.equal(await page.evaluate(()=>!!_recording&&!_recording.stopping),true);
-  const escaped=page.waitForEvent('download');await button.click();await escaped;await page.waitForFunction(()=>!_recording);const cancelled=downloads;
+  const escaped=page.waitForEvent('download');await page.locator('#recordSave').click();await escaped;await page.waitForFunction(()=>!_recording);const cancelled=downloads;
   const statusStyle=await page.locator('#recordStatus').evaluate(el=>({font:getComputedStyle(el).fontSize,panel:getComputedStyle(document.getElementById('panel')).fontSize,text:el.textContent}));assert.equal(statusStyle.font,statusStyle.panel);assert.ok(!statusStyle.text.includes('투명'));assert.equal(await page.getByText('녹화 취소',{exact:true}).count(),0);
   // Null encoder result, thrown rendering error and finalizer error all recover.
   for(const failure of ['encode','render','mux']){

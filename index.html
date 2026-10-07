@@ -317,6 +317,19 @@
   /* 1px 점 + 1px 간격의 dotted 밑줄 (text-decoration dotted 는 브라우저별 패턴이 달라 ::after + repeating-linear-gradient 로 구현) */
   .panel .row .lbvVal::after { content: ''; position: absolute; left: 0; right: 0; bottom: -2px; height: 1px; background: repeating-linear-gradient(to right, currentColor 0 1px, transparent 1px 2px); }
   .panel .gap { height: 10px; }
+  #recordDialog { display:block; left:340px; top:100px; bottom:auto; width:310px; max-width:calc(100vw - 16px); max-height:calc(100dvh - 32px); padding:0; direction:ltr; background:transparent; overflow:auto; z-index:99999; }
+  #recordDialog .recordMeta { display:flex; justify-content:flex-end; gap:8px; margin-bottom:8px; }
+  #recordDialog .recordGroup { margin-bottom:10px; }
+  #recordDialog .row { grid-template-columns:1fr 118px; padding-right:0; }
+  #recordDialog .groupTitle button { background:none; border:0; color:inherit; font-family:inherit; padding:0 2px; }
+  #recordDialog .rangeValue { border:0; padding:0; background:none; color:inherit; font:inherit; cursor:pointer; border-bottom:1px dotted currentColor; }
+  #recordDialog .rangeMark { position:absolute; width:1px; top:-2px; bottom:-2px; background:currentColor; pointer-events:none; }
+  #recordDialog .recordOptions { margin-top:10px; display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+  #recordDialog [hidden] { display:none !important; }
+  #recordDialog input { width:42px; padding:2px; border:0; border-bottom:1px solid currentColor; background:transparent; color:inherit; font:inherit; }
+  #recordDialog .btnRow { margin-top:10px; }
+  #recordDialog .pillBtn { background:transparent; }
+  #recordDialog { color:var(--editor-fg,currentColor); }
   /* 입력창 — resize 핸들 제거(resize: none). 높이는 JS 가 내용에 맞춰 자동 조정 */
   .panel textarea { width: 100%; resize: none; overflow-y: hidden; padding: 4px 6px; border: 1px solid currentColor; background: transparent; color: currentColor; font-family: inherit; font-size: 10px; line-height: 1.4; letter-spacing: 0.5px; outline: none; box-sizing: border-box; margin-bottom: 15px; opacity: 1; min-height: 24px; }
   /* 슬라이더 디자인 문법과 통일된 미니멀 스크롤바 (Webkit) — 트랙: currentColor opacity 0.16, thumb: currentColor solid */
@@ -711,6 +724,7 @@ const MH_CFG = {
     flow: 0,             // 흘리기 — 현재 노드 중 N 개(고정값) 골라 아래로 흘러내리는 선. localStorage('mh_flow') 영속. 0 = 비활성.
     jitter: 0,
     jitterSpeed: 30,
+    chase: 0,
     cornerR: 0,          // 부드럽게 — 픽셀 마스크 + blur 기반 모서리 부드러움
     // 원시 물리 (튜닝값 — UI 슬라이더는 숨김 상태)
     repulse: 20,         // 반발 — 노드끼리 밀어내는 힘
@@ -2199,7 +2213,7 @@ try {
   }
 } catch (_) {}
 
-// 슬라이더 그룹: 밀도 → 골격 → 간격 → 탄성 → 꾸밈 → 배경 색 → 글자 색
+// 슬라이더 그룹: 밀도 → 골격 → 간격 → 탄성 → 꾸밈 → 움직임 → 배경 색 → 글자 색
 //   각 그룹별 주사위(⚀-⚅) 클릭 시 해당 그룹만 랜덤
 const PANEL_GROUPS = [
   { id: 'density', title: '밀도', items: [
@@ -2232,9 +2246,12 @@ const PANEL_GROUPS = [
     ['lineW',       '획 굵기',   0,  30, 1],
     ['borderWidth', '테두리', 0, 30, 1],
     ['flow',        '페인트', 0, 10, 1],
-    ['cornerR',     '부드럽게',  0,  20, 1],
-    ['jitter', '떨림 강도', 0, 100, 1],
-    ['jitterSpeed', '떨림 속도', 0, 100, 1]
+    ['cornerR',     '부드럽게',  0,  20, 1]
+  ]},
+  { id: 'motion', title: '움직임', items: [
+    ['jitter', '떨림 강도', 0, 40, 1],
+    ['jitterSpeed', '떨림 속도', 0, 90, 1],
+    ['chase', '쫒기', 0, 100, 1]
   ]},
   { id: 'bg', title: '배경 색', items: [
     ['_bgR', '빨강', 0, 255, 1],
@@ -2292,6 +2309,7 @@ function getParamValue(key) {
 }
 function setParamValue(key, v, opts) {
   opts = opts || {};
+  if(key==='chase'){PARAMS.chase=Math.max(0,Math.min(100,v));return;}
   if (key === '_invK_ANGLE')  { K_ANGLE = FLEX_MAX - v;  return; }
   if (key === '_invK_ROT')    { K_ROT = FLEX_MAX - v;    return; }
   if (key === '_invK_SPRING') { K_SPRING = FLEX_MAX - v; return; }
@@ -3598,11 +3616,12 @@ function _finishCenterDrag(e, cancel = false) {
   if (cancel) {
     _translateBody(drag.body, drag.startX - drag.body.anchorX, drag.startY - drag.body.anchorY);
   } else if (Math.hypot(drag.body.anchorX-drag.startX, drag.body.anchorY-drag.startY) > 0.01) {
-    const pin = { x: drag.body.anchorX, y: drag.body.anchorY };
+    const offset=drag.body._chaseOffset||{x:0,y:0};
+    const pin = { x: drag.body.anchorX-offset.x, y: drag.body.anchorY-offset.y };
     _centerLayout.points[drag.body.centerKey] = pin;
     _persistCenters();
     _bondUndo.push({ kind:'center', text:_centerLayout.text, key:drag.body.centerKey,
-      before:{ pin:drag.beforePin, x:drag.startX, y:drag.startY },
+      before:{ pin:drag.beforePin, x:drag.startX-offset.x, y:drag.startY-offset.y },
       after:{ pin:{...pin}, ...pin } });
     if (_bondUndo.length > 50) _bondUndo.shift();
     _bondRedo.length = 0;
@@ -3623,10 +3642,14 @@ function _restoreCenterHistory(entry, side) {
   if (state.pin) _centerLayout.points[entry.key]={...state.pin};
   else delete _centerLayout.points[entry.key];
   const body=world?.bodies.find(b=>b.centerKey===entry.key);
-  if (body) _translateBody(body,state.x-body.anchorX,state.y-body.anchorY);
+  if (body) _translateBody(body,state.x+(body._chaseOffset?.x||0)-body.anchorX,state.y+(body._chaseOffset?.y||0)-body.anchorY);
   _persistCenters();
 }
 function _centerRadius() { return 1.5*Math.max((PARAMS.nodeR || 0)/2, 3); }
+function _centerHandleHit(p) {
+  const b=_hoverCenterBody(p);
+  return b&&p&&Math.abs(p.x-b.anchorX)+Math.abs(p.y-b.anchorY)<=_centerRadius()+2?b:null;
+}
 function _hoverCenterBody(p = _centerPointer) {
   if (!p || !world) return null;
   let best = null, distance = Infinity;
@@ -4020,7 +4043,7 @@ function _opticalGap(left,right,scale) {
 
 function _buildWorldInternal(str, options = {}) {
   const optical = _layoutState.mode === 'optical-v2';
-  if (!options.measureOnly) {
+  if (!options.measureOnly && !options.layoutOnly) {
   _finishCenterDrag(null, true);
   if (_centerLayout.text !== str) { _clearCenterHistory(); _centerLayout = { text: str, points: {} }; _persistCenters(); }
   // A rebuild must not leave pointer handlers referencing detached nodes.
@@ -4215,7 +4238,7 @@ function _buildWorldInternal(str, options = {}) {
     if (pin) _translateBody(b, pin.x - b.anchorX, pin.y - b.anchorY);
   });
   const _w = { bodies, lines: lines.length };
-  _resetDripsForNewWorld(_w);
+  if (!options.layoutOnly) _resetDripsForNewWorld(_w);
   return _w;
 }
 
@@ -4992,6 +5015,7 @@ function _computeActiveStart(d) {
 
 function _advanceFlow() {
   const now = performance.now();
+  if(_motionPaused()){_dripsLastT=now;return;}
   const dt = _dripsLastT > 0 ? Math.min(0.1, (now - _dripsLastT) / 1000) : 0;
   _dripsLastT = now;
   if (!world || !world.bodies) return;
@@ -5739,10 +5763,46 @@ function _applyNodeJitter() {
   }));
 }
 
+// A circular pursuit with a nonzero radius. Each phase follows its predecessor
+// (first follows last); phase spacing prevents the usual pursuit collapse.
+// Offsets are transient: SAVE and drag history retain the user's rest anchors.
+function _advanceChase(dt=_jitterDt) {
+  if (!world || _centerDrag || draggedNode) return;
+  const bodies=world.bodies,n=bodies.length;
+  const strength=Math.max(0,Math.min(100,PARAMS.chase||0));
+  if (!n || (!strength && !bodies.some(b=>b._chaseOffset))) return;
+  const base=bodies.map(b=>({x:b.anchorX-(b._chaseOffset?.x||0),y:b.anchorY-(b._chaseOffset?.y||0)}));
+  const center=base.reduce((p,b)=>({x:p.x+b.x/n,y:p.y+b.y/n}),{x:0,y:0});
+  const size=Math.max(24,Math.max(PARAMS.pointDist,4)*3,PARAMS.nodeR,PARAMS.lineW);
+  const maxRadius=Math.max(40,Math.min(cssW-panelOffsetX-editorRightOffset,cssH-_footerOffset())*.34);
+  const radius=Math.min(maxRadius,Math.max(48,size*n/(2*Math.PI),Math.sqrt(base.reduce((s,b)=>s+(b.x-center.x)**2+(b.y-center.y)**2,0)/n)));
+  const gap=2*Math.PI/n,omega=.12+1.88*strength/100;
+  if(!world._chasePhases)world._chasePhases=bodies.map((_,i)=>-i*gap);
+  const previous=world._chasePhases.slice();
+  const blend=1-Math.exp(-8*Math.max(0,Math.min(.05,dt)));
+  bodies.forEach((b,i)=>{
+    const offset=b._chaseOffset||{x:0,y:0};let target={x:0,y:0};
+    if(strength && n>1){
+      const leader=(i+n-1)%n;
+      const phase=previous[i]+(omega+2*Math.sin(previous[leader]-previous[i]-gap))*Math.min(.05,dt);
+      world._chasePhases[i]=phase%(2*Math.PI);
+      target={x:center.x+radius*Math.cos(phase)-base[i].x,y:center.y+radius*Math.sin(phase)-base[i].y};
+    }
+    const next={x:offset.x+(target.x-offset.x)*blend,y:offset.y+(target.y-offset.y)*blend};
+    if(!strength && Math.hypot(next.x,next.y)<.001)next.x=next.y=0;
+    _translateBody(b,next.x-offset.x,next.y-offset.y);b._chaseOffset=next;
+  });
+}
+
 function tick(now = performance.now()) {
-  _advanceMotion(now);
-  step(1);
-  _applyNodeJitter();
+  if(_motionPaused())_motionLast=now;else _advanceMotion(now);
+  _advanceRangePlayback(now);
+  if (!_motionPaused()) {
+    _advanceChase();
+    step(1);
+    _applyNodeJitter();
+  }
+  if(_viewTooltipEl?.classList.contains('show')&&(!_centerHandleHit(_centerPointer)||document.elementFromPoint(_centerPointer.x,_centerPointer.y)!==canvas))_hideViewTooltip();
   draw();
   _captureRecordingFrame(now);
   updateHUD();
@@ -5782,6 +5842,7 @@ function rebuild() {
 
 // ── 키보드 단축키 ──
 window.addEventListener('keydown', e => {
+  if(e.defaultPrevented)return;
   // Native text/IME undo belongs to its input, even while an editor is open.
   if ((e.ctrlKey || e.metaKey) && e.code==='KeyZ' &&
       (e.isComposing || e.keyCode===229 || e.target.isContentEditable || e.target.closest?.('input,textarea,select'))) return;
@@ -5950,7 +6011,7 @@ window.addEventListener('keydown', e => {
   const kc = e.code;
   // [v1.10b 복귀] 단축키: E=문자 창(원래대로 복귀), M=가이드 토글(원래대로 복귀), G 폐기
   if (kc === 'KeyS') { e.preventDefault(); togglePanel(); return; }
-  if (kc === 'KeyE') { e.preventDefault(); openEditor(); return; }       // 문자 창 토글
+  if (kc === 'KeyE') { e.preventDefault(); _recordPopupActive=false;_hideViewTooltip();openEditor(); return; }       // 문자 창 토글
   if (kc === 'KeyR') { e.preventDefault(); randomizeAll(); return; }
   if (kc === 'KeyB') { e.preventDefault(); resetWorld(); return; }       // 글자 리셋
   if (kc === 'KeyT') { e.preventDefault(); applyRandomText(); return; }  // 임의 텍스트
@@ -6849,7 +6910,10 @@ canvas.addEventListener('pointermove', e => {
       if (dd < _hd) { _hd = dd; _hb = body; _hi = ni; }
     }
   }
-  if (near) canvas.classList.add('near-node');
+  const centerHit=_centerHandleHit(p);
+  if(centerHit&&!e.buttons&&e.pointerType!=='touch')_showViewTooltip(e.clientX,e.clientY,'글자의 위치를 옮길 수 있어요');
+  else _hideViewTooltip();
+  if (near||centerHit) canvas.classList.add('near-node');
   else canvas.classList.remove('near-node');
   // 자모 위(노드 hit 반경 약간 여유)에 있을 때만 호버 강조
   if (_hb && _hd < r2 * 4) {
@@ -6918,6 +6982,7 @@ function _showViewTooltip(cx, cy, text) {
   }
   if (_viewTipTimer) clearTimeout(_viewTipTimer);
   _viewTipTimer = setTimeout(() => {
+    if(!_centerHandleHit(_centerPointer)||_centerDrag||draggedNode||document.elementFromPoint(_centerPointer.x,_centerPointer.y)!==canvas)return;
     t.textContent = text;
     t.style.color = (typeof currentFgColor === 'function') ? currentFgColor() : '';
     t.style.background = (typeof currentBgColor === 'function') ? currentBgColor() : '';
@@ -7044,7 +7109,9 @@ canvas.addEventListener('lostpointercapture', e => _finishCenterDrag(e, true));
 canvas.addEventListener('pointerup', endDrag);
 canvas.addEventListener('pointercancel', endDrag);
 canvas.addEventListener('pointerleave', endDrag);
-canvas.addEventListener('pointerleave', () => { _centerPointer = null; _hoverJamo = null; });
+canvas.addEventListener('pointerleave', () => { _centerPointer = null; _hoverJamo = null;canvas.classList.remove('near-node');_hideViewTooltip(); });
+canvas.addEventListener('pointerdown',_hideViewTooltip,true);
+canvas.addEventListener('pointercancel',_hideViewTooltip);
 
 // ── 설정 패널 (미니멀) ──
 //   STRUCTURAL_KEYS: 슬라이더 변경 시 world 재구성이 필요한 키들
@@ -7215,8 +7282,8 @@ function buildPanel() {
   pngBtn.addEventListener('click', () => savePNG());
   btnRow.appendChild(pngBtn);
   const recordBtn=document.createElement('button');recordBtn.className='pillBtn';recordBtn.id='recordMov';
-  recordBtn.title='MOV 녹화 · 최대 30초 / 64MiB';
-  recordBtn.onclick=()=>{if(_recording)void _stopRecording();else _startRecording();};
+  recordBtn.title='MOV 녹화';
+  recordBtn.onclick=e=>_openRecordDialog(e);
   btnRow.appendChild(recordBtn);
   const fileRow=document.createElement('div');fileRow.className='btnRow';
   const saveBtn = document.createElement('button');
@@ -7235,7 +7302,7 @@ function buildPanel() {
   const status=document.createElement('div');status.id='recordStatus';status.setAttribute('role','status');
   status.className='fileStatus';body.appendChild(status);
   _recordButtons();_renderFileStatus('main');
-  for(const [key,tip] of [['jitter','글자가 떨리는 폭입니다. 임의 설정은 0~30입니다.'],['jitterSpeed','떨리는 빠르기입니다. 0이면 현재 떨림을 멈춥니다.']]){
+  for(const [key,tip] of [['jitter','글자가 떨리는 폭입니다. 임의 설정은 0~40입니다.'],['jitterSpeed','떨리는 빠르기입니다. 임의 설정은 0~90입니다. 0이면 현재 떨림을 멈춥니다.'],['chase','앞 글자를 따라 순환합니다. 0이면 원래 배치로 돌아옵니다.']]){
     const row=body.querySelector('[data-key="'+key+'"]');if(row)row.title=tip;
   }
 
@@ -7248,9 +7315,6 @@ function buildPanel() {
   const _panelGuide = _buildGuideList([
     ['그룹 임의 설정 값', '<span class="guideDie" role="img" aria-label="주사위">⚄</span> 클릭'],
     ['변수 입력', '숫자 클릭'],
-    ['SVG 저장', 'Ctrl S'],
-    ['PNG 저장', 'Ctrl P'],
-    ['MOV 저장', 'MOV → 정지'],
   ]);
   _panelGuide.id = 'panelGuide';
   body.appendChild(_panelGuide);
@@ -7289,12 +7353,14 @@ function _snapGuideBoxWidths() {
 function makeGroupRandomizer(group) {
   return () => {
     if (group.id === 'decor') {
-      _randomizeJitter();
       setParamValue('shape', randInt(0, 100), { silent: true });
       // 둘 다 0이면 글자 안 보임 — nodeR 최소 1 보장
       setParamValue('nodeR', randInt(1, 30), { silent: true });
       setParamValue('lineW', randInt(0, 30), { silent: true });
       setParamValue('cornerR', (Math.random() < 0.2) ? randInt(0, 20) : 0, { silent: true });
+    } else if (group.id === 'motion') {
+      _randomizeJitter();
+      setParamValue('chase', randInt(0,100));
     } else {
       group.items.forEach(([key, _label, mn, mx, _step]) => {
         setParamValue(key, randInt(mn, mx), { silent: true });
@@ -7855,8 +7921,8 @@ function togglePanel() {
 
 // ── 랜덤 (단발) — R 한 번 = 한 번 랜덤 도출 후 정지 ──
 function _randomizeJitter() {
-  setParamValue('jitter',randInt(0,30),{silent:true});
-  setParamValue('jitterSpeed',randInt(0,100),{silent:true});
+  setParamValue('jitter',randInt(0,40),{silent:true});
+  setParamValue('jitterSpeed',randInt(0,90),{silent:true});
 }
 function randInt(lo, hi) { return lo + Math.floor(Math.random() * (hi - lo + 1)); }
 
@@ -7897,6 +7963,7 @@ const DERIVED_KEYS = new Set([
   'nonHangulSpread','spaceShrink','magnetForce','magnetMergeFactor','bondPickFactor','detachMagnetForce','detachThreshold','springBoost',
   '_invK_ANGLE','_invK_ROT','_invK_SPRING',
   '_bgR','_bgG','_bgB','_fgR','_fgG','_fgB'
+  ,'chase'
 ]);
 
 // 최적화된 randomizeAll — 다양/실험/가독성 균형
@@ -9337,13 +9404,186 @@ function saveSVG() {
 
 // PNG 저장 — 배경 투명. 캔버스 크기 = 글자+흘리기 경계상자 + 사방 50px (화면 크기 무시).
 //   파이프라인: 흘리기 → 테두리 → 부드럽게 (drawBorders/drawSmoothedBodies 내부에 흘리기 포함됨).
+// MOV ranges are independent of the saved artwork. Click order is directional.
+const _rangePlayback={ranges:{},seconds:2,count:1,loop:false,status:'idle',elapsed:0,last:null};
+let _recordPopup=null,_recordPopupActive=false;
+function _motionPaused(){return !!_recording?.paused || ['paused','finished'].includes(_rangePlayback.status);}
+function _recordRangeItems(){return PANEL_GROUPS.filter(g=>!g.hidden&&g.id!=='form');}
+function _recordRangeDefinition(key){return _recordRangeItems().flatMap(g=>g.items).find(item=>item[0]===key);}
+function _rangeValue(key,value){
+  const item=_recordRangeDefinition(key);if(!item||!Number.isFinite(value))return null;
+  return Math.max(item[2],key==='chase'?Math.min(100,value):value);
+}
+function _loadMotionSettings(value){
+  _pauseMotion();_rangePlayback.ranges={};_rangePlayback.status='idle';_rangePlayback.elapsed=0;_rangePlayback.last=null;
+  _rangePlayback.seconds=Number.isFinite(value?.seconds)?Math.max(.1,Math.min(30,value.seconds)):2;
+  _rangePlayback.count=Number.isFinite(value?.count)?Math.max(1,Math.min(999,Math.round(value.count))):1;
+  _rangePlayback.loop=value?.loop===true;
+  if(value?.ranges&&typeof value.ranges==='object')for(const [key,r] of Object.entries(value.ranges)){
+    const start=_rangeValue(key,r?.start),end=_rangeValue(key,r?.end);
+    if(start!==null&&end!==null)_rangePlayback.ranges[key]={start,end};
+  }
+  for(const [id,key] of [['rangeSeconds','seconds'],['rangeCount','count']]){const el=document.getElementById(id);if(el)el.value=_rangePlayback[key];}
+  _updateRecordDialog();
+}
+function _refreshAnimatedSpacing(oldScale){
+  if(!world||_centerDrag||draggedNode)return;
+  // Compute layout without changing live bodies, random subdivisions, drips or drag references.
+  const layout=buildWorld(currentText(),{layoutOnly:true}),positions=new Map(layout.bodies.map(b=>[b.centerKey,b]));
+  const ratio=Math.max(4,PARAMS.pointDist)/oldScale;
+  world.bodies.forEach(b=>{
+    const target=positions.get(b.centerKey);if(!target)return;
+    const ax=b.anchorX,ay=b.anchorY,nx=target.anchorX+(b._chaseOffset?.x||0),ny=target.anchorY+(b._chaseOffset?.y||0);
+    b.nodes.forEach(n=>{
+      n.x=nx+(n.x-ax)*ratio;n.y=ny+(n.y-ay)*ratio;n.vx*=ratio;n.vy*=ratio;
+      for(const key of ['restX','restY','designX','designY'])if(Number.isFinite(n[key]))n[key]*=ratio;
+    });
+    b.edges.forEach(e=>{e.rest*=ratio;});
+    b.jamos?.forEach(j=>{j.restCx*=ratio;j.restCy*=ratio;});
+    b.anchorX=nx;b.anchorY=ny;
+  });
+  world.lines=layout.lines;
+}
+function _applyRangePosition(t){
+  if(_centerDrag||draggedNode)return;
+  const oldScale=Math.max(4,PARAMS.pointDist);let spacing=false,flow=false;
+  _stripNodeJitter();
+  const entries=Object.entries(_rangePlayback.ranges).sort(([a],[b])=>Number(b.startsWith('_bg'))-Number(a.startsWith('_bg')));
+  for(const [key,range] of entries){
+    const item=_recordRangeDefinition(key);if(!item)continue;
+    const value=Math.round((range.start+(range.end-range.start)*t)/item[4])*item[4];
+    if(value===getParamValue(key))continue;
+    setParamValue(key,value);spacing ||= ['pointDist','letterSpacing','lineHeight'].includes(key);flow ||= key==='flow';
+  }
+  if(spacing)_refreshAnimatedSpacing(oldScale);
+  if(flow&&world)_syncDripsToWorld(world);
+  sliderUpdaters.forEach(update=>update());
+}
+function _advanceRangePlayback(now){
+  const p=_rangePlayback;
+  if(p.status!=='playing'){p.last=now;return;}
+  const delta=p.last===null?0:Math.max(0,Math.min(100,now-p.last));p.last=now;
+  if(_centerDrag||draggedNode)return;
+  p.elapsed+=delta;
+  const duration=p.seconds*1000,finished=!p.loop&&p.elapsed>=duration*p.count;
+  const phase=finished?0:(p.elapsed%duration)/duration;
+  _applyRangePosition(phase<.5?phase*2:2-phase*2);
+  if(finished){p.status='finished';if(_recording)_pauseRecording();_updateRecordDialog();}
+}
+function _pauseMotion(){
+  if(_rangePlayback.status==='playing')_rangePlayback.status='paused';
+  if(_recording)_pauseRecording();
+  _updateRecordDialog();
+}
+function _toggleRangePlay(){
+  if(!Object.keys(_rangePlayback.ranges).length||_recording?.stopping)return;
+  const p=_rangePlayback;
+  if(p.status==='playing'){_pauseMotion();return;}
+  if(p.status!=='paused'){p.elapsed=0;_applyRangePosition(0);}
+  p.status='playing';p.last=performance.now();
+  if(_recording?.paused)_resumeRecording();
+  _updateRecordDialog();
+}
+function _recordFromDialog(){
+  if(_recording){if(_recording.paused){_resumeRecording();if(Object.keys(_rangePlayback.ranges).length){_rangePlayback.status='playing';_rangePlayback.last=performance.now();}}return;}
+  const p=_rangePlayback;p.elapsed=0;p.last=performance.now();p.status=Object.keys(p.ranges).length?'playing':'idle';
+  if(p.status==='playing')_applyRangePosition(0);
+  draw();_startRecording();_updateRecordDialog();
+}
+function _setRecordRange(key,value,endpoint){
+  value=_rangeValue(key,value);if(value===null)return;
+  _pauseMotion();
+  const ranges=_rangePlayback.ranges;
+  if(!ranges[key])ranges[key]={start:value,end:value};
+  else ranges[key][endpoint||'end']=value;
+  _rangePlayback.elapsed=0;_rangePlayback.status='idle';_rangePlayback.last=null;
+  _updateRecordDialog();
+}
+function _updateRecordDialog(){
+  const box=document.getElementById('recordDialog');if(!box)return;
+  const p=_rangePlayback,advanced=Object.keys(p.ranges).length>0;
+  box.querySelector('.recordOptions').hidden=!advanced;
+  box.querySelector('#recordStart').disabled=!!_recording&&!_recording.paused;
+  box.querySelector('#recordStart').textContent=_recording?.paused?'녹화 계속':'녹화';
+  box.querySelector('#recordPause').disabled=(!_recording||_recording.paused||_recording.stopping)&&p.status!=='playing';
+  box.querySelector('#recordSave').disabled=!_recording||_recording.stopping;
+  box.querySelector('#rangePlay').textContent=p.status==='playing'?'일시정지 (Space)':'재생 (Space)';
+  box.querySelector('#rangePlay').disabled=!!_recording?.stopping;
+  box.querySelector('#rangeLoop').textContent='루프 '+(p.loop?'ON':'OFF');
+  box.querySelector('#rangeLoop').setAttribute('aria-pressed',String(p.loop));
+  box.querySelector('#rangeCount').disabled=p.loop;
+  box.querySelectorAll('[data-range-key]').forEach(row=>{
+    const key=row.dataset.rangeKey,r=p.ranges[key],item=_recordRangeDefinition(key);
+    const pct=v=>100*Math.max(0,Math.min(1,(v-item[2])/(item[3]-item[2])));
+    for(const side of ['start','end']){row.querySelector('.range-'+side).textContent=r?r[side]:'—';row.querySelector('.mark-'+side).style.left=pct(r?r[side]:getParamValue(key))+'%';}
+    const fill=row.querySelector('.fill');fill.style.left=(r?Math.min(pct(r.start),pct(r.end)):0)+'%';fill.style.width=(r?Math.abs(pct(r.end)-pct(r.start)):0)+'%';
+    row.querySelector('.rangeClear').hidden=!r;
+  });
+  box.querySelector('#recordPopupStatus').textContent=_recording?(_recording.stopping?'저장 중…':_recording.paused?'녹화 일시정지':'녹화 중'):p.status==='playing'?'재생 중':p.status==='finished'?'반복 완료':'';
+}
+function _closeRecordDialog(){
+  _pauseMotion();if(!_recording)_rangePlayback.status='idle';
+  document.getElementById('recordDialog')?.remove();_recordPopup=null;_recordPopupActive=false;_hideViewTooltip();
+}
+function _openRecordDialog(event){
+  _hideViewTooltip();
+  if(document.getElementById('recordDialog')){_recordPopupActive=true;document.getElementById('recordDialog').focus();return;}
+  const box=document.createElement('div');box.id='recordDialog';box.className='panel mhDialog';box.tabIndex=-1;box.setAttribute('role','dialog');box.setAttribute('aria-label','MOV 녹화');
+  box.innerHTML='<div class="recordMeta"><span class="stageBtn dragHandle" title="옮기기">▩</span><button class="rangeValue" id="recordClose" aria-label="MOV 창 닫기">✕</button></div>';
+  for(const group of _recordRangeItems()){
+    const section=document.createElement('div');section.className='recordGroup';section.dataset.recordGroup=group.id;
+    const title=document.createElement('div');title.className='groupTitle';
+    const label=document.createElement('span');label.className='titleText';label.textContent=group.title+' ';title.append(label);
+    const arrow=document.createElement('button');arrow.className='die';arrow.textContent='▸';arrow.setAttribute('aria-label',group.title+' 펼치기');arrow.setAttribute('aria-expanded','false');title.append(arrow);section.append(title);
+    const rows=document.createElement('div');rows.hidden=true;
+    arrow.onclick=()=>{rows.hidden=!rows.hidden;arrow.textContent=rows.hidden?'▸':'▾';arrow.setAttribute('aria-expanded',String(!rows.hidden));arrow.setAttribute('aria-label',group.title+(rows.hidden?' 펼치기':' 접기'));_recordPopup?.clamp();};
+    for(const [key,label,mn,mx,step] of group.items){
+      const row=document.createElement('div');row.className='row';row.dataset.rangeKey=key;
+      row.innerHTML='<div class="bar"><div class="fill"></div><i class="rangeMark mark-start"></i><i class="rangeMark mark-end"></i></div><span class="lbv"><span class="rangeLabel"></span> <button class="rangeValue range-start">—</button>→<button class="rangeValue range-end">—</button> <button class="rangeValue rangeClear" aria-label="범위 해제">×</button></span>';
+      row.querySelector('.rangeLabel').textContent=label;
+      const bar=row.querySelector('.bar');bar.setAttribute('aria-label',label+' 시작과 끝');let dragging=false,origin=null;
+      const value=e=>{const r=bar.getBoundingClientRect();return Math.round((mn+Math.max(0,Math.min(1,(e.clientX-r.left)/r.width))*(mx-mn))/step)*step;};
+      bar.onpointerdown=e=>{e.preventDefault();origin=_rangePlayback.ranges[key]?{..._rangePlayback.ranges[key]}:null;dragging=true;bar.setPointerCapture(e.pointerId);_setRecordRange(key,value(e));};
+      bar.onpointermove=e=>{if(dragging)_setRecordRange(key,value(e),'end');};
+      bar.onpointerup=()=>{dragging=false;};
+      bar.onpointercancel=()=>{dragging=false;if(origin)_rangePlayback.ranges[key]=origin;else delete _rangePlayback.ranges[key];_updateRecordDialog();};
+      for(const side of ['start','end']){const button=row.querySelector('.range-'+side);button.setAttribute('aria-label',label+' '+(side==='start'?'시작':'끝'));button.onclick=()=>showSliderValueInput(button,_rangePlayback.ranges[key]?.[side]??getParamValue(key),step,v=>_setRecordRange(key,Math.round(v/step)*step,side));}
+      row.querySelector('.rangeClear').onclick=()=>{_pauseMotion();delete _rangePlayback.ranges[key];_rangePlayback.status='idle';_updateRecordDialog();};
+      rows.append(row);
+    }
+    section.append(rows);box.append(section);
+  }
+  const controls=document.createElement('div');controls.innerHTML='<div class="btnRow"><button class="pillBtn" id="recordStart">녹화</button><button class="pillBtn" id="recordPause">일시정지</button><button class="pillBtn" id="recordSave">저장</button></div><div class="recordOptions" hidden><label>구간 반복 초 <input id="rangeSeconds" type="number" min="0.1" max="30" step="0.1" title="시작→끝→시작 왕복 시간"></label><label>반복 횟수 <input id="rangeCount" type="number" min="1" max="999" step="1"></label><button class="pillBtn" id="rangeLoop">루프 OFF</button><button class="pillBtn" id="rangePlay">재생 (Space)</button></div><div id="recordPopupStatus" class="fileStatus" role="status"></div>';
+  box.append(controls);document.body.append(box);
+  box.querySelector('#recordClose').onclick=_closeRecordDialog;box.querySelector('#recordStart').onclick=_recordFromDialog;box.querySelector('#recordPause').onclick=_pauseMotion;
+  box.querySelector('#recordSave').onclick=()=>{_pauseMotion();void _stopRecording();};
+  box.querySelector('#rangePlay').onclick=_toggleRangePlay;
+  box.querySelector('#rangeLoop').onclick=()=>{_rangePlayback.loop=!_rangePlayback.loop;_updateRecordDialog();};
+  for(const [id,key,mn,mx] of [['rangeSeconds','seconds',.1,30],['rangeCount','count',1,999]]){
+    const input=box.querySelector('#'+id);input.value=_rangePlayback[key];input.onchange=()=>{_pauseMotion();const v=Number(input.value);if(input.value.trim()&&Number.isFinite(v))_rangePlayback[key]=Math.max(mn,Math.min(mx,key==='count'?Math.round(v):v));input.value=_rangePlayback[key];};
+  }
+  const popup=_makePersistentDraggablePopup(box,{storageKey:'record-popup'});
+  _recordPopup={...popup,clamp:()=>{popup.clamp();const r=box.getBoundingClientRect();box.style.left=Math.max(8,Math.min(innerWidth-r.width-8,r.left))+'px';box.style.top=Math.max(8,Math.min(innerHeight-r.height-8,r.top))+'px';}};
+  box.querySelector('.dragHandle').addEventListener('pointermove',()=>_recordPopup?.clamp());
+  _withSpawnEvent(event,()=>_recordPopup.place());_recordPopup.clamp();_recordPopupActive=true;box.focus();_updateRecordDialog();
+}
+document.addEventListener('pointerdown',e=>{_recordPopupActive=!!e.target.closest?.('#recordDialog');if(e.target!==canvas)_hideViewTooltip();},true);
+document.addEventListener('focusin',e=>{if(!e.target.closest?.('.sliderValuePrompt'))_recordPopupActive=!!e.target.closest?.('#recordDialog');},true);
+window.addEventListener('keydown',e=>{
+  if(!_recordPopupActive||!document.getElementById('recordDialog')||e.isComposing||e.keyCode===229||e.ctrlKey||e.metaKey||e.altKey)return;
+  if(e.target.closest?.('input,textarea,select,[contenteditable="true"]'))return;
+  if(e.key==='Escape'){e.preventDefault();e.stopImmediatePropagation();_closeRecordDialog();}
+  else if(e.code==='Space'&&!e.target.closest?.('button')){e.preventDefault();e.stopImmediatePropagation();if(!e.repeat)_toggleRangePlay();}
+},true);
+window.addEventListener('resize',()=>_recordPopup?.clamp());
+
 let _recording = null, _recordMessage = '';
 const _fileNotices={main:{token:0,text:''},design:{token:0,text:''}};
 const _fileLoads={main:null,design:null};
 function _renderFileStatus(scope) {
   const el=document.getElementById(scope==='main'?'recordStatus':'designStatus');if(!el)return;
   const notice=_fileNotices[scope].text;
-  const text=scope==='main'&&_recording ? ((_recording.stopping?'저장 중…':'녹화 중')+(notice?' · '+notice:'')) : (notice||(scope==='main'?_recordMessage:''));
+  const text=scope==='main'&&_recording ? ((_recording.stopping?'저장 중…':_recording.paused?'녹화 일시정지':'녹화 중')+(notice?' · '+notice:'')) : (notice||(scope==='main'?_recordMessage:''));
   el.textContent=text;el.hidden=!text;
   if(scope==='design')requestAnimationFrame(_syncJamoGridWidth);
 }
@@ -9369,9 +9609,10 @@ function _recordStatus(text) {
 function _recordButtons() {
   const button=document.getElementById('recordMov');
   if (!button) return;
-  button.textContent=_recording?.stopping?'저장 중…':_recording?'정지':'MOV';
-  button.disabled=!!_recording?.stopping;
+  button.textContent='MOV';
+  button.disabled=false;
   button.setAttribute('aria-pressed',String(!!_recording));
+  _updateRecordDialog();
 }
 function _downloadRecording(blob) {
   const url=URL.createObjectURL(blob),a=document.createElement('a');
@@ -9384,15 +9625,27 @@ function _startRecording() {
   const off=document.createElement('canvas'),scale=Math.min(1,1920/Math.max(cssW,cssH));
   off.width=Math.max(2,Math.floor(cssW*scale/2)*2);off.height=Math.max(2,Math.floor(cssH*scale/2)*2);
   const rec={canvas:off,ctx:off.getContext('2d'),viewport:{x:0,y:0,w:cssW,h:cssH},
-    started:performance.now(),duration:30000,frames:[],times:[],bytes:0,last:-Infinity,busy:null,stopping:false,cancelled:false};
+    started:performance.now(),duration:30000,frames:[],times:[],bytes:0,last:-Infinity,busy:null,stopping:false,cancelled:false,paused:false,pausedMs:0,pausedAt:null};
   _recording=rec;_recordButtons();_recordStatus('녹화 중');
-  rec.timer=setTimeout(()=>_stopRecording(false,'30초 한도에 도달해 저장했습니다.'),rec.duration);
+  _scheduleRecordingLimit(rec);
   _captureRecordingFrame(rec.started);
+}
+function _recordElapsed(rec,now=performance.now()) {return Math.max(0,(rec.paused?rec.pausedAt:now)-rec.started-rec.pausedMs);}
+function _scheduleRecordingLimit(rec){clearTimeout(rec.timer);rec.timer=setTimeout(()=>_stopRecording(false,'30초 한도에 도달해 저장했습니다.'),Math.max(1,rec.duration-_recordElapsed(rec)));}
+function _pauseRecording(){
+  const rec=_recording;if(!rec||rec.paused||rec.stopping)return;
+  rec.pausedAt=performance.now();rec.paused=true;clearTimeout(rec.timer);_recordButtons();_renderFileStatus('main');
+}
+function _resumeRecording(){
+  const rec=_recording;if(!rec||!rec.paused||rec.stopping)return;
+  rec.pausedMs+=performance.now()-rec.pausedAt;rec.pausedAt=null;rec.paused=false;rec.last=-Infinity;
+  _scheduleRecordingLimit(rec);_recordButtons();_renderFileStatus('main');
 }
 function _captureRecordingFrame(now) {
   const rec=_recording;
-  if (!rec || rec.stopping || rec.busy || now-rec.last<1000/15) return;
-  if(now-rec.started>=rec.duration) {void _stopRecording(false,'30초 한도에 도달해 저장했습니다.');return;}
+  if (!rec || rec.paused || rec.stopping || rec.busy || now-rec.last<1000/15) return;
+  const elapsed=_recordElapsed(rec,now);
+  if(elapsed>=rec.duration) {void _stopRecording(false,'30초 한도에 도달해 저장했습니다.');return;}
   rec.last=now;
   try {
     const c=rec.ctx,v=rec.viewport,off=rec.canvas;
@@ -9408,7 +9661,7 @@ function _captureRecordingFrame(now) {
       if(rec.cancelled || _recording!==rec)return;
       if(!blob || blob.type!=='image/png')throw Error('PNG 프레임 생성에 실패했습니다.');
       if(rec.bytes+blob.size>64*1024*1024) {rec.limit=true;return;}
-      rec.frames.push(blob);rec.times.push(Math.max(0,Math.round(now-rec.started)));rec.bytes+=blob.size;
+      rec.frames.push(blob);rec.times.push(Math.round(elapsed));rec.bytes+=blob.size;
     }).catch(error=>{rec.cancelled=true;rec.error=error.message;}).finally(()=>{
       clearTimeout(timeout);rec.busy=null;
       if(rec.error)void _stopRecording(true,rec.error);
@@ -9420,8 +9673,9 @@ async function _stopRecording(cancel=false,message='') {
   const rec=_recording;if(!rec)return;
   if(cancel)rec.cancelled=true;
   if(rec.stopping)return;
+  if(_rangePlayback.status==='playing')_rangePlayback.status='paused';
   rec.stopping=true;clearTimeout(rec.timer);_recordButtons();
-  const end=Math.min(rec.duration,Math.max(1,Math.round(performance.now()-rec.started)));
+  const end=Math.min(rec.duration,Math.max(1,Math.round(_recordElapsed(rec))));
   try {
     if(rec.busy)await rec.busy;
     if(!rec.cancelled && rec.frames.length){
@@ -9432,7 +9686,7 @@ async function _stopRecording(cancel=false,message='') {
   }catch(error){_recordStatus('녹화 실패: '+error.message);}
   finally{
     rec.frames.length=0;rec.canvas.width=rec.canvas.height=1;
-    if(_recording===rec)_recording=null;_recordButtons();_renderFileStatus('main');
+    if(_recording===rec)_recording=null;_rangePlayback.status='idle';_recordButtons();_renderFileStatus('main');
   }
 }
 document.addEventListener('visibilitychange',()=>{if(document.hidden)void _stopRecording(false,'탭이 숨겨져 녹화를 종료하고 저장했습니다.');});
@@ -11380,6 +11634,7 @@ function saveSettings() {
     layout: {..._layoutState},
     centers: deepClone(_centerLayout),
     params: Object.assign({}, PARAMS),
+    motion: {ranges:deepClone(_rangePlayback.ranges),seconds:_rangePlayback.seconds,count:_rangePlayback.count,loop:_rangePlayback.loop},
     elasticity: { K_ANGLE: K_ANGLE, K_ROT: K_ROT, K_SPRING: K_SPRING, FLEX_MAX: FLEX_MAX },
     color: { bgR: bgR, bgG: bgG, bgB: bgB, fgR: fgR, fgG: fgG, fgB: fgB, fgAuto: _fgAuto },
     moimkkol: deepClone(_moimkkolPositions),
@@ -11434,6 +11689,8 @@ function triggerSettingsLoad() {
           if (!data.params || !Object.hasOwn(data.params,'jitterSpeed')) PARAMS.jitterSpeed=PARAMS.jitter>0?100:30;
           PARAMS.jitter=Math.max(0,Math.min(100,PARAMS.jitter));
           PARAMS.jitterSpeed=Math.max(0,Math.min(100,PARAMS.jitterSpeed));
+          PARAMS.chase=Number.isFinite(data.params?.chase)?Math.max(0,Math.min(100,data.params.chase)):0;
+          _loadMotionSettings(data.motion);
           if (data.elasticity) {
             if (typeof data.elasticity.K_ANGLE  === 'number') K_ANGLE  = data.elasticity.K_ANGLE;
             if (typeof data.elasticity.K_ROT    === 'number') K_ROT    = data.elasticity.K_ROT;
