@@ -40,7 +40,7 @@ async function snapshot(page,text){return page.evaluate(text=>{let seed=42;Math.
     await page.evaluate(()=>{PARAMS.letterSpacing=10;TEXT='한글 ABC 한글';world=buildWorld(TEXT);const b=world.bodies[0];_translateBody(b,77,-45);_centerLayout.points[b.centerKey]={x:b.anchorX,y:b.anchorY};_persistCenters();togglePanel();});
     const pinned=await page.evaluate(()=>({..._centerLayout.points}));
     const download=page.waitForEvent('download');await page.getByRole('button',{name:'SAVE',exact:true}).click();fs.mkdirSync('test-results',{recursive:true});await(await download).saveAs('test-results/layout-v2.json');
-    const saved=JSON.parse(fs.readFileSync('test-results/layout-v2.json','utf8'));assert.equal(saved.schema,'mungchin-hangul-settings-v2');assert.equal(saved.layout.anchorSpace,'absolute-css-px');assert.equal(saved.layout.anchorKeyVersion,1);
+    const saved=JSON.parse(fs.readFileSync('test-results/layout-v2.json','utf8'));assert.equal(saved.schema,'mungchin-hangul-settings-v3');assert.equal(saved.layout.anchorSpace,'absolute-css-px');assert.equal(saved.layout.anchorKeyVersion,1);
     const load=async(path)=>{const fc=page.waitForEvent('filechooser');await page.getByRole('button',{name:'LOAD',exact:true}).click();await(await fc).setFiles(path);};
     const untouched=await page.evaluate(()=>JSON.stringify({TEXT,PARAMS,layout:_layoutState,centers:_centerLayout}));
     fs.writeFileSync('test-results/layout-future.json',JSON.stringify({...saved,text:'must not replace',layout:{...saved.layout,version:99}}));

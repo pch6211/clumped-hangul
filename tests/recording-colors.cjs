@@ -14,7 +14,7 @@ async function verifyColors(page){
       draw();updateHUD();window.colorReference=ctx.getImageData(0,0,640,480).data;
       return{bg:[bgR,bgG,bgB],fg:[fgR,fgG,fgB],png:canvas.toDataURL('image/png').split(',')[1]};
     },label);
-    if(index===0)await page.locator('#recordMov').click();else await page.evaluate(index=>_captureRecordingFrame(_recording.started+index*100),index);
+    if(index===0){await page.locator('#recordMov').click();await page.locator('#recordStart').click();}else await page.evaluate(index=>_captureRecordingFrame(_recording.started+index*100),index);
     await page.waitForFunction(index=>_recording?.frames.length===index+1&&!_recording.busy,index);
     const pixels=await page.evaluate(async index=>{
       const bitmap=await createImageBitmap(_recording.frames[index]),c=document.createElement('canvas');c.width=640;c.height=480;const x=c.getContext('2d');x.drawImage(bitmap,0,0);bitmap.close();const data=x.getImageData(0,0,640,480).data;
@@ -45,7 +45,7 @@ async function verifyColors(page){
     assert.ok(pixels.screenDiff<640*480*4*.03,JSON.stringify({label,pixels}));
     const file='color-reference-'+index+'.png';fs.writeFileSync('test-results/'+file,Buffer.from(rawPNG,'base64'));fs.writeFileSync('test-results/color-screen-'+index+'.png',Buffer.from(reference.png,'base64'));results.push({index,label,bg:reference.bg,fg:reference.fg,file,...pixels});
   }
-  const download=page.waitForEvent('download');await page.locator('#recordMov').click();await(await download).saveAs('test-results/recording-colors.mov');await page.waitForFunction(()=>!_recording);assert.equal(await page.locator('#recordMov').innerText(),'MOV');
+  const download=page.waitForEvent('download');await page.locator('#recordSave').click();await(await download).saveAs('test-results/recording-colors.mov');await page.waitForFunction(()=>!_recording);assert.equal(await page.locator('#recordMov').innerText(),'MOV');
   // PNG transparency and SVG artwork export keep their existing behavior.
   await configure(page);const png=page.waitForEvent('download');await page.getByRole('button',{name:'PNG',exact:true}).click();await(await png).saveAs('test-results/color-artwork.png');
   const svg=page.waitForEvent('download');await page.getByRole('button',{name:'SVG',exact:true}).click();await(await svg).saveAs('test-results/color-artwork.svg');

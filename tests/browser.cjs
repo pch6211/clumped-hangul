@@ -75,15 +75,15 @@ run(async page=>{
   const random=await page.evaluate(()=>{
     TEXT='AB';PARAMS.cornerR=0;const samples=[],rng=Math.random;let seed=479;Math.random=()=>((seed=(Math.imul(seed,1664525)+1013904223)>>>0)/4294967296);
     for(let i=0;i<40;i++){randomizeAll();samples.push([PARAMS.jitter,PARAMS.jitterSpeed]);}
-    for(let i=0;i<20;i++){_groupRandomizers.decor();samples.push([PARAMS.jitter,PARAMS.jitterSpeed]);}
+    for(let i=0;i<20;i++){_groupRandomizers.motion();samples.push([PARAMS.jitter,PARAMS.jitterSpeed]);}
     Math.random=()=>0;_randomizeJitter();const low=[PARAMS.jitter,PARAMS.jitterSpeed];Math.random=()=>.99999999;_randomizeJitter();const high=[PARAMS.jitter,PARAMS.jitterSpeed];Math.random=rng;
     const set=window.setInterval,clear=window.clearInterval;let callback;window.setInterval=fn=>{callback=fn;return 99999;};window.clearInterval=()=>{};
     toggleAuto();const initial=[PARAMS.jitter,PARAMS.jitterSpeed];callback();const next=[PARAMS.jitter,PARAMS.jitterSpeed];toggleAuto();window.setInterval=set;window.clearInterval=clear;return{samples,low,high,initial,next};
   });
-  assert.deepEqual(random.low,[0,0]);assert.deepEqual(random.high,[30,100]);assert.ok([...random.samples,random.initial,random.next].every(([a,b])=>Number.isInteger(a)&&a>=0&&a<=30&&Number.isInteger(b)&&b>=0&&b<=100));assert.ok(new Set(random.samples.map(s=>s.join(','))).size>30);
+  assert.deepEqual(random.low,[0,0]);assert.deepEqual(random.high,[40,90]);assert.ok([...random.samples,random.initial,random.next].every(([a,b])=>Number.isInteger(a)&&a>=0&&a<=40&&Number.isInteger(b)&&b>=0&&b<=90));assert.ok(new Set(random.samples.map(s=>s.join(','))).size>30);
   await numeric('jitter',100);await numeric('jitterSpeed',100);assert.deepEqual(await page.evaluate(()=>[PARAMS.jitter,PARAMS.jitterSpeed]),[100,100]);
   await page.evaluate(()=>{openEditor();localStorage.setItem('release-test-sentinel','yes');});page.once('dialog',d=>d.accept());await Promise.all([page.waitForEvent('load'),page.locator('#btnEditorReset').click()]);await page.waitForFunction(()=>typeof world!=='undefined'&&world?.bodies.length);
-  const reset=await page.evaluate(()=>{cancelAnimationFrame(rafId);return{text:TEXT,strength:PARAMS.jitter,speed:PARAMS.jitterSpeed,sentinel:localStorage.getItem('release-test-sentinel')};});assert.equal(reset.text,'뭉친 한글');assert.equal(reset.sentinel,null);assert.ok(reset.strength<=30&&reset.strength>=0&&reset.speed<=100&&reset.speed>=0);
+  const reset=await page.evaluate(()=>{cancelAnimationFrame(rafId);return{text:TEXT,strength:PARAMS.jitter,speed:PARAMS.jitterSpeed,sentinel:localStorage.getItem('release-test-sentinel')};});assert.equal(reset.text,'뭉친 한글');assert.equal(reset.sentinel,null);assert.ok(reset.strength<=40&&reset.strength>=0&&reset.speed<=90&&reset.speed>=0);
   assert.equal(await page.locator('#hudCenterPreview').count(),1);assert.ok(await page.getByText('글자 옮기기:',{exact:true}).isVisible());
   // The shipped main has removed the old intro DOM. Preserve that behavior.
   assert.equal(await page.locator('#introPanel').count(),0);
